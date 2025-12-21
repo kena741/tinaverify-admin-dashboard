@@ -34,3 +34,18 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+
+## Email Confirmation Setup
+
+By default, Supabase requires email confirmation for new user signups. To disable this for development:
+
+1. Go to your Supabase Dashboard
+2. Navigate to **Authentication** → **Settings** → **Email Auth**
+3. Disable **"Enable email confirmations"** for development
+4. Or keep it enabled and users will receive confirmation emails
+
+If email confirmation is enabled:
+- Users must click the confirmation link in their email before they can log in
+- The confirmation email is sent automatically after signup
+- Users will see a helpful error message if they try to login before confirming
+# zuludine
