@@ -1,5 +1,6 @@
 "use client";
 
+import { supabase } from "@/src/supabaseClient";
 import { useRouter } from "next/navigation";
 import { useState, use } from "react";
 
@@ -30,22 +31,44 @@ export default function PaymentPage({ params }: { params: Promise<{ tableId: str
     status: "pending",
   };
 
-  const handlePayWithTelebirr = () => {
+  const handlePayWithTelebirr = async () => {
     setPaymentStatus("processing");
-    
-    // Simulate payment processing
-    setTimeout(() => {
-      // In a real app, this would call the Telebirr API
-      setPaymentStatus("success");
-      
-      // After successful payment, redirect or show success message
-      setTimeout(() => {
-        // In a real app, this would update the order status and table status
-        alert("Payment successful! Thank you for your order.");
-        // Could redirect to a success page or close
-      }, 2000);
-    }, 2000);
+
+    setTimeout(async () => {
+      try {
+        // 1️⃣ Simulate successful payment
+        setPaymentStatus("success");
+
+        // 2️⃣ Update the table status in Supabase to FREE (or PAID if you want reserved)
+        const { data, error } = await supabase
+          .from("restaurant_tables")  // your table name
+          .update({ status: "FREE" }) // or "PAID" if you want to mark as paid/reserved
+          .eq("id", tableId);  // table ID from params
+
+        if (error) throw error;
+        console.log("Table status updated:", data);
+
+        // 3️⃣ Optional: Update order status too
+        const { data: orderData, error: orderError } = await supabase
+          .from("orders") // your orders table
+          .update({ status: "PAID" })
+          .eq("table_id", tableId)
+          .eq("status", "PENDING");
+
+        if (orderError) throw orderError;
+        console.log("Order status updated:", orderData);
+
+        // 4️⃣ Notify user and redirect
+        alert("Payment successful! Table and order status updated.");
+        
+      } catch (err: any) {
+        console.error("Failed to update table or order status:", err);
+        setPaymentStatus("failed");
+        alert("Payment succeeded but failed to update table or order status.");
+      }
+    }, 2000); // simulate payment delay
   };
+
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center px-4 py-8">
