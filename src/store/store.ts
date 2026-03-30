@@ -1,5 +1,6 @@
 import { configureStore, combineReducers, AnyAction } from '@reduxjs/toolkit';
 import { resetStore } from './resetActions';
+import { backendApi } from '../services/backendApi';
 
 // Import all reducers
 import authReducer from '../features/auth/authSlice';
@@ -25,6 +26,7 @@ const appReducer = combineReducers({
   payments: paymentsReducer,
   customers: customersReducer,
   menu: menuReducer,
+  [backendApi.reducerPath]: backendApi.reducer,
 });
 
 // Reset the store when resetStore action is dispatched
@@ -33,7 +35,7 @@ const rootReducer = (state: ReturnType<typeof appReducer> | undefined, action: A
   if (action && action.type === RESET_TYPE) {
     state = undefined;
   }
-  return appReducer(state as any, action);
+  return appReducer(state, action);
 };
 
 export const store = configureStore({
@@ -44,7 +46,7 @@ export const store = configureStore({
         // Ignore these action types if needed
         ignoredActions: [resetStore.type],
       },
-    }),
+    }).concat(backendApi.middleware),
 });
 
 export type RootState = ReturnType<typeof store.getState>;

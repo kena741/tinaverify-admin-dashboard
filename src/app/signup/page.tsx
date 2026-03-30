@@ -3,71 +3,66 @@
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useState } from "react";
-import { useAppDispatch, useAppSelector } from "../../store/hooks";
-import { signupRestaurantOwner, checkEmailExists, clearError } from "../../features/auth/signupSlice";
+import {
+  useRegisterUserMutation,
+  useCreateBusinessMutation,
+  useCreateBranchMutation,
+} from "../../services/backendApi";
 
 export default function SignupPage() {
   const router = useRouter();
-  const dispatch = useAppDispatch();
-  const { loading, error, success, signupData } = useAppSelector((state) => state.signup);
+
+  const [registerUser, { isLoading: isRegistering }] = useRegisterUserMutation();
+  const [createBusiness, { isLoading: isCreatingBusiness }] = useCreateBusinessMutation();
+  const [createBranch, { isLoading: isCreatingBranch }] = useCreateBranchMutation();
+
   const [currentStep, setCurrentStep] = useState(1);
-  const [emailError, setEmailError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [signupResult, setSignupResult] = useState<{
+    email: string | null;
+    businessName: string;
+    branchName: string;
+  } | null>(null);
+
+  const isSubmitting = isRegistering || isCreatingBusiness || isCreatingBranch;
 
   const [formData, setFormData] = useState({
     // Owner info
-    name: "",
+    firstName: "",
+    lastName: "",
     email: "",
     phone: "",
     password: "",
     confirmPassword: "",
-    // Restaurant info
-    restaurantName: "",
+    // Business info
+    businessName: "",
+    tinNumber: "",
     // Branch info
     branchName: "",
     branchAddress: "",
-    // Telebirr (optional)
-    telebirrMerchantId: "",
-    telebirrAppKey: "",
-    telebirrPublicKey: "",
-    telebirrShortcode: "",
+    isHeadQuarter: true,
   });
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
-    if (name === "email") {
-      setEmailError(null);
-    }
   };
 
-  const handleEmailBlur = async () => {
-    if (formData.email) {
-      try {
-        const result = await dispatch(checkEmailExists(formData.email)).unwrap();
-        if (result.exists) {
-          setEmailError("This email is already registered");
-        }
-      } catch (error) {
-        // Email check failed, but continue
-      }
-    }
+  const handleCheckboxChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, checked } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: checked }));
   };
 
   const validateStep = (step: number): boolean => {
     switch (step) {
       case 1:
-        if (!formData.name || !formData.email || !formData.phone || !formData.password) {
-          return false;
-        }
-        if (formData.password !== formData.confirmPassword) {
-          return false;
-        }
-        if (formData.password.length < 6) {
-          return false;
-        }
+        if (!formData.firstName || !formData.lastName) return false;
+        if (!formData.phone || !formData.password) return false;
+        if (formData.password !== formData.confirmPassword) return false;
+        if (formData.password.length < 6) return false;
         return true;
       case 2:
-        return !!formData.restaurantName;
+        return !!formData.businessName && !!formData.tinNumber;
       case 3:
         return !!formData.branchName && !!formData.branchAddress;
       default:
@@ -78,52 +73,83 @@ export default function SignupPage() {
   const handleNext = () => {
     if (validateStep(currentStep)) {
       setCurrentStep(currentStep + 1);
-      dispatch(clearError());
+      setError(null);
     }
   };
 
   const handleBack = () => {
     setCurrentStep(currentStep - 1);
-    dispatch(clearError());
+    setError(null);
+  };
+
+  const getErrorMessage = (err: unknown): string => {
+    const e = err as {
+      data?: { detail?: string; message?: string };
+      error?: string;
+      message?: string;
+    };
+    return (
+      e.data?.detail ||
+      e.data?.message ||
+      e.error ||
+      e.message ||
+      "Signup failed"
+    );
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!validateStep(3)) {
-      return;
-    }
 
-    if (emailError) {
-      return;
-    }
+    if (!validateStep(3)) return;
 
-    const signupPayload = {
-      name: formData.name,
-      email: formData.email,
-      phone: formData.phone,
-      password: formData.password,
-      restaurantName: formData.restaurantName,
-      branchName: formData.branchName,
-      branchAddress: formData.branchAddress,
-      telebirrMerchantId: formData.telebirrMerchantId || undefined,
-      telebirrAppKey: formData.telebirrAppKey || undefined,
-      telebirrPublicKey: formData.telebirrPublicKey || undefined,
-      telebirrShortcode: formData.telebirrShortcode || undefined,
-    };
+    setError(null);
 
     try {
-      await dispatch(signupRestaurantOwner(signupPayload)).unwrap();
-      // Redirect to login or dashboard after successful signup
+      const registerResp = await registerUser({
+        phone_number: formData.phone,
+        password: formData.password,
+        email: formData.email ? formData.email : null,
+        user_information: {
+          first_name: formData.firstName,
+          last_name: formData.lastName,
+        },
+      }).unwrap();
+
+      const accessToken = registerResp.access_token;
+
+      const businessResp = await createBusiness({
+        accessToken,
+        body: {
+          name: formData.businessName,
+          tin_number: formData.tinNumber,
+        },
+      }).unwrap();
+
+      const branchResp = await createBranch({
+        accessToken,
+        body: {
+          business_id: businessResp.id,
+          name: formData.branchName,
+          address: formData.branchAddress,
+          is_head_quarter: formData.isHeadQuarter,
+        },
+      }).unwrap();
+
+      setSignupResult({
+        email: registerResp.user.email,
+        businessName: businessResp.name,
+        branchName: branchResp.name,
+      });
+
       setTimeout(() => {
         router.push("/login?signup=success");
       }, 2000);
     } catch (error) {
-      // Error is handled by Redux
+      setError(getErrorMessage(error));
     }
   };
 
-  if (success && signupData) {
+  if (signupResult) {
     return (
       <div className="min-h-screen bg-linear-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center px-4">
         <div className="max-w-md w-full">
@@ -135,12 +161,13 @@ export default function SignupPage() {
             </div>
             <h2 className="text-2xl font-bold text-gray-900 mb-2">Signup Successful!</h2>
             <p className="text-gray-600 mb-4">
-              Your restaurant <strong>{signupData.restaurant.name}</strong> and branch <strong>{signupData.branch.name}</strong> have been created successfully.
+              Your business <strong>{signupResult.businessName}</strong> and branch <strong>{signupResult.branchName}</strong> have been created successfully.
             </p>
             <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
               <p className="text-sm text-green-800 font-semibold mb-1">✅ Account Ready</p>
               <p className="text-xs text-green-700">
-                Your account has been created. You can now log in with your email: <strong>{signupData.admin.email}</strong>
+                Your account has been created. You can now log in with your email:{" "}
+                <strong>{signupResult.email || "your email"}</strong>
               </p>
             </div>
             <p className="text-sm text-gray-500 mb-6">
@@ -224,34 +251,39 @@ export default function SignupPage() {
               <div className="space-y-4">
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">Owner Information</h3>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Full Name *</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">First Name *</label>
                   <input
                     type="text"
-                    name="name"
-                    value={formData.name}
+                    name="firstName"
+                    value={formData.firstName}
                     onChange={handleInputChange}
                     required
                     className="w-full px-4 py-2 bg-white text-gray-900 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    placeholder="Enter your full name"
+                    placeholder="Enter your first name"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Email *</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Last Name *</label>
+                  <input
+                    type="text"
+                    name="lastName"
+                    value={formData.lastName}
+                    onChange={handleInputChange}
+                    required
+                    className="w-full px-4 py-2 bg-white text-gray-900 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="Enter your last name"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Email (optional)</label>
                   <input
                     type="email"
                     name="email"
                     value={formData.email}
                     onChange={handleInputChange}
-                    onBlur={handleEmailBlur}
-                    required
-                    className={`w-full px-4 py-2 bg-white text-gray-900 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                      emailError ? "border-red-300" : "border-gray-300"
-                    }`}
-                    placeholder="Enter your email"
+                    className="w-full px-4 py-2 bg-white text-gray-900 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="Enter your email (optional)"
                   />
-                  {emailError && (
-                    <p className="mt-1 text-sm text-red-600">{emailError}</p>
-                  )}
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Phone Number *</label>
@@ -303,17 +335,29 @@ export default function SignupPage() {
             {/* Step 2: Restaurant Information */}
             {currentStep === 2 && (
               <div className="space-y-4">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Restaurant Information</h3>
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Business Information</h3>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Restaurant Name *</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Business Name *</label>
                   <input
                     type="text"
-                    name="restaurantName"
-                    value={formData.restaurantName}
+                    name="businessName"
+                    value={formData.businessName}
                     onChange={handleInputChange}
                     required
                     className="w-full px-4 py-2 bg-white text-gray-900 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    placeholder="Enter restaurant name"
+                    placeholder="Enter business name"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">TIN Number *</label>
+                  <input
+                    type="text"
+                    name="tinNumber"
+                    value={formData.tinNumber}
+                    onChange={handleInputChange}
+                    required
+                    className="w-full px-4 py-2 bg-white text-gray-900 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="Enter TIN number"
                   />
                 </div>
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
@@ -353,54 +397,17 @@ export default function SignupPage() {
                   />
                 </div>
                 <div className="border-t border-gray-200 pt-4">
-                  <h4 className="text-sm font-semibold text-gray-700 mb-3">Telebirr Integration (Optional)</h4>
-                  <p className="text-xs text-gray-500 mb-4">You can configure Telebirr credentials later in settings</p>
-                  <div className="space-y-3">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Merchant ID</label>
-                      <input
-                        type="text"
-                        name="telebirrMerchantId"
-                        value={formData.telebirrMerchantId}
-                        onChange={handleInputChange}
-                        className="w-full px-4 py-2 bg-white text-gray-900 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                        placeholder="Optional"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">App Key</label>
-                      <input
-                        type="text"
-                        name="telebirrAppKey"
-                        value={formData.telebirrAppKey}
-                        onChange={handleInputChange}
-                        className="w-full px-4 py-2 bg-white text-gray-900 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                        placeholder="Optional"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Public Key</label>
-                      <input
-                        type="text"
-                        name="telebirrPublicKey"
-                        value={formData.telebirrPublicKey}
-                        onChange={handleInputChange}
-                        className="w-full px-4 py-2 bg-white text-gray-900 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                        placeholder="Optional"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Shortcode</label>
-                      <input
-                        type="text"
-                        name="telebirrShortcode"
-                        value={formData.telebirrShortcode}
-                        onChange={handleInputChange}
-                        className="w-full px-4 py-2 bg-white text-gray-900 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                        placeholder="Optional"
-                      />
-                    </div>
-                  </div>
+                  <h4 className="text-sm font-semibold text-gray-700 mb-3">Branch Settings</h4>
+                  <label className="flex items-center gap-3 text-sm text-gray-700">
+                    <input
+                      type="checkbox"
+                      name="isHeadQuarter"
+                      checked={formData.isHeadQuarter}
+                      onChange={handleCheckboxChange}
+                      className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    />
+                    Set as Head Quarter
+                  </label>
                 </div>
               </div>
             )}
@@ -430,10 +437,10 @@ export default function SignupPage() {
               ) : (
                 <button
                   type="submit"
-                  disabled={loading || !validateStep(3) || !!emailError}
+                  disabled={isSubmitting || !validateStep(3)}
                   className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium disabled:bg-gray-300 disabled:cursor-not-allowed"
                 >
-                  {loading ? "Creating Account..." : "Create Account"}
+                  {isSubmitting ? "Creating Account..." : "Create Account"}
                 </button>
               )}
             </div>
