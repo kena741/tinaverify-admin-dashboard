@@ -13,6 +13,14 @@ const eslintConfig = defineConfig([
     "build/**",
     "next-env.d.ts",
   ]),
+  // This project frequently renders apostrophes in JSX text.
+  // Turning off this rule prevents noisy lint errors like:
+  // `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`.
+  {
+    rules: {
+      "react/no-unescaped-entities": "off",
+    },
+  },
 ]);
 
 export default eslintConfig;
