@@ -556,7 +556,7 @@ export default function RestaurantDetailPage({ params }: { params: Promise<{ id:
                     <div key={index} className="flex-1 flex flex-col items-center">
                       <div className="w-full flex items-end justify-center" style={{ height: "100%" }}>
                         <div
-                          className="w-full bg-gradient-to-t from-blue-500 to-blue-400 rounded-t-lg hover:from-blue-600 hover:to-blue-500 transition-colors cursor-pointer"
+                          className="w-full bg-linear-to-t from-blue-500 to-blue-400 rounded-t-lg hover:from-blue-600 hover:to-blue-500 transition-colors cursor-pointer"
                           style={{ height: `${(item.revenue / maxMonthlyRevenue) * 100}%` }}
                           title={`${item.month}: ETB ${item.revenue.toLocaleString()}`}
                         />
@@ -575,7 +575,7 @@ export default function RestaurantDetailPage({ params }: { params: Promise<{ id:
                     <div key={index} className="flex-1 flex flex-col items-center">
                       <div className="w-full flex items-end justify-center" style={{ height: "100%" }}>
                         <div
-                          className="w-full bg-gradient-to-t from-green-500 to-green-400 rounded-t-lg hover:from-green-600 hover:to-green-500 transition-colors cursor-pointer"
+                          className="w-full bg-linear-to-t from-green-500 to-green-400 rounded-t-lg hover:from-green-600 hover:to-green-500 transition-colors cursor-pointer"
                           style={{ height: `${(item.revenue / maxHourlyRevenue) * 100}%` }}
                           title={`${item.hour}: ETB ${item.revenue.toLocaleString()}`}
                         />

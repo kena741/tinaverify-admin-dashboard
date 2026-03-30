@@ -198,7 +198,7 @@ export default function AdminDashboard() {
           {recentActivity.map((activity) => (
             <div key={activity.id} className="flex items-start space-x-4 p-4 rounded-lg hover:bg-gray-50 transition-colors">
               <div
-                className={`flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center ${
+                className={`shrink-0 w-10 h-10 rounded-lg flex items-center justify-center ${
                   activity.status === "error"
                     ? "bg-red-100"
                     : activity.status === "success"

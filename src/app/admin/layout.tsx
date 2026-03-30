@@ -197,7 +197,7 @@ export default function AdminLayout({
                         >
                           <div className="flex items-start">
                             <div
-                              className={`flex-shrink-0 w-2 h-2 rounded-full mt-2 ${
+                              className={`shrink-0 w-2 h-2 rounded-full mt-2 ${
                                 notification.type === "error"
                                   ? "bg-red-500"
                                   : notification.type === "success"
@@ -210,7 +210,7 @@ export default function AdminLayout({
                               <p className="text-xs text-gray-500 mt-1">{notification.time}</p>
                             </div>
                             {!notification.read && (
-                              <div className="flex-shrink-0">
+                              <div className="shrink-0">
                                 <div className="w-2 h-2 bg-blue-600 rounded-full"></div>
                               </div>
                             )}
