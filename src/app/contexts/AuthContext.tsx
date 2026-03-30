@@ -2,15 +2,14 @@
 
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { useAppDispatch, useAppSelector } from "../../store/hooks";
-import { loginAdmin, logoutAdmin, getCurrentAdmin, PlatformAdmin } from "../../features/auth/authSlice";
+import { useLazyReadMeQuery, useLoginUserMutation, UserOutput } from "../../services/backendApi";
 
 type UserRole = "system_admin" | "branch_admin";
 
 interface User {
   id: string;
   name: string;
-  email: string;
+  email: string | null;
   role: UserRole;
   branchId?: string;
   branchName?: string;
@@ -22,66 +21,87 @@ interface AuthContextType {
   logout: () => void;
   isSystemAdmin: () => boolean;
   isBranchAdmin: () => boolean;
+  loading: boolean;
+  error: string | null;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Helper to convert PlatformAdmin to User
-const platformAdminToUser = (admin: PlatformAdmin): User => {
+const ACCESS_TOKEN_STORAGE_KEY = "zuludine_access_token";
+
+const backendUserToUser = (u: UserOutput): User => {
+  const first = u.user_information?.first_name?.trim() || "";
+  const last = u.user_information?.last_name?.trim() || "";
+  const name = `${first} ${last}`.trim() || u.username || u.phone_number;
+
   return {
-    id: admin.user_id || admin.id || '', // Use user_id as the primary identifier
-    name: admin.name,
-    email: admin.email,
-    role: admin.role.toLowerCase() as UserRole,
+    id: u.id,
+    name,
+    email: u.email,
+    role: u.is_superuser ? "system_admin" : "branch_admin",
   };
 };
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const dispatch = useAppDispatch();
-  const { admin, isAuthenticated, loading, error } = useAppSelector((state: any) => state.auth);
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
-
-  // Sync Redux admin state to local user state
-  useEffect(() => {
-    if (admin) {
-      setUser(platformAdminToUser(admin));
-    } else {
-      setUser(null);
-    }
-  }, [admin]);
+  const [error, setError] = useState<string | null>(null);
+  const [loginUser, { isLoading: isLoggingIn }] = useLoginUserMutation();
+  const [readMe, { isFetching: isReadingMe }] = useLazyReadMeQuery();
 
   // Check for existing session on mount
   useEffect(() => {
     const checkSession = async () => {
       try {
-        await dispatch(getCurrentAdmin()).unwrap();
-      } catch (error) {
-        // No active session, clear any stored data
+        const token = typeof window !== "undefined" ? localStorage.getItem(ACCESS_TOKEN_STORAGE_KEY) : null;
+        if (!token) {
+          setUser(null);
+          return;
+        }
+
+        const me = await readMe({ accessToken: token }).unwrap();
+        setUser(backendUserToUser(me));
+      } catch (e) {
+        if (typeof window !== "undefined") {
+          localStorage.removeItem(ACCESS_TOKEN_STORAGE_KEY);
+        }
         setUser(null);
       }
     };
     checkSession();
-  }, [dispatch]);
+  }, [readMe]);
 
   const login = async (email: string, password: string): Promise<boolean> => {
     try {
-      await dispatch(loginAdmin({ email, password })).unwrap();
+      setError(null);
+
+      const auth = await loginUser({ username: email, password }).unwrap();
+      if (typeof window !== "undefined") {
+        localStorage.setItem(ACCESS_TOKEN_STORAGE_KEY, auth.access_token);
+      }
+      setUser(backendUserToUser(auth.user));
       return true;
-    } catch (error: any) {
-      console.error("Login error:", error);
+    } catch (e: unknown) {
+      const err = e as { data?: { detail?: string; message?: string }; error?: string; message?: string };
+      setError(err.data?.detail || err.data?.message || err.error || err.message || "Login failed");
       return false;
     }
   };
 
   const logout = async () => {
     try {
-      await dispatch(logoutAdmin()).unwrap();
+      setError(null);
+      if (typeof window !== "undefined") {
+        localStorage.removeItem(ACCESS_TOKEN_STORAGE_KEY);
+      }
       setUser(null);
       router.push("/login");
     } catch (error) {
       console.error("Logout error:", error);
       // Still clear local state even if logout fails
+      if (typeof window !== "undefined") {
+        localStorage.removeItem(ACCESS_TOKEN_STORAGE_KEY);
+      }
       setUser(null);
       router.push("/login");
     }
@@ -89,9 +109,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const isSystemAdmin = () => user?.role === "system_admin";
   const isBranchAdmin = () => user?.role === "branch_admin";
+  const loading = isLoggingIn || isReadingMe;
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, isSystemAdmin, isBranchAdmin }}>
+    <AuthContext.Provider
+      value={{ user, login, logout, isSystemAdmin, isBranchAdmin, loading, error }}
+    >
       {children}
     </AuthContext.Provider>
   );

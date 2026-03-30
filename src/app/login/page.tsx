@@ -2,48 +2,43 @@
 
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useAuth } from "../contexts/AuthContext";
-import { useAppSelector } from "../../store/hooks";
 
 export default function LoginPage() {
   const router = useRouter();
-  const { login } = useAuth();
-  const { error: authError, loading: authLoading } = useAppSelector((state: any) => state.auth);
+  const { login, loading: authLoading, error: authError } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
 
-  // Update error from Redux state
-  useEffect(() => {
-    if (authError) {
-      setError(authError);
-    }
-  }, [authError]);
-
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError("");
+    setError(authError || "");
 
     const success = await login(email, password);
     
     if (success) {
       router.push("/admin");
     }
-    // Error is handled by Redux and displayed via useEffect above
+    if (!success && authError) {
+      setError(authError);
+    }
   };
 
   const handleDemoLogin = async (demoEmail: string, demoPassword: string) => {
     setEmail(demoEmail);
     setPassword(demoPassword);
-    setError("");
+    setError(authError || "");
 
     const success = await login(demoEmail, demoPassword);
     
     if (success) {
       router.push("/admin");
     }
-    // Error is handled by Redux and displayed via useEffect above
+    if (!success && authError) {
+      setError(authError);
+    }
   };
 
   return (
@@ -106,11 +101,11 @@ export default function LoginPage() {
 
           {/* Login Form */}
           <form onSubmit={handleLogin} className="space-y-4">
-            {error && (
+            {(error || authError) && (
               <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
                 <p className="font-semibold mb-1">Login Failed</p>
-                <p>{error}</p>
-                {error.includes('confirm') && (
+                <p>{error || authError}</p>
+                {(error || authError || "").includes('confirm') && (
                   <p className="mt-2 text-xs">
                     Check your email inbox (and spam folder) for the confirmation link.
                   </p>

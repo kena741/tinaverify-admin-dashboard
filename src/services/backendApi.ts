@@ -34,6 +34,11 @@ export type UserAuthResponse = {
   user: UserOutput;
 };
 
+export type LoginRequest = {
+  username: string;
+  password: string;
+};
+
 export type BusinessCreateRequest = {
   name: string;
   tin_number: string;
@@ -83,6 +88,32 @@ export const backendApi = createApi({
       }),
     }),
 
+    loginUser: builder.mutation<UserAuthResponse, LoginRequest>({
+      query: ({ username, password }) => {
+        const body = new URLSearchParams();
+        body.set("username", username);
+        body.set("password", password);
+        return {
+          url: "/api/v1/users/login",
+          method: "POST",
+          body,
+          headers: {
+            "Content-Type": "application/x-www-form-urlencoded",
+          },
+        };
+      },
+    }),
+
+    readMe: builder.query<UserOutput, { accessToken: string }>({
+      query: ({ accessToken }) => ({
+        url: "/api/v1/users/me",
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      }),
+    }),
+
     createBusiness: builder.mutation<
       BusinessOutput,
       { body: BusinessCreateRequest; accessToken: string }
@@ -115,6 +146,8 @@ export const backendApi = createApi({
 
 export const {
   useRegisterUserMutation,
+  useLoginUserMutation,
+  useLazyReadMeQuery,
   useCreateBusinessMutation,
   useCreateBranchMutation,
 } = backendApi;
