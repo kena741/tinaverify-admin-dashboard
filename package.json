@@ -1,29 +1,31 @@
 {
-  "name": "zuludine",
-  "version": "0.1.0",
-  "private": true,
-  "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "lint": "eslint"
-  },
-  "dependencies": {
-    "@reduxjs/toolkit": "^2.11.2",
-    "@supabase/supabase-js": "^2.89.0",
-    "next": "16.1.0",
-    "react": "19.2.3",
-    "react-dom": "19.2.3",
-    "react-redux": "^9.2.0"
-  },
-  "devDependencies": {
-    "@tailwindcss/postcss": "^4.2.2",
-    "@types/node": "^20",
-    "@types/react": "^19",
-    "@types/react-dom": "^19",
-    "eslint": "^9",
-    "eslint-config-next": "16.1.0",
-    "tailwindcss": "^4.2.2",
-    "typescript": "^5"
-  }
+	"name": "zuludine",
+	"version": "0.1.0",
+	"private": true,
+	"scripts": {
+		"preinstall": "only-allow pnpm",
+		"dev": "next dev",
+		"build": "next build",
+		"start": "next start",
+		"lint": "eslint"
+	},
+	"dependencies": {
+		"@reduxjs/toolkit": "^2.11.2",
+		"@supabase/supabase-js": "^2.89.0",
+		"next": "16.1.0",
+		"react": "19.2.3",
+		"react-dom": "19.2.3",
+		"react-redux": "^9.2.0"
+	},
+	"devDependencies": {
+		"@tailwindcss/postcss": "^4.2.2",
+		"@types/node": "^20",
+		"@types/react": "^19",
+		"@types/react-dom": "^19",
+		"eslint": "^9",
+		"eslint-config-next": "16.1.0",
+		"only-allow": "^1.2.2",
+		"tailwindcss": "^4.2.2",
+		"typescript": "^5"
+	}
 }
