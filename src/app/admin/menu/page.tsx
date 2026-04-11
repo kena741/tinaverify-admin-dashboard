@@ -51,11 +51,14 @@ export default function MenuPage() {
     image_url: "",
   });
 
-  // Fetch restaurants and branches on mount
   useEffect(() => {
     dispatch(fetchRestaurants());
-    dispatch(fetchBranches());
   }, [dispatch]);
+
+  useEffect(() => {
+    if (restaurants.length === 0) return;
+    dispatch(fetchBranches());
+  }, [dispatch, restaurants]);
 
   // Set branch for branch admins
   useEffect(() => {

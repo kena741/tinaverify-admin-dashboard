@@ -147,7 +147,10 @@ export default function RestaurantDetailPage({ params }: { params: Promise<{ id:
                   {restaurant.status === "ACTIVE" ? "Active" : "Inactive"}
                 </span>
                 <span className="text-xs text-gray-500">
-                  Created: {new Date(restaurant.created_at).toLocaleDateString()}
+                  Created:{" "}
+                  {restaurant.created_at
+                    ? new Date(restaurant.created_at).toLocaleDateString()
+                    : "—"}
                 </span>
               </div>
             </div>

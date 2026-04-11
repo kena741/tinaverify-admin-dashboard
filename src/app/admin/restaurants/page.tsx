@@ -15,11 +15,14 @@ export default function RestaurantsPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
 
-  // Fetch restaurants and branches on component mount
   useEffect(() => {
     dispatch(fetchRestaurants());
-    dispatch(fetchBranches()); // Fetch all branches to count per restaurant
   }, [dispatch]);
+
+  useEffect(() => {
+    if (restaurants.length === 0) return;
+    dispatch(fetchBranches());
+  }, [dispatch, restaurants]);
 
   // Helper function to get branch count for a restaurant
   const getBranchCount = (restaurantId: string) => {
@@ -142,7 +145,9 @@ export default function RestaurantsPage() {
                       {getBranchCount(restaurant.id)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {new Date(restaurant.created_at).toLocaleDateString()}
+                      {restaurant.created_at
+                        ? new Date(restaurant.created_at).toLocaleDateString()
+                        : "—"}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       <div className="flex items-center justify-end space-x-2">

@@ -8,6 +8,7 @@ import {
 	useCreateBusinessMutation,
 	useCreateBranchMutation,
 } from "../../services/branch-management/branchManagementApi";
+import { addStoredBusinessId } from "../../services/businessIdsStorage";
 
 export default function SignupPage() {
 	const router = useRouter();
@@ -129,6 +130,8 @@ export default function SignupPage() {
 					tin_number: formData.tinNumber,
 				},
 			}).unwrap();
+
+			addStoredBusinessId(businessResp.id);
 
 			const branchResp = await createBranch({
 				accessToken,

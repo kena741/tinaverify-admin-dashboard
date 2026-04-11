@@ -26,12 +26,15 @@ export default function StaffPage() {
   });
   const [formError, setFormError] = useState<string>("");
 
-  // Fetch branches, restaurants, and staff on component mount
   useEffect(() => {
-    dispatch(fetchBranches());
     dispatch(fetchRestaurants());
-    dispatch(fetchStaff()); // Fetch all staff
+    dispatch(fetchStaff());
   }, [dispatch]);
+
+  useEffect(() => {
+    if (restaurants.length === 0) return;
+    dispatch(fetchBranches());
+  }, [dispatch, restaurants]);
 
   // Create a map of restaurant IDs to names for lookup
   const restaurantMap = useMemo(() => {

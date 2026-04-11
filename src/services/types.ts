@@ -24,6 +24,7 @@ export type UserOutput = {
 
 export type UserAuthResponse = {
   access_token: string;
+  refresh_token: string;
   token_type: string;
   user: UserOutput;
 };
@@ -53,6 +54,15 @@ export type BranchCreateRequest = {
   is_head_quarter?: boolean;
 };
 
+/** OpenAPI `BranchUpdateSchema` — body for `PUT /api/v1/branches/{branch_id}` */
+export type BranchUpdateRequest = {
+  name?: string | null;
+  address?: string | null;
+  is_head_quarter?: boolean | null;
+  is_archived?: boolean | null;
+};
+
+/** OpenAPI `BranchResponseSchema` */
 export type BranchOutput = {
   id: string;
   name: string;

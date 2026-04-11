@@ -3,36 +3,38 @@
 import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { useAppDispatch, useAppSelector } from "../../../store/hooks";
-import { fetchBranches } from "../../../features/branches/branchesSlice";
-import { fetchRestaurants } from "../../../features/restaurants/restaurantsSlice";
+import {
+  fetchBranches,
+  type Branch,
+} from "../../../features/branches/branchesSlice";
+import type { RootState } from "../../../store/store";
 
 export default function BranchesPage() {
   const dispatch = useAppDispatch();
-  const { branches, loading, error } = useAppSelector((state: any) => state.branches);
-  const { restaurants } = useAppSelector((state: any) => state.restaurants);
+  const { branches, myBusinesses, loading, error } = useAppSelector(
+    (state: RootState) => state.branches,
+  );
   
   const [showAddModal, setShowAddModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [restaurantFilter, setRestaurantFilter] = useState("all");
 
-  // Fetch branches and restaurants on component mount
+  // Businesses from `GET /api/v1/users/me/business`, then branches per business.
   useEffect(() => {
     dispatch(fetchBranches());
-    dispatch(fetchRestaurants());
   }, [dispatch]);
 
-  // Create a map of restaurant IDs to names for lookup
   const restaurantMap = useMemo(() => {
     const map: Record<string, string> = {};
-    restaurants.forEach((restaurant: any) => {
-      map[restaurant.id] = restaurant.name;
+    myBusinesses.forEach((b: { id: string; name: string }) => {
+      map[b.id] = b.name;
     });
     return map;
-  }, [restaurants]);
+  }, [myBusinesses]);
 
   // Filter branches based on search and filters
   const filteredBranches = useMemo(() => {
-    return branches.filter((branch: any) => {
+    return branches.filter((branch: Branch) => {
       const restaurantName = restaurantMap[branch.restaurant_id] || "";
       const matchesSearch = 
         branch.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -90,9 +92,9 @@ export default function BranchesPage() {
             className="px-4 py-2 bg-white text-gray-900 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
           >
             <option value="all">All Restaurants</option>
-            {restaurants.map((restaurant: any) => (
-              <option key={restaurant.id} value={restaurant.id}>
-                {restaurant.name}
+            {myBusinesses.map((b: { id: string; name: string }) => (
+              <option key={b.id} value={b.id}>
+                {b.name}
               </option>
             ))}
           </select>
@@ -122,29 +124,27 @@ export default function BranchesPage() {
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Branch Name</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Restaurant</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Business</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Address</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Telebirr</th>
                   <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {filteredBranches.map((branch: any) => (
+                {filteredBranches.map((branch: Branch) => (
                   <tr key={branch.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm font-medium text-gray-900">{branch.name}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm text-gray-900">
-                        {restaurantMap[branch.restaurant_id] || "Unknown"}
+                        {restaurantMap[branch.restaurant_id] || "—"}
                       </div>
                     </td>
                     <td className="px-6 py-4">
                       <div className="text-sm text-gray-500 max-w-xs truncate">
-                        {branch.address || "No address"}
+                        {branch.address ?? "—"}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
@@ -155,21 +155,7 @@ export default function BranchesPage() {
                             : "bg-gray-100 text-gray-800"
                         }`}
                       >
-                        {branch.active ? "Active" : "Inactive"}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {branch.created_at ? new Date(branch.created_at).toLocaleDateString() : "N/A"}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span
-                        className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                          branch.telebirr_merchant_id
-                            ? "bg-green-100 text-green-800"
-                            : "bg-red-100 text-red-800"
-                        }`}
-                      >
-                        {branch.telebirr_merchant_id ? "Connected" : "Not Connected"}
+                        {branch.active ? "Active" : "Archived"}
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
@@ -209,9 +195,11 @@ export default function BranchesPage() {
                 <label className="block text-sm font-medium text-gray-700 mb-1">Restaurant</label>
                 <select className="w-full px-3 py-2 bg-white text-gray-900 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                   <option value="">Select restaurant</option>
-                  <option value="1">Addis Café</option>
-                  <option value="2">Blue Nile Hotel</option>
-                  <option value="3">Kaldi's Coffee</option>
+                  {myBusinesses.map((b: { id: string; name: string }) => (
+                    <option key={b.id} value={b.id}>
+                      {b.name}
+                    </option>
+                  ))}
                 </select>
               </div>
               <div>

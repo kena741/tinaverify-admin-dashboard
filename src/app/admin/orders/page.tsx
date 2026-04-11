@@ -28,11 +28,14 @@ export default function OrdersPage() {
   const [selectedTable, setSelectedTable] = useState<string | null>(null);
   const [selectedWaiter, setSelectedWaiter] = useState<string>("");
 
-  // Fetch restaurants and branches on component mount
   useEffect(() => {
     dispatch(fetchRestaurants());
-    dispatch(fetchBranches());
   }, [dispatch]);
+
+  useEffect(() => {
+    if (restaurants.length === 0) return;
+    dispatch(fetchBranches());
+  }, [dispatch, restaurants]);
 
   useEffect(() => {
     if (!user) {

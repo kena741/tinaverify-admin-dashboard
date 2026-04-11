@@ -13,14 +13,19 @@ import {
 	useLoginUserMutation,
 } from "../../services/auth/authApi";
 import type { UserOutput } from "../../services/types";
-
-type UserRole = "system_admin" | "branch_admin";
+import {
+	clearStoredTokens,
+	getStoredAccessToken,
+	getStoredRefreshToken,
+	setStoredTokens,
+	refreshAccessToken,
+} from "../../services/authTokens";
 
 interface User {
 	id: string;
 	name: string;
 	email: string | null;
-	role: UserRole;
+	isSuperuser: boolean;
 	branchId?: string;
 	branchName?: string;
 }
@@ -37,8 +42,6 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const ACCESS_TOKEN_STORAGE_KEY = "zuludine_access_token";
-
 const backendUserToUser = (u: UserOutput): User => {
 	const first = u.user_information?.first_name?.trim() || "";
 	const last = u.user_information?.last_name?.trim() || "";
@@ -48,7 +51,7 @@ const backendUserToUser = (u: UserOutput): User => {
 		id: u.id,
 		name,
 		email: u.email,
-		role: u.is_superuser ? "system_admin" : "branch_admin",
+		isSuperuser: u.is_superuser,
 	};
 };
 
@@ -63,21 +66,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 	useEffect(() => {
 		const checkSession = async () => {
 			try {
-				const token =
-					typeof window !== "undefined"
-						? localStorage.getItem(ACCESS_TOKEN_STORAGE_KEY)
-						: null;
-				if (!token) {
+				if (typeof window === "undefined") return;
+
+				const hasAccess = Boolean(getStoredAccessToken());
+				const hasRefresh = Boolean(getStoredRefreshToken());
+				if (!hasAccess && !hasRefresh) {
 					setUser(null);
 					return;
 				}
-
-				const me = await readMe({ accessToken: token }).unwrap();
-				setUser(backendUserToUser(me));
-			} catch (e) {
-				if (typeof window !== "undefined") {
-					localStorage.removeItem(ACCESS_TOKEN_STORAGE_KEY);
+				if (!hasAccess && hasRefresh) {
+					const ok = await refreshAccessToken();
+					if (!ok) {
+						setUser(null);
+						return;
+					}
 				}
+
+				const me = await readMe().unwrap();
+				setUser(backendUserToUser(me));
+			} catch {
+				clearStoredTokens();
 				setUser(null);
 			}
 		};
@@ -90,7 +98,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
 			const auth = await loginUser({ username: email, password }).unwrap();
 			if (typeof window !== "undefined") {
-				localStorage.setItem(ACCESS_TOKEN_STORAGE_KEY, auth.access_token);
+				setStoredTokens(auth.access_token, auth.refresh_token);
 			}
 			setUser(backendUserToUser(auth.user));
 			return true;
@@ -114,24 +122,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 	const logout = async () => {
 		try {
 			setError(null);
-			if (typeof window !== "undefined") {
-				localStorage.removeItem(ACCESS_TOKEN_STORAGE_KEY);
-			}
+			clearStoredTokens();
 			setUser(null);
 			router.push("/login");
 		} catch (error) {
 			console.error("Logout error:", error);
-			// Still clear local state even if logout fails
-			if (typeof window !== "undefined") {
-				localStorage.removeItem(ACCESS_TOKEN_STORAGE_KEY);
-			}
+			clearStoredTokens();
 			setUser(null);
 			router.push("/login");
 		}
 	};
 
-	const isSystemAdmin = () => user?.role === "system_admin";
-	const isBranchAdmin = () => user?.role === "branch_admin";
+	const isSystemAdmin = () => Boolean(user?.isSuperuser);
+	const isBranchAdmin = () => Boolean(user && !user.isSuperuser);
 	const loading = isLoggingIn || isReadingMe;
 
 	return (

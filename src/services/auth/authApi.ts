@@ -1,5 +1,6 @@
 import { createApi } from "@reduxjs/toolkit/query/react";
 import { backendBaseQuery } from "../baseQuery";
+import { getStoredAccessToken } from "../authTokens";
 import type {
 	LoginRequest,
 	RegisterUserRequest,
@@ -35,13 +36,24 @@ export const authApi = createApi({
 			},
 		}),
 
-		readMe: builder.query<UserOutput, { accessToken: string }>({
-			query: ({ accessToken }) => ({
-				url: "/api/v1/users/me",
-				method: "GET",
-				headers: {
-					Authorization: `Bearer ${accessToken}`,
-				},
+		readMe: builder.query<UserOutput, void>({
+			query: () => {
+				const token = getStoredAccessToken();
+				return {
+					url: "/api/v1/users/me",
+					method: "GET",
+					headers: token
+						? { Authorization: `Bearer ${token}` }
+						: {},
+				};
+			},
+		}),
+
+		refreshToken: builder.mutation<UserAuthResponse, { refreshToken: string }>({
+			query: ({ refreshToken }) => ({
+				url: "/api/v1/users/refresh-token",
+				method: "POST",
+				params: { refresh_token: refreshToken },
 			}),
 		}),
 	}),
@@ -51,4 +63,5 @@ export const {
 	useRegisterUserMutation,
 	useLoginUserMutation,
 	useLazyReadMeQuery,
+	useRefreshTokenMutation,
 } = authApi;
