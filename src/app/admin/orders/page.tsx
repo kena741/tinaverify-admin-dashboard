@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation";
 import { useAppDispatch, useAppSelector } from "../../../store/hooks";
 import { fetchRestaurants } from "../../../features/restaurants/restaurantsSlice";
 import { useListAllUserBranchesQuery } from "../../../services/branch-management/branchManagementApi";
-import { branchFromOutput } from "../../../features/branches/branchModel";
+import { branchFromOutput } from "../../../services/types";
 import { fetchTables, assignTableToWaiter } from "../../../features/tables/tablesSlice";
 import { fetchMenuItems, fetchCategories } from "../../../features/menu/menuSlice";
 import { createOrder } from "../../../features/orders/ordersSlice";

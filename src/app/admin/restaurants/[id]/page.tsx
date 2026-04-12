@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useAppDispatch, useAppSelector } from "../../../../store/hooks";
 import { fetchRestaurantById } from "../../../../features/restaurants/restaurantsSlice";
 import { useListBusinessBranchesQuery } from "../../../../services/branch-management/branchManagementApi";
-import { branchFromOutput } from "../../../../features/branches/branchModel";
+import { branchFromOutput } from "../../../../services/types";
 import { fetchStaff } from "../../../../features/staff/staffSlice";
 import { tabNavButtonClass, tabPanelEnterClass } from "@/lib/tab-animation";
 import { cn } from "@/lib/utils";

@@ -6,7 +6,7 @@ import { useListAllUserBranchesQuery } from "../../../services/branch-management
 import {
   branchFromOutput,
   type Branch,
-} from "../../../features/branches/branchModel";
+} from "../../../services/types";
 
 export default function BranchesPage() {
   const { data, isLoading: loading, error: queryError } =

@@ -16,7 +16,7 @@ import {
 } from "../../../features/menu/menuSlice";
 import { fetchRestaurants } from "../../../features/restaurants/restaurantsSlice";
 import { useListAllUserBranchesQuery } from "../../../services/branch-management/branchManagementApi";
-import { branchFromOutput } from "../../../features/branches/branchModel";
+import { branchFromOutput } from "../../../services/types";
 import { tabNavButtonClass, tabPanelEnterClass } from "@/lib/tab-animation";
 import { cn } from "@/lib/utils";
 

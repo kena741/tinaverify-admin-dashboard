@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useAppDispatch, useAppSelector } from "../../../store/hooks";
 import { fetchRestaurants } from "../../../features/restaurants/restaurantsSlice";
 import { useListAllUserBranchesQuery } from "../../../services/branch-management/branchManagementApi";
-import { branchFromOutput } from "../../../features/branches/branchModel";
+import { branchFromOutput } from "../../../services/types";
 
 export default function RestaurantsPage() {
   const dispatch = useAppDispatch();

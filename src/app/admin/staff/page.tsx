@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useAppDispatch, useAppSelector } from "../../../store/hooks";
 import { useListAllUserBranchesQuery } from "../../../services/branch-management/branchManagementApi";
-import { branchFromOutput } from "../../../features/branches/branchModel";
+import { branchFromOutput } from "../../../services/types";
 import { fetchRestaurants } from "../../../features/restaurants/restaurantsSlice";
 import {
 	fetchBusinessEmployees,
