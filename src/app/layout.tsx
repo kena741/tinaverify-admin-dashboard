@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import { Providers } from "../../components/providers";
 import { AuthProvider } from "./contexts/AuthContext";
 import { ReduxProvider } from "../store/ReduxProvider";
 
@@ -25,13 +26,15 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
+    <html
+      lang="en"
+      className={`${geistSans.variable} ${geistMono.variable}`}
+      suppressHydrationWarning
+    >
+      <body className="min-h-svh bg-background font-sans text-foreground antialiased">
         <ReduxProvider>
           <AuthProvider>
-            {children}
+            <Providers>{children}</Providers>
           </AuthProvider>
         </ReduxProvider>
       </body>

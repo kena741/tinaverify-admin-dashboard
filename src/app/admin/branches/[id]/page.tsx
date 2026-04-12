@@ -8,6 +8,8 @@ import { fetchBranchById } from "../../../../features/branches/branchesSlice";
 import { fetchRestaurants } from "../../../../features/restaurants/restaurantsSlice";
 import { fetchTables, createTable } from "../../../../features/tables/tablesSlice";
 import { fetchStaff, createStaff, assignStaffToBranch } from "../../../../features/staff/staffSlice";
+import { tabNavButtonClass, tabPanelEnterClass } from "@/lib/tab-animation";
+import { cn } from "@/lib/utils";
 
 export default function BranchDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
@@ -333,71 +335,53 @@ export default function BranchDetailPage({ params }: { params: Promise<{ id: str
       {/* Tabs */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200">
         <div className="border-b border-gray-200">
-          <nav className="-mb-px flex space-x-8 px-6">
+          <nav className="-mb-px flex flex-wrap gap-8 px-6">
             <button
+              type="button"
               onClick={() => setActiveTab("overview")}
-              className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                activeTab === "overview"
-                  ? "border-blue-500 text-blue-600"
-                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-              }`}
+              className={tabNavButtonClass(activeTab === "overview")}
             >
               Overview
             </button>
             <button
+              type="button"
               onClick={() => setActiveTab("tables")}
-              className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                activeTab === "tables"
-                  ? "border-blue-500 text-blue-600"
-                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-              }`}
+              className={tabNavButtonClass(activeTab === "tables")}
             >
               Tables ({branchTables.length})
             </button>
             <button
+              type="button"
               onClick={() => setActiveTab("staff")}
-              className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                activeTab === "staff"
-                  ? "border-blue-500 text-blue-600"
-                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-              }`}
+              className={tabNavButtonClass(activeTab === "staff")}
             >
               Staff ({branchStaff.length})
             </button>
             <button
+              type="button"
               onClick={() => setActiveTab("transactions")}
-              className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                activeTab === "transactions"
-                  ? "border-blue-500 text-blue-600"
-                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-              }`}
+              className={tabNavButtonClass(activeTab === "transactions")}
             >
               Transactions
             </button>
             <button
+              type="button"
               onClick={() => setActiveTab("analytics")}
-              className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                activeTab === "analytics"
-                  ? "border-blue-500 text-blue-600"
-                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-              }`}
+              className={tabNavButtonClass(activeTab === "analytics")}
             >
               Analytics
             </button>
             <button
+              type="button"
               onClick={() => setActiveTab("settings")}
-              className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                activeTab === "settings"
-                  ? "border-blue-500 text-blue-600"
-                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-              }`}
+              className={tabNavButtonClass(activeTab === "settings")}
             >
               Settings
             </button>
           </nav>
         </div>
 
-        <div className="p-6">
+        <div key={activeTab} className={cn("p-6", tabPanelEnterClass)}>
           {/* Overview Tab */}
           {activeTab === "overview" && (
             <div className="space-y-6">

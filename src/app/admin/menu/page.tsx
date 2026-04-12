@@ -16,6 +16,8 @@ import {
 } from "../../../features/menu/menuSlice";
 import { fetchRestaurants } from "../../../features/restaurants/restaurantsSlice";
 import { fetchBranches } from "../../../features/branches/branchesSlice";
+import { tabNavButtonClass, tabPanelEnterClass } from "@/lib/tab-animation";
+import { cn } from "@/lib/utils";
 
 export default function MenuPage() {
   const { user, isSystemAdmin, isBranchAdmin } = useAuth();
@@ -261,31 +263,25 @@ export default function MenuPage() {
       {/* Tabs */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200">
         <div className="border-b border-gray-200">
-          <nav className="-mb-px flex space-x-8 px-6">
+          <nav className="-mb-px flex gap-8 px-6">
             <button
+              type="button"
               onClick={() => setActiveTab("categories")}
-              className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                activeTab === "categories"
-                  ? "border-blue-500 text-blue-600"
-                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-              }`}
+              className={tabNavButtonClass(activeTab === "categories")}
             >
               Categories ({categories.length})
             </button>
             <button
+              type="button"
               onClick={() => setActiveTab("items")}
-              className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                activeTab === "items"
-                  ? "border-blue-500 text-blue-600"
-                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-              }`}
+              className={tabNavButtonClass(activeTab === "items")}
             >
               Menu Items ({items.length})
             </button>
           </nav>
         </div>
 
-        <div className="p-6">
+        <div key={activeTab} className={cn("p-6", tabPanelEnterClass)}>
           {/* Categories Tab */}
           {activeTab === "categories" && (
             <div className="space-y-6">
