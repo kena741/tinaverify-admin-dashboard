@@ -22,10 +22,11 @@ export type UserOutput = {
   } | null;
 };
 
+/** OpenAPI `UserAuthResponse` — `token_type` defaults to `"bearer"` on the server */
 export type UserAuthResponse = {
   access_token: string;
   refresh_token: string;
-  token_type: string;
+  token_type?: string;
   user: UserOutput;
 };
 
@@ -87,6 +88,8 @@ export type EmployeeOutput = {
   branch_id: string;
   role_id: string;
   is_active: boolean;
+  user?: UserOutput | null;
+  branch?: BranchOutput | null;
 };
 
 /** OpenAPI `CreateEmployeeUserRequest` */
