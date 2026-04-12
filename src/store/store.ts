@@ -7,7 +7,6 @@ import { branchManagementApi } from "../services/branch-management/branchManagem
 import authReducer from "../features/auth/authSlice";
 import signupReducer from "../features/auth/signupSlice";
 import restaurantsReducer from "../features/restaurants/restaurantsSlice";
-import branchesReducer from "../features/branches/branchesSlice";
 import staffReducer from "../features/staff/staffSlice";
 import tablesReducer from "../features/tables/tablesSlice";
 import ordersReducer from "../features/orders/ordersSlice";
@@ -20,7 +19,6 @@ const appReducer = combineReducers({
 	auth: authReducer,
 	signup: signupReducer,
 	restaurants: restaurantsReducer,
-	branches: branchesReducer,
 	staff: staffReducer,
 	tables: tablesReducer,
 	orders: ordersReducer,

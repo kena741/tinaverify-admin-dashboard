@@ -1,11 +1,12 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState, useEffect, use } from "react";
+import { useState, useEffect, use, useMemo } from "react";
 import Link from "next/link";
 import { useAppDispatch, useAppSelector } from "../../../../store/hooks";
 import { fetchRestaurantById } from "../../../../features/restaurants/restaurantsSlice";
-import { fetchBranches } from "../../../../features/branches/branchesSlice";
+import { useListBusinessBranchesQuery } from "../../../../services/branch-management/branchManagementApi";
+import { branchFromOutput } from "../../../../features/branches/branchModel";
 import { fetchStaff } from "../../../../features/staff/staffSlice";
 import { tabNavButtonClass, tabPanelEnterClass } from "@/lib/tab-animation";
 import { cn } from "@/lib/utils";
@@ -13,19 +14,25 @@ import { cn } from "@/lib/utils";
 export default function RestaurantDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
   const dispatch = useAppDispatch();
+  const { id } = use(params);
+
   const { selectedRestaurant, loading, error } = useAppSelector((state: any) => state.restaurants);
-  const { branches, loading: branchesLoading } = useAppSelector((state: any) => state.branches);
+  const { data: branchRows, isLoading: branchesLoading } =
+    useListBusinessBranchesQuery(
+      { businessId: id },
+      { skip: !id },
+    );
+  const branches = useMemo(
+    () => (branchRows ?? []).map(branchFromOutput),
+    [branchRows],
+  );
   const { staff: restaurantStaff, loading: staffLoading } = useAppSelector((state: any) => state.staff);
   const [activeTab, setActiveTab] = useState("overview");
-
-  // Unwrap params Promise using React.use()
-  const { id } = use(params);
 
   // Fetch restaurant by ID and its branches on component mount
   useEffect(() => {
     if (id) {
       dispatch(fetchRestaurantById(id));
-      dispatch(fetchBranches(id)); // Fetch branches for this restaurant
       dispatch(fetchStaff({ restaurantId: id })); // Fetch staff for this restaurant
     }
   }, [dispatch, id]);
@@ -37,7 +44,7 @@ export default function RestaurantDetailPage({ params }: { params: Promise<{ id:
   };
 
   // Filter branches for this restaurant (in case all branches are fetched)
-  const restaurantBranches = branches.filter((branch: any) => branch.restaurant_id === id);
+  const restaurantBranches = branches;
 
   // Get branch name for staff member
   const getBranchName = (branchId?: string) => {

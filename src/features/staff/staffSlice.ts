@@ -1,5 +1,12 @@
 import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
 import { supabase } from '../../supabaseClient';
+import { backendFetchJson } from '../../services/backendFetch';
+import type {
+  CreateEmployeeUserRequest,
+  CreateEmployeeUserResponse,
+  EmployeeOutput,
+  RoleOutput,
+} from '../../services/types';
 
 export interface Staff {
   id: string;
@@ -26,6 +33,13 @@ interface StaffState {
   staffBranches: StaffBranch[];
   loading: boolean;
   error: string | null;
+  /** REST: roles for selected business (`GET /api/v1/business/roles`). */
+  businessRoles: RoleOutput[];
+  rolesLoading: boolean;
+  /** REST: employees for selected business (`GET /api/v1/business/{id}/employees`). */
+  apiEmployees: EmployeeOutput[];
+  employeesBusinessId: string | null;
+  employeesLoading: boolean;
 }
 
 const initialState: StaffState = {
@@ -34,7 +48,56 @@ const initialState: StaffState = {
   staffBranches: [],
   loading: false,
   error: null,
+  businessRoles: [],
+  rolesLoading: false,
+  apiEmployees: [],
+  employeesBusinessId: null,
+  employeesLoading: false,
 };
+
+/** `GET /api/v1/business/roles?business_id=` */
+export const fetchBusinessRoles = createAsyncThunk(
+  'staff/fetchBusinessRoles',
+  async (businessId: string) => {
+    const roles = await backendFetchJson<RoleOutput[]>(
+      `/api/v1/business/roles?business_id=${encodeURIComponent(businessId)}`,
+      { method: 'GET' },
+    );
+    return { businessId, roles };
+  },
+);
+
+/** `GET /api/v1/business/{business_id}/employees` */
+export const fetchBusinessEmployees = createAsyncThunk(
+  'staff/fetchBusinessEmployees',
+  async (businessId: string) => {
+    const employees = await backendFetchJson<EmployeeOutput[]>(
+      `/api/v1/business/${businessId}/employees`,
+      { method: 'GET' },
+    );
+    return { businessId, employees };
+  },
+);
+
+/** `POST /api/v1/business/employees/create-user` */
+export const createEmployeeUser = createAsyncThunk(
+  'staff/createEmployeeUser',
+  async (body: CreateEmployeeUserRequest, { rejectWithValue }) => {
+    try {
+      return await backendFetchJson<CreateEmployeeUserResponse>(
+        '/api/v1/business/employees/create-user',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        },
+      );
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Failed to create employee';
+      return rejectWithValue(msg);
+    }
+  },
+);
 
 // Async thunks
 export const fetchStaff = createAsyncThunk(
@@ -442,6 +505,36 @@ const staffSlice = createSlice({
       // Fetch staff branches
       .addCase(fetchStaffBranches.fulfilled, (state, action) => {
         state.staffBranches = action.payload;
+      })
+      .addCase(fetchBusinessRoles.pending, (state) => {
+        state.rolesLoading = true;
+      })
+      .addCase(fetchBusinessRoles.fulfilled, (state, action) => {
+        state.rolesLoading = false;
+        state.businessRoles = action.payload.roles;
+      })
+      .addCase(fetchBusinessRoles.rejected, (state) => {
+        state.rolesLoading = false;
+      })
+      .addCase(fetchBusinessEmployees.pending, (state) => {
+        state.employeesLoading = true;
+        state.error = null;
+      })
+      .addCase(fetchBusinessEmployees.fulfilled, (state, action) => {
+        state.employeesLoading = false;
+        state.apiEmployees = action.payload.employees;
+        state.employeesBusinessId = action.payload.businessId;
+      })
+      .addCase(fetchBusinessEmployees.rejected, (state, action) => {
+        state.employeesLoading = false;
+        state.error = action.error.message || 'Failed to load employees';
+      })
+      .addCase(createEmployeeUser.fulfilled, (state) => {
+        state.error = null;
+      })
+      .addCase(createEmployeeUser.rejected, (state, action) => {
+        state.error =
+          (action.payload as string) || action.error.message || 'Failed to create employee';
       });
   },
 });

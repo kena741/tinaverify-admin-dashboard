@@ -1,15 +1,20 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { useAppDispatch, useAppSelector } from "../../../store/hooks";
 import { fetchRestaurants } from "../../../features/restaurants/restaurantsSlice";
-import { fetchBranches } from "../../../features/branches/branchesSlice";
+import { useListAllUserBranchesQuery } from "../../../services/branch-management/branchManagementApi";
+import { branchFromOutput } from "../../../features/branches/branchModel";
 
 export default function RestaurantsPage() {
   const dispatch = useAppDispatch();
   const { restaurants, loading, error } = useAppSelector((state: any) => state.restaurants);
-  const { branches } = useAppSelector((state: any) => state.branches);
+  const { data: allBranchesData } = useListAllUserBranchesQuery();
+  const branches = useMemo(
+    () => (allBranchesData?.branches ?? []).map(branchFromOutput),
+    [allBranchesData?.branches],
+  );
   
   const [showAddModal, setShowAddModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -18,11 +23,6 @@ export default function RestaurantsPage() {
   useEffect(() => {
     dispatch(fetchRestaurants());
   }, [dispatch]);
-
-  useEffect(() => {
-    if (restaurants.length === 0) return;
-    dispatch(fetchBranches());
-  }, [dispatch, restaurants]);
 
   // Helper function to get branch count for a restaurant
   const getBranchCount = (restaurantId: string) => {

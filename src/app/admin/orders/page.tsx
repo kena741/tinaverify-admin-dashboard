@@ -6,7 +6,8 @@ import { useAuth } from "../../contexts/AuthContext";
 import { useRouter } from "next/navigation";
 import { useAppDispatch, useAppSelector } from "../../../store/hooks";
 import { fetchRestaurants } from "../../../features/restaurants/restaurantsSlice";
-import { fetchBranches } from "../../../features/branches/branchesSlice";
+import { useListAllUserBranchesQuery } from "../../../services/branch-management/branchManagementApi";
+import { branchFromOutput } from "../../../features/branches/branchModel";
 import { fetchTables, assignTableToWaiter } from "../../../features/tables/tablesSlice";
 import { fetchMenuItems, fetchCategories } from "../../../features/menu/menuSlice";
 import { createOrder } from "../../../features/orders/ordersSlice";
@@ -17,7 +18,12 @@ export default function OrdersPage() {
   const router = useRouter();
   const dispatch = useAppDispatch();
   const { restaurants, loading: restaurantsLoading } = useAppSelector((state: any) => state.restaurants);
-  const { branches, loading: branchesLoading } = useAppSelector((state: any) => state.branches);
+  const { data: allBranchesData, isLoading: branchesLoading } =
+    useListAllUserBranchesQuery();
+  const branches = useMemo(
+    () => (allBranchesData?.branches ?? []).map(branchFromOutput),
+    [allBranchesData?.branches],
+  );
   const { tables: branchTables, loading: tablesLoading } = useAppSelector((state: any) => state.tables);
   const { items: menuItems, categories, loading: menuLoading } = useAppSelector((state: any) => state.menu);
   const { staff: waiters, loading: waitersLoading } = useAppSelector((state: any) => state.staff);
@@ -31,11 +37,6 @@ export default function OrdersPage() {
   useEffect(() => {
     dispatch(fetchRestaurants());
   }, [dispatch]);
-
-  useEffect(() => {
-    if (restaurants.length === 0) return;
-    dispatch(fetchBranches());
-  }, [dispatch, restaurants]);
 
   useEffect(() => {
     if (!user) {

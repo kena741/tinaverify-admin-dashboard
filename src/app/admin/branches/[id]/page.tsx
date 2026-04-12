@@ -4,7 +4,8 @@ import { useRouter } from "next/navigation";
 import { useState, useEffect, use, useMemo } from "react";
 import Link from "next/link";
 import { useAppDispatch, useAppSelector } from "../../../../store/hooks";
-import { fetchBranchById } from "../../../../features/branches/branchesSlice";
+import { useGetBranchQuery } from "../../../../services/branch-management/branchManagementApi";
+import { branchFromOutput } from "../../../../features/branches/branchModel";
 import { fetchRestaurants } from "../../../../features/restaurants/restaurantsSlice";
 import { fetchTables, createTable } from "../../../../features/tables/tablesSlice";
 import { fetchStaff, createStaff, assignStaffToBranch } from "../../../../features/staff/staffSlice";
@@ -14,7 +15,15 @@ import { cn } from "@/lib/utils";
 export default function BranchDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
   const dispatch = useAppDispatch();
-  const { selectedBranch, loading, error } = useAppSelector((state: any) => state.branches);
+  const { id } = use(params);
+
+  const {
+    data: branchOutput,
+    isLoading: loading,
+    isError,
+  } = useGetBranchQuery({ branchId: id }, { skip: !id });
+  const selectedBranch = branchOutput ? branchFromOutput(branchOutput) : null;
+  const error = isError ? "Failed to load branch" : null;
   const { restaurants } = useAppSelector((state: any) => state.restaurants);
   const { tables: branchTables, loading: tablesLoading } = useAppSelector((state: any) => state.tables);
   const { staff: branchStaff, loading: staffLoading } = useAppSelector((state: any) => state.staff);
@@ -34,13 +43,9 @@ export default function BranchDetailPage({ params }: { params: Promise<{ id: str
   });
   const [staffFormError, setStaffFormError] = useState<string>("");
 
-  // Unwrap params Promise using React.use()
-  const { id } = use(params);
-
-  // Fetch branch, restaurants, tables, and staff on component mount
+  // Fetch restaurants, tables, and staff on component mount (branch via RTK Query)
   useEffect(() => {
     if (id) {
-      dispatch(fetchBranchById(id));
       dispatch(fetchRestaurants());
       dispatch(fetchTables(id)); // Fetch tables for this branch
       dispatch(fetchStaff({ branchId: id })); // Fetch staff for this branch

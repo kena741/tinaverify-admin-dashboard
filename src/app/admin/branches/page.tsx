@@ -1,28 +1,26 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useMemo } from "react";
 import Link from "next/link";
-import { useAppDispatch, useAppSelector } from "../../../store/hooks";
+import { useListAllUserBranchesQuery } from "../../../services/branch-management/branchManagementApi";
 import {
-  fetchBranches,
+  branchFromOutput,
   type Branch,
-} from "../../../features/branches/branchesSlice";
-import type { RootState } from "../../../store/store";
+} from "../../../features/branches/branchModel";
 
 export default function BranchesPage() {
-  const dispatch = useAppDispatch();
-  const { branches, myBusinesses, loading, error } = useAppSelector(
-    (state: RootState) => state.branches,
+  const { data, isLoading: loading, error: queryError } =
+    useListAllUserBranchesQuery();
+  const branches = useMemo(
+    () => (data?.branches ?? []).map(branchFromOutput),
+    [data?.branches],
   );
-  
+  const myBusinesses = data?.myBusinesses ?? [];
+  const error = queryError ? "Failed to load branches" : null;
+
   const [showAddModal, setShowAddModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [restaurantFilter, setRestaurantFilter] = useState("all");
-
-  // Businesses from `GET /api/v1/users/me/business`, then branches per business.
-  useEffect(() => {
-    dispatch(fetchBranches());
-  }, [dispatch]);
 
   const restaurantMap = useMemo(() => {
     const map: Record<string, string> = {};

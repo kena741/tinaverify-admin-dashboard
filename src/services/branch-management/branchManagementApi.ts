@@ -1,4 +1,5 @@
 import { createApi } from "@reduxjs/toolkit/query/react";
+import type { FetchBaseQueryError } from "@reduxjs/toolkit/query";
 import { getStoredAccessToken } from "../authTokens";
 import { backendBaseQuery } from "../baseQuery";
 import type {
@@ -9,11 +10,88 @@ import type {
 	BusinessOutput,
 } from "../types";
 
+function bearerHeaders(accessToken?: string | null) {
+	const token =
+		accessToken !== undefined &&
+		accessToken !== null &&
+		accessToken !== ""
+			? accessToken
+			: getStoredAccessToken();
+	return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+export type ListAllUserBranchesResult = {
+	branches: BranchOutput[];
+	myBusinesses: { id: string; name: string }[];
+};
+
 export const branchManagementApi = createApi({
 	reducerPath: "branchManagementApi",
 	baseQuery: backendBaseQuery,
-	tagTypes: ["Branch"],
+	tagTypes: ["Branch", "MyBusinesses"],
 	endpoints: (builder) => ({
+		listMyBusinesses: builder.query<BusinessOutput[], void>({
+			query: () => ({
+				url: "/api/v1/users/me/business",
+				headers: bearerHeaders(),
+			}),
+			providesTags: [{ type: "MyBusinesses", id: "LIST" }],
+		}),
+
+		/**
+		 * `GET /api/v1/users/me/business`, then `GET /api/v1/business/{business_id}/branches` per business.
+		 */
+		listAllUserBranches: builder.query<ListAllUserBranchesResult, void>({
+			async queryFn(_arg, _api, _extraOptions, baseQuery) {
+				const bizRes = await baseQuery({
+					url: "/api/v1/users/me/business",
+					headers: bearerHeaders(),
+				});
+				if (bizRes.error) {
+					return { error: bizRes.error as FetchBaseQueryError };
+				}
+				const businesses = bizRes.data as BusinessOutput[];
+				if (businesses.length === 0) {
+					return { data: { branches: [], myBusinesses: [] } };
+				}
+				const branchResults = await Promise.all(
+					businesses.map((b) =>
+						baseQuery({
+							url: `/api/v1/business/${b.id}/branches`,
+							headers: bearerHeaders(),
+						}),
+					),
+				);
+				for (const r of branchResults) {
+					if (r.error) {
+						return { error: r.error as FetchBaseQueryError };
+					}
+				}
+				const branches = branchResults.flatMap(
+					(r) => r.data as BranchOutput[],
+				);
+				return {
+					data: {
+						branches,
+						myBusinesses: businesses.map((b) => ({
+							id: b.id,
+							name: b.name,
+						})),
+					},
+				};
+			},
+			providesTags: (result) =>
+				result
+					? [
+							{ type: "Branch" as const, id: "LIST" },
+							...result.branches.map((b) => ({
+								type: "Branch" as const,
+								id: b.id,
+							})),
+						]
+					: [{ type: "Branch" as const, id: "LIST" }],
+		}),
+
 		createBusiness: builder.mutation<
 			BusinessOutput,
 			{ body: BusinessCreateRequest; accessToken: string }
@@ -23,39 +101,43 @@ export const branchManagementApi = createApi({
 				method: "POST",
 				body,
 				headers: {
-					Authorization: `Bearer ${accessToken ?? getStoredAccessToken() ?? ""}`,
+					...bearerHeaders(accessToken),
 				},
 			}),
+			invalidatesTags: [{ type: "MyBusinesses", id: "LIST" }, { type: "Branch", id: "LIST" }],
 		}),
 
 		listBusinessBranches: builder.query<
 			BranchOutput[],
-			{ businessId: string; accessToken: string }
+			{ businessId: string; accessToken?: string | null }
 		>({
 			query: ({ businessId, accessToken }) => ({
 				url: `/api/v1/business/${businessId}/branches`,
-				headers: {
-					Authorization: `Bearer ${accessToken ?? getStoredAccessToken() ?? ""}`,
-				},
+				headers: bearerHeaders(accessToken),
 			}),
-			providesTags: (result) =>
+			providesTags: (result, _err, { businessId }) =>
 				result
 					? [
 							{ type: "Branch" as const, id: "LIST" },
-							...result.map((b) => ({ type: "Branch" as const, id: b.id })),
+							{ type: "Branch" as const, id: `BUSINESS_${businessId}` },
+							...result.map((b) => ({
+								type: "Branch" as const,
+								id: b.id,
+							})),
 						]
-					: [{ type: "Branch" as const, id: "LIST" }],
+					: [
+							{ type: "Branch" as const, id: "LIST" },
+							{ type: "Branch" as const, id: `BUSINESS_${businessId}` },
+						],
 		}),
 
 		getBranch: builder.query<
 			BranchOutput,
-			{ branchId: string; accessToken: string }
+			{ branchId: string; accessToken?: string | null }
 		>({
 			query: ({ branchId, accessToken }) => ({
 				url: `/api/v1/branches/${branchId}`,
-				headers: {
-					Authorization: `Bearer ${accessToken ?? getStoredAccessToken() ?? ""}`,
-				},
+				headers: bearerHeaders(accessToken),
 			}),
 			providesTags: (_result, _err, { branchId }) => [
 				{ type: "Branch" as const, id: branchId },
@@ -71,22 +153,27 @@ export const branchManagementApi = createApi({
 				method: "POST",
 				body,
 				headers: {
-					Authorization: `Bearer ${accessToken ?? getStoredAccessToken() ?? ""}`,
+					"Content-Type": "application/json",
+					...bearerHeaders(accessToken),
 				},
 			}),
-			invalidatesTags: [{ type: "Branch", id: "LIST" }],
+			invalidatesTags: [
+				{ type: "Branch", id: "LIST" },
+				{ type: "MyBusinesses", id: "LIST" },
+			],
 		}),
 
 		updateBranch: builder.mutation<
 			BranchOutput,
-			{ branchId: string; body: BranchUpdateRequest; accessToken: string }
+			{ branchId: string; body: BranchUpdateRequest; accessToken?: string | null }
 		>({
 			query: ({ branchId, body, accessToken }) => ({
 				url: `/api/v1/branches/${branchId}`,
 				method: "PUT",
 				body,
 				headers: {
-					Authorization: `Bearer ${accessToken ?? getStoredAccessToken() ?? ""}`,
+					"Content-Type": "application/json",
+					...bearerHeaders(accessToken),
 				},
 			}),
 			invalidatesTags: (_result, _err, { branchId }) => [
@@ -97,14 +184,12 @@ export const branchManagementApi = createApi({
 
 		deleteBranch: builder.mutation<
 			void,
-			{ branchId: string; accessToken: string }
+			{ branchId: string; accessToken?: string | null }
 		>({
 			query: ({ branchId, accessToken }) => ({
 				url: `/api/v1/branches/${branchId}`,
 				method: "DELETE",
-				headers: {
-					Authorization: `Bearer ${accessToken ?? getStoredAccessToken() ?? ""}`,
-				},
+				headers: bearerHeaders(accessToken),
 			}),
 			invalidatesTags: (_result, _err, { branchId }) => [
 				{ type: "Branch", id: branchId },
@@ -115,6 +200,8 @@ export const branchManagementApi = createApi({
 });
 
 export const {
+	useListMyBusinessesQuery,
+	useListAllUserBranchesQuery,
 	useCreateBusinessMutation,
 	useCreateBranchMutation,
 	useListBusinessBranchesQuery,

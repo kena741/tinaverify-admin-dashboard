@@ -74,3 +74,66 @@ export type BranchOutput = {
   updated_at: string;
 };
 
+/** OpenAPI `RoleOutputSchema` */
+export type RoleOutput = {
+  id: string;
+  name: string;
+};
+
+/** OpenAPI `EmployeeOutputSchema` */
+export type EmployeeOutput = {
+  id: string;
+  user_id: string;
+  branch_id: string;
+  role_id: string;
+  is_active: boolean;
+};
+
+/** OpenAPI `CreateEmployeeUserRequest` */
+export type CreateEmployeeUserRequest = {
+  phone_number: string;
+  role_id: string;
+  branch_id: string;
+  username?: string | null;
+  email?: string | null;
+};
+
+/** OpenAPI `CreateEmployeeUserResponse` */
+export type CreateEmployeeUserResponse = {
+  phone_number: string;
+  temporary_password: string;
+  role_id: string;
+  branch_id: string;
+};
+
+
+/** UI branch model; `restaurant_id` matches OpenAPI `business_id` for tenant scoping. */
+export interface Branch {
+	id: string;
+	restaurant_id: string;
+	name: string;
+	address?: string | null;
+	is_head_quarter: boolean;
+	active: boolean;
+	telebirr_merchant_id?: string;
+	telebirr_app_key?: string;
+	telebirr_public_key?: string;
+	telebirr_shortcode?: string;
+	created_at: string;
+	updated_at: string;
+}
+
+export type MyBusinessRef = { id: string; name: string };
+
+export function branchFromOutput(b: BranchOutput): Branch {
+	return {
+		id: b.id,
+		restaurant_id: b.business_id,
+		name: b.name,
+		address: b.address,
+		is_head_quarter: b.is_head_quarter,
+		active: !b.is_archived,
+		created_at: b.created_at,
+		updated_at: b.updated_at,
+	};
+}

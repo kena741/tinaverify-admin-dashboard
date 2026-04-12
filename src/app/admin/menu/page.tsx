@@ -15,7 +15,8 @@ import {
   deleteMenuItem,
 } from "../../../features/menu/menuSlice";
 import { fetchRestaurants } from "../../../features/restaurants/restaurantsSlice";
-import { fetchBranches } from "../../../features/branches/branchesSlice";
+import { useListAllUserBranchesQuery } from "../../../services/branch-management/branchManagementApi";
+import { branchFromOutput } from "../../../features/branches/branchModel";
 import { tabNavButtonClass, tabPanelEnterClass } from "@/lib/tab-animation";
 import { cn } from "@/lib/utils";
 
@@ -25,7 +26,11 @@ export default function MenuPage() {
   const dispatch = useAppDispatch();
   
   const { restaurants } = useAppSelector((state: any) => state.restaurants);
-  const { branches } = useAppSelector((state: any) => state.branches);
+  const { data: allBranchesData } = useListAllUserBranchesQuery();
+  const branches = useMemo(
+    () => (allBranchesData?.branches ?? []).map(branchFromOutput),
+    [allBranchesData?.branches],
+  );
   const { categories, items, loading, error } = useAppSelector((state: any) => state.menu);
   
   const [selectedRestaurant, setSelectedRestaurant] = useState<string>("");
@@ -56,11 +61,6 @@ export default function MenuPage() {
   useEffect(() => {
     dispatch(fetchRestaurants());
   }, [dispatch]);
-
-  useEffect(() => {
-    if (restaurants.length === 0) return;
-    dispatch(fetchBranches());
-  }, [dispatch, restaurants]);
 
   // Set branch for branch admins
   useEffect(() => {
