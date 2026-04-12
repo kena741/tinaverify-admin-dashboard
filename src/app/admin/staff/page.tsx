@@ -11,20 +11,10 @@ import {
 	createEmployeeUser,
 	clearError,
 } from "../../../features/staff/staffSlice";
-import {
-	fetchUserById,
-	formatUserDisplayName,
-} from "../../../../lib/userDisplay";
+import { employeeUserDisplayName } from "../../../../lib/userDisplay";
+import type { EmployeeOutput } from "../../../services/types";
 
 type BranchRow = { id: string; name: string; restaurant_id: string };
-
-type EmployeeRow = {
-	id: string;
-	user_id: string;
-	branch_id: string;
-	role_id: string;
-	is_active: boolean;
-};
 
 export default function StaffPage() {
 	const dispatch = useAppDispatch();
@@ -79,10 +69,6 @@ export default function StaffPage() {
 		temporary_password: string;
 		phone_number: string;
 	} | null>(null);
-
-	const [userNameByUserId, setUserNameByUserId] = useState<
-		Record<string, string>
-	>({});
 
 	useEffect(() => {
 		dispatch(fetchRestaurants());
@@ -164,8 +150,8 @@ export default function StaffPage() {
 		return m;
 	}, [branches]);
 
-	const employeesForBranch = useMemo((): EmployeeRow[] => {
-		const list = apiEmployees as EmployeeRow[];
+	const employeesForBranch = useMemo((): EmployeeOutput[] => {
+		const list = apiEmployees as EmployeeOutput[];
 		if (!selectedBranchId || !selectedBusinessId) return [];
 		if (employeesBusinessId !== selectedBusinessId) return [];
 		return list.filter((emp) => emp.branch_id === selectedBranchId);
@@ -175,7 +161,7 @@ export default function StaffPage() {
 		return employeesForBranch.filter((emp) => {
 			const roleName = (roleNameById[emp.role_id] || "").toLowerCase();
 			const branchName = (branchNameById[emp.branch_id] || "").toLowerCase();
-			const userName = (userNameByUserId[emp.user_id] || "").toLowerCase();
+			const userName = employeeUserDisplayName(emp).toLowerCase();
 			const q = searchTerm.toLowerCase();
 			const matchesSearch =
 				!q ||
@@ -196,32 +182,7 @@ export default function StaffPage() {
 		statusFilter,
 		roleNameById,
 		branchNameById,
-		userNameByUserId,
 	]);
-
-	useEffect(() => {
-		const ids = [...new Set(employeesForBranch.map((e) => e.user_id))];
-		if (ids.length === 0) {
-			setUserNameByUserId({});
-			return;
-		}
-		let cancelled = false;
-		(async () => {
-			const entries = await Promise.all(
-				ids.map(async (id) => {
-					const u = await fetchUserById(id);
-					const label = u ? formatUserDisplayName(u) : "—";
-					return [id, label] as const;
-				}),
-			);
-			if (!cancelled) {
-				setUserNameByUserId(Object.fromEntries(entries));
-			}
-		})();
-		return () => {
-			cancelled = true;
-		};
-	}, [employeesForBranch]);
 
 	const loading = employeesLoading || rolesLoading;
 
@@ -454,7 +415,7 @@ export default function StaffPage() {
 													</span>
 												</td>
 												<td className="px-6 py-4 text-sm text-gray-900">
-													{userNameByUserId[emp.user_id] ?? "…"}
+													{employeeUserDisplayName(emp)}
 												</td>
 											</tr>
 										))

@@ -1,5 +1,4 @@
-import { backendFetchJson } from "../src/services/backendFetch";
-import type { UserOutput } from "../src/services/types";
+import type { EmployeeOutput, UserOutput } from "../src/services/types";
 
 /** Prefer full name, then username, then phone. */
 export function formatUserDisplayName(u: UserOutput): string {
@@ -11,17 +10,9 @@ export function formatUserDisplayName(u: UserOutput): string {
 	return u.phone_number;
 }
 
-/**
- * Loads user for display. Backend may expose `GET /api/v1/users/{user_id}` even if omitted from OpenAPI.
- */
-export async function fetchUserById(
-	userId: string,
-): Promise<UserOutput | null> {
-	try {
-		return await backendFetchJson<UserOutput>(`/api/v1/users/${userId}`, {
-			method: "GET",
-		});
-	} catch {
-		return null;
-	}
+/** Uses nested `user` from `GET /api/v1/business/{business_id}/employees` — no extra user fetch. */
+export function employeeUserDisplayName(emp: EmployeeOutput): string {
+	const u = emp.user;
+	if (u) return formatUserDisplayName(u);
+	return "—";
 }
