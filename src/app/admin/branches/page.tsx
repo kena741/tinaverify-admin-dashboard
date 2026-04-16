@@ -1,250 +1,739 @@
 "use client";
 
-import { useState, useMemo } from "react";
-import Link from "next/link";
-import { useListAllUserBranchesQuery } from "../../../services/branch-management/branchManagementApi";
+import { useMemo, useState } from "react";
 import {
-  branchFromOutput,
-  type Branch,
-} from "../../../services/types";
+	Building2Icon,
+	Loader2Icon,
+	MoreHorizontalIcon,
+	PlusIcon,
+	SearchIcon,
+	Trash2Icon,
+} from "lucide-react";
 
-export default function BranchesPage() {
-  const { data, isLoading: loading, error: queryError } =
-    useListAllUserBranchesQuery();
-  const branches = useMemo(
-    () => (data?.branches ?? []).map(branchFromOutput),
-    [data?.branches],
-  );
-  const myBusinesses = data?.myBusinesses ?? [];
-  const error = queryError ? "Failed to load branches" : null;
+import {
+	useCreateBranchMutation,
+	useDeleteBranchMutation,
+	useListAllUserBranchesQuery,
+} from "../../../services/branch-management/branchManagementApi";
+import { getStoredAccessToken } from "../../../services/authTokens";
+import { branchFromOutput, type Branch } from "../../../services/types";
+import {
+	AlertDialog,
+	AlertDialogAction,
+	AlertDialogCancel,
+	AlertDialogContent,
+	AlertDialogDescription,
+	AlertDialogFooter,
+	AlertDialogHeader,
+	AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+	Card,
+	CardContent,
+	CardDescription,
+	CardHeader,
+	CardTitle,
+} from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuGroup,
+	DropdownMenuItem,
+	DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+	Dialog,
+	DialogContent,
+	DialogDescription,
+	DialogFooter,
+	DialogHeader,
+	DialogTitle,
+} from "@/components/ui/dialog";
+import {
+	Field,
+	FieldContent,
+	FieldDescription,
+	FieldError,
+	FieldGroup,
+	FieldLabel,
+} from "@/components/ui/field";
+import {
+	InputGroup,
+	InputGroupAddon,
+	InputGroupInput,
+} from "@/components/ui/input-group";
+import { Input } from "@/components/ui/input";
+import {
+	Select,
+	SelectContent,
+	SelectGroup,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@/components/ui/select";
+import {
+	Table,
+	TableBody,
+	TableCaption,
+	TableCell,
+	TableHead,
+	TableHeader,
+	TableRow,
+} from "@/components/ui/table";
+import { Textarea } from "@/components/ui/textarea";
+import { cn } from "@/lib/utils";
+import { useRouter } from "next/navigation";
 
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [restaurantFilter, setRestaurantFilter] = useState("all");
+type CreateFormState = {
+	businessId: string;
+	name: string;
+	address: string;
+	isHeadQuarter: boolean;
+};
 
-  const restaurantMap = useMemo(() => {
-    const map: Record<string, string> = {};
-    myBusinesses.forEach((b: { id: string; name: string }) => {
-      map[b.id] = b.name;
-    });
-    return map;
-  }, [myBusinesses]);
-
-  // Filter branches based on search and filters
-  const filteredBranches = useMemo(() => {
-    return branches.filter((branch: Branch) => {
-      const restaurantName = restaurantMap[branch.restaurant_id] || "";
-      const matchesSearch = 
-        branch.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        restaurantName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (branch.address && branch.address.toLowerCase().includes(searchTerm.toLowerCase()));
-      
-      const matchesRestaurant = 
-        restaurantFilter === "all" || branch.restaurant_id === restaurantFilter;
-      
-      return matchesSearch && matchesRestaurant;
-    });
-  }, [branches, restaurantMap, searchTerm, restaurantFilter]);
-
-  return (
-    <div className="space-y-6">
-      {/* Page header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Branches</h1>
-          <p className="mt-1 text-sm text-gray-500">Manage all restaurant branches</p>
-        </div>
-        <button
-          onClick={() => setShowAddModal(true)}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium flex items-center space-x-2"
-        >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-          </svg>
-          <span>Add Branch</span>
-        </button>
-      </div>
-
-      {/* Filters */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="md:col-span-2">
-            <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                </svg>
-              </div>
-              <input
-                type="text"
-                placeholder="Search branches..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="block w-full pl-10 pr-3 py-2 bg-white text-gray-900 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              />
-            </div>
-          </div>
-          <select
-            value={restaurantFilter}
-            onChange={(e) => setRestaurantFilter(e.target.value)}
-            className="px-4 py-2 bg-white text-gray-900 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-          >
-            <option value="all">All Restaurants</option>
-            {myBusinesses.map((b: { id: string; name: string }) => (
-              <option key={b.id} value={b.id}>
-                {b.name}
-              </option>
-            ))}
-          </select>
-        </div>
-      </div>
-
-      {/* Error message */}
-      {error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-          <p className="text-red-800 text-sm">{error}</p>
-        </div>
-      )}
-
-      {/* Branches table */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-        {loading ? (
-          <div className="p-8 text-center">
-            <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-            <p className="mt-4 text-sm text-gray-500">Loading branches...</p>
-          </div>
-        ) : filteredBranches.length === 0 ? (
-          <div className="p-8 text-center">
-            <p className="text-gray-500">No branches found.</p>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Business</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Address</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {filteredBranches.map((branch: Branch) => (
-                  <tr key={branch.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-gray-900">{branch.name}</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">
-                        {restaurantMap[branch.restaurant_id] || "—"}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="text-sm text-gray-500 max-w-xs truncate">
-                        {branch.address ?? "—"}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span
-                        className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                          branch.active
-                            ? "bg-green-100 text-green-800"
-                            : "bg-gray-100 text-gray-800"
-                        }`}
-                      >
-                        {branch.active ? "Active" : "Archived"}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <div className="flex items-center justify-end space-x-2">
-                        <Link href={`/admin/branches/${branch.id}`} className="text-blue-600 hover:text-blue-900">
-                          View
-                        </Link>
-                        <button className="text-gray-600 hover:text-gray-900">Edit</button>
-                        <button className="text-red-600 hover:text-red-900">Delete</button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-
-      {/* Add Branch Modal */}
-      {showAddModal && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center p-4">
-          <div className="relative bg-white rounded-xl shadow-xl max-w-md w-full p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-xl font-semibold text-gray-900">Add New Branch</h3>
-              <button
-                onClick={() => setShowAddModal(false)}
-                className="text-gray-400 hover:text-gray-500"
-              >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-            <form className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Restaurant</label>
-                <select className="w-full px-3 py-2 bg-white text-gray-900 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-                  <option value="">Select restaurant</option>
-                  {myBusinesses.map((b: { id: string; name: string }) => (
-                    <option key={b.id} value={b.id}>
-                      {b.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Branch Name</label>
-                <input
-                  type="text"
-                  className="w-full px-3 py-2 bg-white text-gray-900 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  placeholder="Enter branch name"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
-                <textarea
-                  className="w-full px-3 py-2 bg-white text-gray-900 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  rows={3}
-                  placeholder="Enter branch address"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Number of Tables</label>
-                <input
-                  type="number"
-                  className="w-full px-3 py-2 bg-white text-gray-900 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  placeholder="Enter number of tables"
-                />
-              </div>
-              <div className="flex items-center space-x-3 pt-4">
-                <button
-                  type="button"
-                  onClick={() => setShowAddModal(false)}
-                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
-                >
-                  Add Branch
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-    </div>
-  );
+function getErrorMessage(error: unknown, fallback: string): string {
+	if (
+		typeof error === "object" &&
+		error !== null &&
+		"data" in error &&
+		(error as { data?: { detail?: unknown } }).data?.detail
+	) {
+		const detail = (error as { data: { detail: unknown } }).data.detail;
+		if (typeof detail === "string") return detail;
+		if (Array.isArray(detail)) {
+			const messages = detail
+				.map((item) =>
+					typeof item === "object" &&
+					item !== null &&
+					"msg" in item &&
+					typeof item.msg === "string"
+						? item.msg
+						: null,
+				)
+				.filter(Boolean);
+			if (messages.length > 0) return messages.join(", ");
+		}
+	}
+	if (error instanceof Error) return error.message;
+	return fallback;
 }
 
+function buildCreateValidation(
+	form: CreateFormState,
+): Partial<Record<keyof CreateFormState | "businessId", string>> {
+	const errors: Partial<Record<keyof CreateFormState | "businessId", string>> =
+		{};
+	if (!form.businessId) {
+		errors.businessId = "Select a business.";
+	}
+	if (!form.name.trim()) {
+		errors.name = "Branch name is required.";
+	}
+	return errors;
+}
 
+export default function BranchesPage() {
+	const router = useRouter();
+	const branchDateFormatter = useMemo(
+		() =>
+			new Intl.DateTimeFormat(undefined, {
+				dateStyle: "medium",
+				timeStyle: "short",
+			}),
+		[],
+	);
+
+	const formatBranchDate = (value: string) =>
+		branchDateFormatter.format(new Date(value));
+	const {
+		data,
+		isLoading: loading,
+		error: queryError,
+	} = useListAllUserBranchesQuery();
+	const branches = useMemo(
+		() => (data?.branches ?? []).map(branchFromOutput),
+		[data?.branches],
+	);
+	const myBusinesses = useMemo(() => data?.myBusinesses ?? [], [data]);
+
+	const [searchTerm, setSearchTerm] = useState("");
+	const [restaurantFilter, setRestaurantFilter] = useState("all");
+
+	const [createOpen, setCreateOpen] = useState(false);
+	const [createForm, setCreateForm] = useState<CreateFormState>({
+		businessId: "",
+		name: "",
+		address: "",
+		isHeadQuarter: false,
+	});
+	const [createValidation, setCreateValidation] = useState<
+		Partial<Record<keyof CreateFormState | "businessId", string>>
+	>({});
+	const [createError, setCreateError] = useState<string | null>(null);
+
+	const [branchPendingDelete, setBranchPendingDelete] = useState<Branch | null>(
+		null,
+	);
+	const [deleteError, setDeleteError] = useState<string | null>(null);
+	const [branchActionsMenuId, setBranchActionsMenuId] = useState<string | null>(
+		null,
+	);
+
+	const [createBranch, { isLoading: creating }] = useCreateBranchMutation();
+	const [deleteBranch, { isLoading: deleting }] = useDeleteBranchMutation();
+
+	const restaurantMap = useMemo(() => {
+		const map: Record<string, string> = {};
+		myBusinesses.forEach((b: { id: string; name: string }) => {
+			map[b.id] = b.name;
+		});
+		return map;
+	}, [myBusinesses]);
+
+	const filteredBranches = useMemo(() => {
+		return branches.filter((branch: Branch) => {
+			const restaurantName = restaurantMap[branch.restaurant_id] || "";
+			const q = searchTerm.toLowerCase();
+			const matchesSearch =
+				branch.name.toLowerCase().includes(q) ||
+				restaurantName.toLowerCase().includes(q) ||
+				(branch.address && branch.address.toLowerCase().includes(q));
+
+			const matchesRestaurant =
+				restaurantFilter === "all" || branch.restaurant_id === restaurantFilter;
+
+			return matchesSearch && matchesRestaurant;
+		});
+	}, [branches, restaurantMap, searchTerm, restaurantFilter]);
+
+	const totalBranches = branches.length;
+	const activeCount = branches.filter((b) => b.active).length;
+	const businessCount = myBusinesses.length;
+
+	const loadError = queryError
+		? getErrorMessage(queryError, "Failed to load branches.")
+		: null;
+
+	const resetCreateForm = () => {
+		setCreateForm({
+			businessId: "",
+			name: "",
+			address: "",
+			isHeadQuarter: false,
+		});
+		setCreateValidation({});
+		setCreateError(null);
+	};
+
+	const openCreate = () => {
+		resetCreateForm();
+		setCreateOpen(true);
+	};
+
+	const handleCreateSubmit = async (event: React.FormEvent) => {
+		event.preventDefault();
+		setCreateError(null);
+		const validation = buildCreateValidation(createForm);
+		setCreateValidation(validation);
+		if (Object.keys(validation).length > 0) return;
+
+		const token = getStoredAccessToken();
+		if (!token) {
+			setCreateError("You are not signed in.");
+			return;
+		}
+
+		try {
+			await createBranch({
+				accessToken: token,
+				body: {
+					business_id: createForm.businessId,
+					name: createForm.name.trim(),
+					address: createForm.address.trim() || null,
+					is_head_quarter: createForm.isHeadQuarter,
+				},
+			}).unwrap();
+			resetCreateForm();
+			setCreateOpen(false);
+		} catch (error) {
+			setCreateError(getErrorMessage(error, "Could not create the branch."));
+		}
+	};
+
+	const handleDeleteConfirm = async () => {
+		if (!branchPendingDelete) return;
+		setDeleteError(null);
+		const token = getStoredAccessToken();
+		if (!token) {
+			setDeleteError("You are not signed in.");
+			return;
+		}
+		try {
+			await deleteBranch({
+				branchId: branchPendingDelete.id,
+				accessToken: token,
+			}).unwrap();
+			setBranchPendingDelete(null);
+		} catch (error) {
+			setDeleteError(getErrorMessage(error, "Could not remove this branch."));
+		}
+	};
+
+	return (
+		<main className="flex flex-col gap-6">
+			<header className="flex flex-col gap-3">
+				<div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+					<div className="flex flex-col gap-1">
+						<h1 className="text-balance text-2xl font-semibold tracking-tight sm:text-3xl">
+							Branches
+						</h1>
+						<p className="text-pretty text-sm text-muted-foreground">
+							View and manage branches across your businesses.
+						</p>
+					</div>
+					<Button type="button" onClick={openCreate}>
+						<PlusIcon data-icon="inline-start" aria-hidden="true" />
+						Add Branch
+					</Button>
+				</div>
+			</header>
+
+			<section className="grid gap-4 lg:grid-cols-3">
+				<Card>
+					<CardHeader>
+						<CardTitle>Total branches</CardTitle>
+						<CardDescription>Across all your businesses.</CardDescription>
+					</CardHeader>
+					<CardContent>
+						<p className="text-3xl font-semibold tabular-nums">
+							{totalBranches}
+						</p>
+					</CardContent>
+				</Card>
+				<Card>
+					<CardHeader>
+						<CardTitle>Active</CardTitle>
+						<CardDescription>Not archived.</CardDescription>
+					</CardHeader>
+					<CardContent>
+						<p className="text-3xl font-semibold tabular-nums">{activeCount}</p>
+					</CardContent>
+				</Card>
+				<Card>
+					<CardHeader>
+						<CardTitle>Businesses</CardTitle>
+						<CardDescription>Tenants you can add branches to.</CardDescription>
+					</CardHeader>
+					<CardContent className="flex items-center gap-2">
+						<Building2Icon
+							className="text-muted-foreground"
+							aria-hidden="true"
+						/>
+						<p className="text-3xl font-semibold tabular-nums">
+							{businessCount}
+						</p>
+					</CardContent>
+				</Card>
+			</section>
+
+			<Card>
+				<CardHeader className="gap-4 border-b border-border pb-4">
+					<div className="flex flex-col gap-1">
+						<CardTitle className="text-balance">Branch Directory</CardTitle>
+						<CardDescription className="text-pretty">
+							{loading ? (
+								<span aria-live="polite">Loading branches…</span>
+							) : (
+								<>
+									Showing{" "}
+									<span className="font-medium text-foreground tabular-nums">
+										{filteredBranches.length}
+									</span>{" "}
+									of <span className="tabular-nums">{branches.length}</span>{" "}
+									branches. Search by name, business, or address.
+								</>
+							)}
+						</CardDescription>
+					</div>
+					<FieldGroup className="grid min-w-0 items-stretch gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(10rem,16rem)]">
+						<Field className="min-w-0 h-full">
+							<FieldLabel htmlFor="branches-search">Search</FieldLabel>
+							<InputGroup className="h-10 shrink-0">
+								<InputGroupAddon>
+									<SearchIcon aria-hidden="true" />
+								</InputGroupAddon>
+								<InputGroupInput
+									id="branches-search"
+									name="branch-search"
+									placeholder="Search branches…"
+									value={searchTerm}
+									onChange={(e) => setSearchTerm(e.target.value)}
+									autoComplete="off"
+									spellCheck={false}
+									disabled={Boolean(loadError)}
+								/>
+							</InputGroup>
+						</Field>
+						<Field className="min-w-0 h-full">
+							<FieldLabel htmlFor="branches-business-filter">
+								Business
+							</FieldLabel>
+							<Select
+								value={restaurantFilter}
+								onValueChange={(value) => setRestaurantFilter(value ?? "all")}
+								disabled={Boolean(loadError)}
+							>
+								<SelectTrigger
+									id="branches-business-filter"
+									className="h-10 w-full min-h-10 data-[size=default]:h-10"
+								>
+									<SelectValue placeholder="All businesses" />
+								</SelectTrigger>
+								<SelectContent>
+									<SelectGroup>
+										<SelectItem value="all">All businesses</SelectItem>
+										{myBusinesses.map((b: { id: string; name: string }) => (
+											<SelectItem key={b.id} value={b.id}>
+												{b.name}
+											</SelectItem>
+										))}
+									</SelectGroup>
+								</SelectContent>
+							</Select>
+						</Field>
+					</FieldGroup>
+				</CardHeader>
+				<CardContent className="p-0">
+					{loadError ? (
+						<div className="p-4">
+							<Alert variant="destructive">
+								<AlertTitle>Could not load branches</AlertTitle>
+								<AlertDescription>{loadError}</AlertDescription>
+							</Alert>
+						</div>
+					) : loading ? (
+						<div
+							role="status"
+							aria-live="polite"
+							className="flex items-center gap-2 px-4 py-12 text-sm text-muted-foreground"
+						>
+							<Loader2Icon className="animate-spin" aria-hidden="true" />
+							Loading branches…
+						</div>
+					) : filteredBranches.length === 0 ? (
+						<div className="px-4 py-12">
+							<Alert className="border-none">
+								<AlertTitle>No branches found</AlertTitle>
+								<AlertDescription>
+									{branches.length === 0
+										? "Create a branch to get started."
+										: "Try adjusting search or filters."}
+								</AlertDescription>
+							</Alert>
+						</div>
+					) : (
+						<div className="overflow-x-auto">
+							<Table>
+								<TableCaption className="sr-only">
+									Branches you have access to; columns include name, business,
+									address, headquarters flag, status, and last updated time.
+								</TableCaption>
+								<TableHeader>
+									<TableRow>
+										<TableHead>Name</TableHead>
+										<TableHead>Business</TableHead>
+										<TableHead>Address</TableHead>
+										<TableHead>HQ</TableHead>
+										<TableHead>Status</TableHead>
+										<TableHead className="hidden min-w-0 lg:table-cell">
+											Updated
+										</TableHead>
+										<TableHead className="text-right">Actions</TableHead>
+									</TableRow>
+								</TableHeader>
+								<TableBody>
+									{filteredBranches.map((branch: Branch) => (
+										<TableRow
+											key={branch.id}
+											className="group/row cursor-pointer"
+											onClick={() =>
+												router.push(`/admin/branches/${branch.id}`)
+											}
+										>
+											<TableCell className="min-w-0 max-w-40 font-medium sm:max-w-none">
+												<span className="block truncate">{branch.name}</span>
+											</TableCell>
+											<TableCell className="min-w-0 max-w-40 truncate sm:max-w-none">
+												{restaurantMap[branch.restaurant_id] ?? "—"}
+											</TableCell>
+											<TableCell className="max-w-40 truncate text-muted-foreground">
+												{branch.address ?? "—"}
+											</TableCell>
+											<TableCell>
+												{branch.is_head_quarter ? (
+													<Badge variant="secondary">HQ</Badge>
+												) : (
+													<span className="text-muted-foreground">—</span>
+												)}
+											</TableCell>
+											<TableCell>
+												<Badge variant={branch.active ? "default" : "outline"}>
+													{branch.active ? "Active" : "Archived"}
+												</Badge>
+											</TableCell>
+											<TableCell className="hidden tabular-nums text-muted-foreground lg:table-cell">
+												{formatBranchDate(branch.updated_at)}
+											</TableCell>
+											<TableCell
+												className="text-right"
+												onClick={(e) => e.stopPropagation()}
+											>
+												<DropdownMenu
+													open={branchActionsMenuId === branch.id}
+													onOpenChange={(open) =>
+														setBranchActionsMenuId(open ? branch.id : null)
+													}
+												>
+													<DropdownMenuTrigger
+														render={
+															<Button
+																type="button"
+																variant="ghost"
+																size="icon-sm"
+																className={cn(
+																	"text-muted-foreground opacity-0 transition-opacity hover:bg-muted hover:text-foreground",
+																	"group-hover/row:opacity-100",
+																	"focus-visible:opacity-100",
+																	branchActionsMenuId === branch.id &&
+																		"opacity-100",
+																)}
+																aria-label="Branch actions"
+															/>
+														}
+													>
+														<MoreHorizontalIcon aria-hidden="true" />
+													</DropdownMenuTrigger>
+													<DropdownMenuContent align="end" sideOffset={4}>
+														<DropdownMenuGroup>
+															<DropdownMenuItem
+																variant="destructive"
+																onClick={() => {
+																	setDeleteError(null);
+																	setBranchPendingDelete(branch);
+																	setBranchActionsMenuId(null);
+																}}
+															>
+																<Trash2Icon aria-hidden="true" />
+																Delete
+															</DropdownMenuItem>
+														</DropdownMenuGroup>
+													</DropdownMenuContent>
+												</DropdownMenu>
+											</TableCell>
+										</TableRow>
+									))}
+								</TableBody>
+							</Table>
+						</div>
+					)}
+				</CardContent>
+			</Card>
+
+			<Dialog
+				open={createOpen}
+				onOpenChange={(open) => {
+					if (!open) {
+						resetCreateForm();
+					}
+					setCreateOpen(open);
+				}}
+			>
+				<DialogContent className="sm:max-w-md">
+					<DialogHeader>
+						<DialogTitle>Add branch</DialogTitle>
+						<DialogDescription>
+							Create a branch under a business. You can edit details later on
+							the branch page.
+						</DialogDescription>
+					</DialogHeader>
+					<form onSubmit={handleCreateSubmit} className="flex flex-col gap-4">
+						<FieldGroup className="flex flex-col gap-4">
+							<Field
+								data-invalid={createValidation.businessId ? true : undefined}
+							>
+								<FieldLabel htmlFor="create-branch-business">
+									Business
+								</FieldLabel>
+								<Select
+									value={createForm.businessId}
+									onValueChange={(value) =>
+										setCreateForm((c) => ({
+											...c,
+											businessId: value ?? "",
+										}))
+									}
+								>
+									<SelectTrigger
+										id="create-branch-business"
+										className="w-full"
+										aria-invalid={Boolean(createValidation.businessId)}
+									>
+										<SelectValue placeholder="Select a business" />
+									</SelectTrigger>
+									<SelectContent>
+										<SelectGroup>
+											{myBusinesses.map((b: { id: string; name: string }) => (
+												<SelectItem key={b.id} value={b.id}>
+													{b.name}
+												</SelectItem>
+											))}
+										</SelectGroup>
+									</SelectContent>
+								</Select>
+								{createValidation.businessId ? (
+									<FieldError>{createValidation.businessId}</FieldError>
+								) : null}
+							</Field>
+
+							<Field data-invalid={createValidation.name ? true : undefined}>
+								<FieldLabel htmlFor="create-branch-name">
+									Branch name
+								</FieldLabel>
+								<Input
+									id="create-branch-name"
+									value={createForm.name}
+									onChange={(e) =>
+										setCreateForm((c) => ({ ...c, name: e.target.value }))
+									}
+									placeholder="e.g. Bole"
+									autoComplete="off"
+									aria-invalid={Boolean(createValidation.name)}
+								/>
+								{createValidation.name ? (
+									<FieldError>{createValidation.name}</FieldError>
+								) : null}
+							</Field>
+
+							<Field>
+								<FieldLabel htmlFor="create-branch-address">Address</FieldLabel>
+								<FieldDescription>Optional location details.</FieldDescription>
+								<Textarea
+									id="create-branch-address"
+									value={createForm.address}
+									onChange={(e) =>
+										setCreateForm((c) => ({ ...c, address: e.target.value }))
+									}
+									placeholder="Street, city…"
+									rows={3}
+								/>
+							</Field>
+
+							<Field orientation="horizontal">
+								<Checkbox
+									id="create-branch-hq"
+									checked={createForm.isHeadQuarter}
+									onCheckedChange={(checked) =>
+										setCreateForm((c) => ({
+											...c,
+											isHeadQuarter: checked === true,
+										}))
+									}
+								/>
+								<FieldContent>
+									<FieldLabel htmlFor="create-branch-hq">
+										Headquarters branch
+									</FieldLabel>
+									<FieldDescription>
+										Mark if this is the main branch for the business.
+									</FieldDescription>
+								</FieldContent>
+							</Field>
+						</FieldGroup>
+
+						{createError ? (
+							<Alert variant="destructive">
+								<AlertDescription>{createError}</AlertDescription>
+							</Alert>
+						) : null}
+
+						<DialogFooter className="gap-2 sm:gap-0">
+							<Button
+								type="button"
+								variant="outline"
+								onClick={() => setCreateOpen(false)}
+							>
+								Cancel
+							</Button>
+							<Button type="submit" disabled={creating}>
+								{creating ? (
+									<>
+										<Loader2Icon
+											className="animate-spin"
+											data-icon="inline-start"
+										/>
+										Creating…
+									</>
+								) : (
+									"Create branch"
+								)}
+							</Button>
+						</DialogFooter>
+					</form>
+				</DialogContent>
+			</Dialog>
+
+			<AlertDialog
+				open={branchPendingDelete !== null}
+				onOpenChange={(open) => {
+					if (!open) {
+						setBranchPendingDelete(null);
+						setDeleteError(null);
+					}
+				}}
+			>
+				<AlertDialogContent>
+					<AlertDialogHeader>
+						<AlertDialogTitle>Delete branch?</AlertDialogTitle>
+						<AlertDialogDescription>
+							This will archive or remove{" "}
+							<strong>{branchPendingDelete?.name}</strong> depending on server
+							rules. This cannot be undone from here.
+						</AlertDialogDescription>
+					</AlertDialogHeader>
+					{deleteError ? (
+						<Alert variant="destructive">
+							<AlertDescription>{deleteError}</AlertDescription>
+						</Alert>
+					) : null}
+					<AlertDialogFooter>
+						<AlertDialogCancel>Cancel</AlertDialogCancel>
+						<AlertDialogAction
+							className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+							onClick={(e) => {
+								e.preventDefault();
+								void handleDeleteConfirm();
+							}}
+							disabled={deleting}
+						>
+							{deleting ? (
+								<>
+									<Loader2Icon
+										className="animate-spin"
+										data-icon="inline-start"
+									/>
+									Deleting…
+								</>
+							) : (
+								"Delete"
+							)}
+						</AlertDialogAction>
+					</AlertDialogFooter>
+				</AlertDialogContent>
+			</AlertDialog>
+		</main>
+	);
+}
