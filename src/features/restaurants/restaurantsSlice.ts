@@ -5,7 +5,7 @@ import {
 	getStoredBusinessIds,
 	removeStoredBusinessId,
 	setStoredBusinessIds,
-} from "../../services/businessIdsStorage";
+} from "../../services/branch-management/businessIdsStorage";
 import type { BusinessOutput } from "../../services/types";
 
 /** UI model; maps to OpenAPI `BusinessOutputSchema` (tenant / “restaurant”). */
@@ -56,9 +56,12 @@ async function collectBusinessIdsForFetch(): Promise<string[]> {
 	const fromStorage = getStoredBusinessIds();
 	let fromMe: string[] = [];
 	try {
-		const me = await backendFetchJson<Record<string, unknown>>("/api/v1/users/me", {
-			method: "GET",
-		});
+		const me = await backendFetchJson<Record<string, unknown>>(
+			"/api/v1/users/me",
+			{
+				method: "GET",
+			},
+		);
 		fromMe = mergeBusinessIdsFromMePayload(me);
 	} catch {
 		/* unauthenticated or network */
@@ -104,16 +107,21 @@ export const fetchRestaurants = createAsyncThunk(
 				}
 			}),
 		);
-		return results.filter((r): r is BusinessOutput => r !== null).map(mapBusinessOutput);
+		return results
+			.filter((r): r is BusinessOutput => r !== null)
+			.map(mapBusinessOutput);
 	},
 );
 
 export const fetchRestaurantById = createAsyncThunk(
 	"restaurants/fetchById",
 	async (id: string) => {
-		const row = await backendFetchJson<BusinessOutput>(`/api/v1/business/${id}`, {
-			method: "GET",
-		});
+		const row = await backendFetchJson<BusinessOutput>(
+			`/api/v1/business/${id}`,
+			{
+				method: "GET",
+			},
+		);
 		addStoredBusinessId(row.id);
 		return mapBusinessOutput(row);
 	},
@@ -141,17 +149,23 @@ export const updateRestaurant = createAsyncThunk(
 	},
 );
 
-export const deleteRestaurant = createAsyncThunk("restaurants/delete", async (_id: string) => {
-	throw new Error(
-		"Deleting a business is not available in the published API (no DELETE for /api/v1/business/{id}).",
-	);
-});
+export const deleteRestaurant = createAsyncThunk(
+	"restaurants/delete",
+	async (_id: string) => {
+		throw new Error(
+			"Deleting a business is not available in the published API (no DELETE for /api/v1/business/{id}).",
+		);
+	},
+);
 
 const restaurantsSlice = createSlice({
 	name: "restaurants",
 	initialState,
 	reducers: {
-		setSelectedRestaurant: (state, action: PayloadAction<Restaurant | null>) => {
+		setSelectedRestaurant: (
+			state,
+			action: PayloadAction<Restaurant | null>,
+		) => {
 			state.selectedRestaurant = action.payload;
 		},
 		clearError: (state) => {

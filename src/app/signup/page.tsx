@@ -8,7 +8,7 @@ import {
 	useCreateBusinessMutation,
 	useCreateBranchMutation,
 } from "../../services/branch-management/branchManagementApi";
-import { addStoredBusinessId } from "../../services/businessIdsStorage";
+import { addStoredBusinessId } from "../../services/branch-management/businessIdsStorage";
 
 export default function SignupPage() {
 	const router = useRouter();

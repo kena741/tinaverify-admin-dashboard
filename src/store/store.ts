@@ -2,6 +2,7 @@ import { configureStore, combineReducers, AnyAction } from "@reduxjs/toolkit";
 import { resetStore } from "./resetActions";
 import { authApi } from "../services/auth/authApi";
 import { branchManagementApi } from "../services/branch-management/branchManagementApi";
+import { menuApi } from "../services/menu/menuApi";
 
 // Import all reducers
 import authReducer from "../features/auth/authSlice";
@@ -27,6 +28,7 @@ const appReducer = combineReducers({
 	menu: menuReducer,
 	[authApi.reducerPath]: authApi.reducer,
 	[branchManagementApi.reducerPath]: branchManagementApi.reducer,
+	[menuApi.reducerPath]: menuApi.reducer,
 });
 
 // Reset the store when resetStore action is dispatched
@@ -49,7 +51,7 @@ export const store = configureStore({
 				// Ignore these action types if needed
 				ignoredActions: [resetStore.type],
 			},
-		}).concat(authApi.middleware, branchManagementApi.middleware),
+		}).concat(authApi.middleware, branchManagementApi.middleware, menuApi.middleware),
 });
 
 export type RootState = ReturnType<typeof store.getState>;

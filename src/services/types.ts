@@ -140,3 +140,40 @@ export function branchFromOutput(b: BranchOutput): Branch {
 		updated_at: b.updated_at,
 	};
 }
+
+/** OpenAPI `MenuCategory` enum */
+export type MenuCategoryEnum = "Food" | "Drink";
+
+/** OpenAPI `MenuInputSchema` — `POST /api/v1/menus` */
+export type MenuInputRequest = {
+	branch_id: string;
+	name: string;
+	description?: string | null;
+	price: number;
+	currency: string;
+	category: MenuCategoryEnum;
+};
+
+/** OpenAPI `MenuResponseSchema` */
+export type MenuResponse = {
+	id: string;
+	name: string;
+	description: string | null;
+	price: number;
+	currency: string;
+	category: MenuCategoryEnum;
+	branch_id: string;
+	is_archived: boolean;
+	created_at: string;
+	updated_at: string;
+};
+
+/** OpenAPI `MenuUpdateSchema` — `PUT /api/v1/menus/{menu_id}` */
+export type MenuUpdateRequest = {
+	name?: string | null;
+	description?: string | null;
+	price?: number | null;
+	currency?: string | null;
+	category?: MenuCategoryEnum | null;
+	is_archived?: boolean | null;
+};
