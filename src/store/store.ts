@@ -4,6 +4,8 @@ import { authApi } from "../services/auth/authApi";
 import { bankAccountsApi } from "../services/bank-accounts/bankAccountsApi";
 import { branchManagementApi } from "../services/branch-management/branchManagementApi";
 import { menuApi } from "../services/menu/menuApi";
+import { ordersApi } from "../services/orders/ordersApi";
+import { tablesApi } from "../services/tables/tablesApi";
 
 // Import all reducers
 import authReducer from "../features/auth/authSlice";
@@ -31,6 +33,8 @@ const appReducer = combineReducers({
 	[bankAccountsApi.reducerPath]: bankAccountsApi.reducer,
 	[branchManagementApi.reducerPath]: branchManagementApi.reducer,
 	[menuApi.reducerPath]: menuApi.reducer,
+	[ordersApi.reducerPath]: ordersApi.reducer,
+	[tablesApi.reducerPath]: tablesApi.reducer,
 });
 
 // Reset the store when resetStore action is dispatched
@@ -58,6 +62,8 @@ export const store = configureStore({
 			bankAccountsApi.middleware,
 			branchManagementApi.middleware,
 			menuApi.middleware,
+			ordersApi.middleware,
+			tablesApi.middleware,
 		),
 });
 

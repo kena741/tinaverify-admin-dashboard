@@ -13,6 +13,7 @@ import {
 	Landmark,
 	MapPin,
 	Settings,
+	TableProperties,
 	UtensilsCrossed,
 	Users,
 } from "lucide-react";
@@ -49,6 +50,7 @@ const systemAdminNavigation: {
 	{ name: "Branch", href: "/admin/branches/", icon: MapPin },
 	{ name: "Staff", href: "/admin/staff", icon: Users },
 	{ name: "Menu", href: "/admin/menu", icon: UtensilsCrossed },
+	{ name: "Tables", href: "/admin/tables", icon: TableProperties },
 	{ name: "Bank Accounts", href: "/admin/bank-accounts", icon: Landmark },
 	{ name: "Transactions", href: "/admin/transactions", icon: CreditCard },
 	{ name: "Notifications", href: "/admin/notifications", icon: Bell },
@@ -65,6 +67,7 @@ const branchAdminNavigation: {
 	{ name: "Branch", href: "/admin/branches/", icon: MapPin },
 	{ name: "Orders", href: "/admin/orders", icon: ClipboardList },
 	{ name: "Menu", href: "/admin/menu", icon: UtensilsCrossed },
+	{ name: "Tables", href: "/admin/tables", icon: TableProperties },
 	{ name: "Bank Accounts", href: "/admin/bank-accounts", icon: Landmark },
 	{ name: "Transactions", href: "/admin/transactions", icon: CreditCard },
 	{ name: "Staff", href: "/admin/staff", icon: Users },

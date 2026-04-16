@@ -594,8 +594,7 @@ export default function StaffPage() {
 								/>
 							</div>
 							<p className="text-xs text-gray-500">
-								The API sets a temporary password; share it securely with the
-								new employee.
+								This temporary password should be shared with the employee.
 							</p>
 							<div className="flex gap-3 pt-2">
 								<button

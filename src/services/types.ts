@@ -203,3 +203,57 @@ export type BankAccountResponse = {
 	account_number: string;
 	is_archived: boolean;
 };
+
+/** OpenAPI `TableInputSchema` — `POST /api/v1/tables` */
+export type TableInputRequest = {
+	branch_id: string;
+	name: string;
+};
+
+/** OpenAPI `TableResponseSchema` */
+export type TableResponse = {
+	id: string;
+	name: string;
+	branch_id: string;
+	is_archived: boolean;
+	created_at: string;
+	updated_at: string;
+};
+
+/** OpenAPI `TableUpdateSchema` — `PUT /api/v1/tables/{table_id}` */
+export type TableUpdateRequest = {
+	name?: string | null;
+	is_archived?: boolean | null;
+};
+
+/** OpenAPI `OrderStatus` enum */
+export type OrderStatus = "pending" | "in_progress" | "completed" | "cancelled";
+
+/** OpenAPI `OrderItemResponseSchema` */
+export type OrderItemResponse = {
+	id: string;
+	order_id: string;
+	menu_id: string;
+	quantity: number;
+	unit_price: number;
+};
+
+/** OpenAPI `OrderResponseSchema` */
+export type OrderResponse = {
+	id: string;
+	table_id: string | null;
+	transaction_id: string | null;
+	created_by: string | null;
+	status: OrderStatus;
+	is_archived: boolean;
+	items: OrderItemResponse[];
+	created_at: string;
+	updated_at: string;
+};
+
+/** OpenAPI `OrderTransactionSummaryResponse` */
+export type OrderTransactionSummaryResponse = {
+	order_id: string;
+	transaction_id: string;
+	amount: number;
+};
