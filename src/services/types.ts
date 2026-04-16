@@ -177,3 +177,29 @@ export type MenuUpdateRequest = {
 	category?: MenuCategoryEnum | null;
 	is_archived?: boolean | null;
 };
+
+/** OpenAPI `BankNameEnum` */
+export type BankNameEnum =
+	| "CBE"
+	| "DASHEN"
+	| "AWASH"
+	| "ABYSINIA"
+	| "TELEBIRR"
+	| "CBEBIRR";
+
+/** OpenAPI `BankAccountCreateSchema` */
+export type BankAccountCreateRequest = {
+	business_id: string;
+	bank_name: BankNameEnum;
+	account_name: string;
+	account_number: string;
+};
+
+/** OpenAPI `BankAccountResponseSchema` */
+export type BankAccountResponse = {
+	business_id: string;
+	bank_name: BankNameEnum;
+	account_name: string;
+	account_number: string;
+	is_archived: boolean;
+};
