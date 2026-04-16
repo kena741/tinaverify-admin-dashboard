@@ -8,6 +8,8 @@ import type {
 	BranchUpdateRequest,
 	BusinessCreateRequest,
 	BusinessOutput,
+	EmployeeOutput,
+	RoleOutput,
 } from "../types";
 
 function bearerHeaders(accessToken?: string | null) {
@@ -28,7 +30,7 @@ export type ListAllUserBranchesResult = {
 export const branchManagementApi = createApi({
 	reducerPath: "branchManagementApi",
 	baseQuery: backendBaseQuery,
-	tagTypes: ["Branch", "MyBusinesses"],
+	tagTypes: ["Branch", "MyBusinesses", "Employee", "Role"],
 	endpoints: (builder) => ({
 		listMyBusinesses: builder.query<BusinessOutput[], void>({
 			query: () => ({
@@ -105,6 +107,29 @@ export const branchManagementApi = createApi({
 				},
 			}),
 			invalidatesTags: [{ type: "MyBusinesses", id: "LIST" }, { type: "Branch", id: "LIST" }],
+		}),
+
+		/** `GET /api/v1/business/roles?business_id=` */
+		listBusinessRoles: builder.query<RoleOutput[], { businessId: string }>({
+			query: ({ businessId }) => ({
+				url: "/api/v1/business/roles",
+				params: { business_id: businessId },
+				headers: bearerHeaders(),
+			}),
+			providesTags: (_result, _err, { businessId }) => [
+				{ type: "Role" as const, id: businessId },
+			],
+		}),
+
+		/** `GET /api/v1/business/{business_id}/employees` */
+		listBusinessEmployees: builder.query<EmployeeOutput[], { businessId: string }>({
+			query: ({ businessId }) => ({
+				url: `/api/v1/business/${businessId}/employees`,
+				headers: bearerHeaders(),
+			}),
+			providesTags: (_result, _err, { businessId }) => [
+				{ type: "Employee" as const, id: businessId },
+			],
 		}),
 
 		listBusinessBranches: builder.query<
@@ -202,6 +227,8 @@ export const branchManagementApi = createApi({
 export const {
 	useListMyBusinessesQuery,
 	useListAllUserBranchesQuery,
+	useListBusinessRolesQuery,
+	useListBusinessEmployeesQuery,
 	useCreateBusinessMutation,
 	useCreateBranchMutation,
 	useListBusinessBranchesQuery,

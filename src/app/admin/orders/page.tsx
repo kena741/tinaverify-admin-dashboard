@@ -1,25 +1,22 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import {
-	ClipboardListIcon,
-	Loader2Icon,
-	ReceiptTextIcon,
-	SearchIcon,
-} from "lucide-react";
+import { ChevronsUpDownIcon, Loader2Icon } from "lucide-react";
 
+import { employeeUserDisplayName } from "../../../../lib/userDisplay";
 import { useAuth } from "../../contexts/AuthContext";
 import {
 	useListBusinessBranchesQuery,
+	useListBusinessEmployeesQuery,
+	useListBusinessRolesQuery,
 	useListMyBusinessesQuery,
 } from "../../../services/branch-management/branchManagementApi";
 import {
-	useLazyGetOrderQuery,
 	useListOrderTransactionsSummaryQuery,
 	useListTableOrdersQuery,
 } from "../../../services/orders/ordersApi";
 import { useListBranchTablesQuery } from "../../../services/tables/tablesApi";
-import type { OrderResponse, OrderStatus } from "../../../services/types";
+import type { OrderStatus } from "../../../services/types";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -27,20 +24,31 @@ import {
 	Card,
 	CardContent,
 	CardDescription,
-	CardFooter,
 	CardHeader,
 	CardTitle,
 } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
+	Command,
+	CommandEmpty,
+	CommandGroup,
+	CommandInput,
+	CommandItem,
+	CommandList,
+} from "@/components/ui/command";
+import {
 	Field,
 	FieldContent,
 	FieldDescription,
-	FieldError,
 	FieldGroup,
 	FieldLabel,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import {
+	Popover,
+	PopoverContent,
+	PopoverTrigger,
+} from "@/components/ui/popover";
 import {
 	Select,
 	SelectContent,
@@ -49,7 +57,6 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@/components/ui/select";
-import { Separator } from "@/components/ui/separator";
 import {
 	Table,
 	TableBody,
@@ -64,8 +71,113 @@ type SummaryFilterState = {
 	startDate: string;
 	endDate: string;
 	includeBranchFilter: boolean;
-	createdBy: string;
+	createdByUserIds: string[];
 };
+
+type WaiterOption = {
+	userId: string;
+	label: string;
+	branchLabel: string;
+};
+
+function WaiterCreatorsCombobox({
+	waiters,
+	selectedUserIds,
+	onChange,
+	disabled,
+	emptyMessage,
+}: {
+	waiters: WaiterOption[];
+	selectedUserIds: string[];
+	onChange: (ids: string[]) => void;
+	disabled?: boolean;
+	emptyMessage: string;
+}) {
+	const [open, setOpen] = useState(false);
+
+	const selectedSet = useMemo(
+		() => new Set(selectedUserIds),
+		[selectedUserIds],
+	);
+
+	const toggle = (userId: string) => {
+		const next = new Set(selectedUserIds);
+		if (next.has(userId)) next.delete(userId);
+		else next.add(userId);
+		onChange(Array.from(next));
+	};
+
+	const summaryLabel = useMemo(() => {
+		if (selectedUserIds.length === 0) {
+			return "All creators (no filter)";
+		}
+		if (selectedUserIds.length === 1) {
+			const w = waiters.find((x) => x.userId === selectedUserIds[0]);
+			return w?.label ?? selectedUserIds[0];
+		}
+		return `${selectedUserIds.length} waiters selected`;
+	}, [selectedUserIds, waiters]);
+
+	return (
+		<Popover open={open} onOpenChange={setOpen}>
+			<PopoverTrigger
+				render={
+					<Button
+						type="button"
+						variant="outline"
+						className="h-10 w-full justify-between"
+						disabled={disabled}
+						aria-labelledby="summary-created-by-label"
+					/>
+				}
+			>
+				<span className="truncate text-left">{summaryLabel}</span>
+				<ChevronsUpDownIcon data-icon="inline-end" aria-hidden="true" />
+			</PopoverTrigger>
+			<PopoverContent className="w-(--anchor-width) p-0" align="start">
+				<Command>
+					<CommandInput placeholder="Search waiters…" />
+					<CommandList>
+						<CommandEmpty className="py-6 text-sm">{emptyMessage}</CommandEmpty>
+						<CommandGroup heading="Waiters">
+							{waiters.map((w) => (
+								<CommandItem
+									key={w.userId}
+									value={`${w.label} ${w.branchLabel} ${w.userId}`}
+									onSelect={() => toggle(w.userId)}
+									className="[&>svg:last-child]:hidden"
+								>
+									<Checkbox
+										checked={selectedSet.has(w.userId)}
+										className="pointer-events-none"
+										tabIndex={-1}
+									/>
+									<span className="flex min-w-0 flex-1 flex-col gap-0.5 text-left">
+										<span className="truncate">{w.label}</span>
+										<span className="truncate text-xs text-muted-foreground">
+											{w.branchLabel}
+										</span>
+									</span>
+								</CommandItem>
+							))}
+						</CommandGroup>
+					</CommandList>
+				</Command>
+				<div className="flex justify-end border-t border-border p-2">
+					<Button
+						type="button"
+						variant="ghost"
+						size="sm"
+						className="h-8"
+						onClick={() => onChange([])}
+					>
+						Clear
+					</Button>
+				</div>
+			</PopoverContent>
+		</Popover>
+	);
+}
 
 function getErrorMessage(error: unknown, fallback: string): string {
 	if (
@@ -126,13 +238,6 @@ function getStatusBadgeVariant(status: OrderStatus) {
 	}
 }
 
-function isMatchingLookup(
-	orderId: string,
-	lookupOrder?: OrderResponse,
-): boolean {
-	return Boolean(orderId && lookupOrder && orderId === lookupOrder.id);
-}
-
 export default function OrdersPage() {
 	const { user, isBranchAdmin } = useAuth();
 
@@ -146,17 +251,44 @@ export default function OrdersPage() {
 	const [branchId, setBranchId] = useState("");
 	const [tableId, setTableId] = useState("");
 	const [selectedOrderId, setSelectedOrderId] = useState("");
-	const [lookupOrderId, setLookupOrderId] = useState("");
-	const [lookupError, setLookupError] = useState<string | null>(null);
 	const [summaryFilters, setSummaryFilters] = useState<SummaryFilterState>({
 		startDate: formatDateTimeLocalInput(defaultStartDate),
 		endDate: formatDateTimeLocalInput(defaultEndDate),
 		includeBranchFilter: false,
-		createdBy: "",
+		createdByUserIds: [],
 	});
 
 	const { data: businesses = [], isLoading: businessesLoading } =
 		useListMyBusinessesQuery();
+
+	const { data: businessRoles = [], isLoading: rolesLoading } =
+		useListBusinessRolesQuery({ businessId }, { skip: !businessId });
+
+	const { data: businessEmployees = [], isLoading: employeesLoading } =
+		useListBusinessEmployeesQuery({ businessId }, { skip: !businessId });
+
+	const waiterRoleIds = useMemo(() => {
+		return new Set(
+			businessRoles.filter((r) => /waiter/i.test(r.name)).map((r) => r.id),
+		);
+	}, [businessRoles]);
+
+	const waiterOptions = useMemo((): WaiterOption[] => {
+		const byUser = new Map<string, WaiterOption>();
+		for (const emp of businessEmployees) {
+			if (!emp.is_active || !waiterRoleIds.has(emp.role_id)) continue;
+			const uid = emp.user_id;
+			if (byUser.has(uid)) continue;
+			byUser.set(uid, {
+				userId: uid,
+				label: employeeUserDisplayName(emp),
+				branchLabel: emp.branch?.name ?? "—",
+			});
+		}
+		return Array.from(byUser.values()).sort((a, b) =>
+			a.label.localeCompare(b.label),
+		);
+	}, [businessEmployees, waiterRoleIds]);
 
 	const {
 		data: businessBranches = [],
@@ -200,19 +332,12 @@ export default function OrdersPage() {
 		{ skip: !resolvedTableId },
 	);
 
-	const [
-		triggerGetOrder,
-		{
-			data: lookupOrder,
-			isFetching: lookupFetching,
-			error: lookupRequestError,
-		},
-	] = useLazyGetOrderQuery();
-
 	const summaryQueryArgs = useMemo(() => {
 		if (!businessId || !summaryFilters.startDate || !summaryFilters.endDate) {
 			return null;
 		}
+
+		const createdByUserIds = [...summaryFilters.createdByUserIds].sort();
 
 		return {
 			businessId,
@@ -221,12 +346,12 @@ export default function OrdersPage() {
 			branchId: summaryFilters.includeBranchFilter
 				? resolvedBranchId || null
 				: null,
-			createdBy: summaryFilters.createdBy.trim() || null,
+			createdByUserIds,
 		};
 	}, [
 		businessId,
 		resolvedBranchId,
-		summaryFilters.createdBy,
+		summaryFilters.createdByUserIds,
 		summaryFilters.endDate,
 		summaryFilters.includeBranchFilter,
 		summaryFilters.startDate,
@@ -257,37 +382,12 @@ export default function OrdersPage() {
 		[branchTables, resolvedTableId],
 	);
 
-	const detailOrder = useMemo(() => {
-		const fromList =
-			tableOrders.find((order) => order.id === selectedOrderId) ?? null;
-		if (fromList) return fromList;
-		return isMatchingLookup(selectedOrderId, lookupOrder) ? lookupOrder : null;
-	}, [lookupOrder, selectedOrderId, tableOrders]);
-
 	const totalOrders = tableOrders.length;
 	const activeOrders = tableOrders.filter((order) => !order.is_archived).length;
 	const totalSummaryAmount = transactionsSummary.reduce(
 		(sum, entry) => sum + entry.amount,
 		0,
 	);
-
-	const handleOrderLookup = async (event: React.FormEvent) => {
-		event.preventDefault();
-		setLookupError(null);
-
-		const orderId = lookupOrderId.trim();
-		if (!orderId) {
-			setLookupError("Enter an order ID to look up.");
-			return;
-		}
-
-		try {
-			const result = await triggerGetOrder({ orderId }).unwrap();
-			setSelectedOrderId(result.id);
-		} catch (error) {
-			setLookupError(getErrorMessage(error, "Could not fetch the order."));
-		}
-	};
 
 	return (
 		<main className="flex flex-col gap-6">
@@ -533,7 +633,7 @@ export default function OrdersPage() {
 							<CardTitle>Transactions Summary</CardTitle>
 						</CardHeader>
 						<CardContent className="flex flex-col gap-5">
-							<FieldGroup className="grid gap-4 md:grid-cols-2">
+							<FieldGroup className="grid gap-4 grid-cols-1 md:grid-cols-3">
 								<Field>
 									<FieldLabel htmlFor="summary-start-date">
 										Start Date
@@ -564,9 +664,32 @@ export default function OrdersPage() {
 										}
 									/>
 								</Field>
+								<Field className="min-w-0">
+									<FieldLabel id="summary-created-by-label">
+										Created By
+									</FieldLabel>
+									<WaiterCreatorsCombobox
+										waiters={waiterOptions}
+										selectedUserIds={summaryFilters.createdByUserIds}
+										onChange={(ids) =>
+											setSummaryFilters((current) => ({
+												...current,
+												createdByUserIds: ids,
+											}))
+										}
+										disabled={!businessId}
+										emptyMessage={
+											rolesLoading || employeesLoading
+												? "Loading…"
+												: !businessId
+													? "Select a business first."
+													: "No waiters found for this business."
+										}
+									/>
+								</Field>
 							</FieldGroup>
 
-							<FieldGroup className="grid gap-4 md:grid-cols-2">
+							<FieldGroup>
 								<Field orientation="horizontal">
 									<Checkbox
 										id="summary-use-branch"
@@ -583,24 +706,6 @@ export default function OrdersPage() {
 											Filter by selected branch
 										</FieldLabel>
 									</FieldContent>
-								</Field>
-
-								<Field>
-									<FieldLabel htmlFor="summary-created-by">
-										Created By
-									</FieldLabel>
-									<Input
-										id="summary-created-by"
-										value={summaryFilters.createdBy}
-										onChange={(event) =>
-											setSummaryFilters((current) => ({
-												...current,
-												createdBy: event.target.value,
-											}))
-										}
-										placeholder="Optional user UUID"
-										autoComplete="off"
-									/>
 								</Field>
 							</FieldGroup>
 
