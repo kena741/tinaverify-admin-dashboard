@@ -129,7 +129,7 @@ export function AppSidebar({
 											className={cn(
 												"h-11 min-h-11 gap-3 text-base leading-snug transition-colors duration-150 [&_svg]:size-5",
 												isActive
-													? "bg-sidebar-primary font-semibold text-sidebar-primary-foreground shadow-sm hover:bg-sidebar-primary hover:text-sidebar-primary-foreground data-active:bg-sidebar-primary data-active:text-sidebar-primary-foreground"
+													? "hover:bg-sidebar-primary hover:text-sidebar-primary-foreground font-semibold shadow-sm data-active:bg-sidebar-primary data-active:text-sidebar-primary-foreground"
 													: "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
 											)}
 											render={

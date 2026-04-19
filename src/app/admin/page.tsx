@@ -324,7 +324,7 @@ export default function AdminDashboard() {
 		);
 	}
 
-	return (
+  return (
 		<main className="flex flex-col gap-6">
 			<header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
 				<div className="flex flex-col gap-1">
@@ -334,7 +334,7 @@ export default function AdminDashboard() {
 					<p className="text-sm text-muted-foreground">
 						Overview of your businesses, branches, and activity.
 					</p>
-				</div>
+        </div>
 				<Field className="w-full min-w-0 sm:max-w-xs">
 					<FieldLabel htmlFor="dashboard-period">Period</FieldLabel>
 					<Select value={period} onValueChange={(v) => setPeriod(v as Period)}>
@@ -427,7 +427,7 @@ export default function AdminDashboard() {
 							<div className="flex flex-col gap-2">
 								<Skeleton className="h-9 w-24" />
 								<Skeleton className="h-4 w-32" />
-							</div>
+            </div>
 						) : (
 							<>
 								<p className="text-3xl font-semibold tabular-nums">
@@ -450,7 +450,7 @@ export default function AdminDashboard() {
 								<Skeleton className="h-10 w-full" />
 								<Skeleton className="h-10 w-full" />
 								<Skeleton className="h-10 w-full" />
-							</div>
+          </div>
 						) : revenueRows.length === 0 ? (
 							<p className="text-sm text-muted-foreground">
 								No transaction rows in this period.
@@ -466,7 +466,7 @@ export default function AdminDashboard() {
 											<span className="shrink-0 tabular-nums text-muted-foreground">
 												ETB {formatAmount(row.amount)}
 											</span>
-										</div>
+                </div>
 										<div
 											className="h-2 w-full overflow-hidden rounded-full bg-muted"
 											aria-hidden="true"
@@ -476,14 +476,14 @@ export default function AdminDashboard() {
 												style={{
 													width: `${(row.amount / maxBusinessAmount) * 100}%`,
 												}}
-											/>
-										</div>
+                    />
+                  </div>
 										<p className="text-xs text-muted-foreground">
 											{row.txCount.toLocaleString()} transactions
 										</p>
-									</div>
-								))}
-							</div>
+                </div>
+              ))}
+            </div>
 						)}
 					</CardContent>
 				</Card>
@@ -512,14 +512,14 @@ export default function AdminDashboard() {
 					<p className="text-sm text-muted-foreground">
 						Manage locations and open detail pages.
 					</p>
-				</div>
+              </div>
 				<Card>
 					<CardContent className="pt-6">
 						{branchesLoading ? (
 							<div className="flex items-center gap-2 text-sm text-muted-foreground">
 								<Loader2Icon className="animate-spin" aria-hidden="true" />
 								Loading branches…
-							</div>
+            </div>
 						) : branches.length === 0 ? (
 							<p className="text-sm text-muted-foreground">
 								No branches yet. Create a business and branch to get started.
@@ -586,7 +586,7 @@ export default function AdminDashboard() {
 										))}
 									</TableBody>
 								</Table>
-							</div>
+        </div>
 						)}
 					</CardContent>
 				</Card>

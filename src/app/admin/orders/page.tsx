@@ -225,7 +225,7 @@ function formatDateTimeLocalInput(date: Date): string {
 }
 
 function getStatusBadgeVariant(status: OrderStatus) {
-	switch (status) {
+    switch (status) {
 		case "completed":
 			return "default";
 		case "cancelled":
@@ -233,7 +233,7 @@ function getStatusBadgeVariant(status: OrderStatus) {
 		case "in_progress":
 			return "secondary";
 		case "pending":
-		default:
+      default:
 			return "outline";
 	}
 }
@@ -389,7 +389,7 @@ export default function OrdersPage() {
 		0,
 	);
 
-	return (
+  return (
 		<main className="flex flex-col gap-6">
 			<header className="flex flex-col gap-3">
 				<h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
@@ -499,7 +499,7 @@ export default function OrdersPage() {
 											<SelectGroup>
 												{businessBranches.map((branch) => (
 													<SelectItem key={branch.id} value={branch.id}>
-														{branch.name}
+                    {branch.name}
 													</SelectItem>
 												))}
 											</SelectGroup>
@@ -582,7 +582,7 @@ export default function OrdersPage() {
 								<div className="flex items-center gap-2 text-sm text-muted-foreground">
 									<Loader2Icon className="animate-spin" />
 									Loading table orders...
-								</div>
+                    </div>
 							) : tableOrders.length === 0 ? (
 								<Alert className="border-none">
 									<AlertTitle>No orders found</AlertTitle>
@@ -733,7 +733,7 @@ export default function OrdersPage() {
 								<div className="flex items-center gap-2 text-sm text-muted-foreground">
 									<Loader2Icon className="animate-spin" />
 									Loading transaction summary...
-								</div>
+                            </div>
 							) : transactionsSummary.length === 0 ? (
 								<Alert className="border-none">
 									<AlertTitle>No summary rows found</AlertTitle>
@@ -774,8 +774,8 @@ export default function OrdersPage() {
 							)}
 						</CardContent>
 					</Card>
-				</div>
+    </div>
 			</section>
 		</main>
-	);
+  );
 }

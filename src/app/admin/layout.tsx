@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { AppSidebar } from "@/components/admin/app-sidebar";
+import { ModeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -105,6 +106,7 @@ export default function AdminLayout({
 						</div>
 					</div>
 					<div className="flex items-center gap-4">
+						<ModeToggle />
 						<div className="relative">
 							<Button
 								type="button"
