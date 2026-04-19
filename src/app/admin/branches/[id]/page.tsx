@@ -38,7 +38,6 @@ import {
 import {
 	Dialog,
 	DialogContent,
-	DialogDescription,
 	DialogFooter,
 	DialogHeader,
 	DialogTitle,
@@ -142,10 +141,7 @@ export default function BranchDetailPage({
 		data: tables = [],
 		isLoading: tablesLoading,
 		error: tablesError,
-	} = useListBranchTablesQuery(
-		{ branchId: id },
-		{ skip: !id || !branch },
-	);
+	} = useListBranchTablesQuery({ branchId: id }, { skip: !id || !branch });
 
 	const {
 		data: businessEmployees = [],
@@ -240,7 +236,10 @@ export default function BranchDetailPage({
 	if (branchLoading || businessesLoading) {
 		return (
 			<main className="flex min-h-[40vh] flex-col items-center justify-center gap-3">
-				<Loader2Icon className="animate-spin text-muted-foreground" aria-hidden="true" />
+				<Loader2Icon
+					className="animate-spin text-muted-foreground"
+					aria-hidden="true"
+				/>
 				<p className="text-sm text-muted-foreground" role="status">
 					Loading branch…
 				</p>
@@ -328,7 +327,10 @@ export default function BranchDetailPage({
 			<section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
 				<Card>
 					<CardHeader className="flex flex-row items-center gap-2 pb-2">
-						<TablePropertiesIcon className="text-muted-foreground" aria-hidden="true" />
+						<TablePropertiesIcon
+							className="text-muted-foreground"
+							aria-hidden="true"
+						/>
 						<CardTitle className="text-base">Tables</CardTitle>
 					</CardHeader>
 					<CardContent>
@@ -361,12 +363,8 @@ export default function BranchDetailPage({
 						<CardTitle className="text-base">Timestamps</CardTitle>
 					</CardHeader>
 					<CardContent className="flex flex-col gap-1 text-sm text-muted-foreground">
-						<span>
-							Created {formatDateTime(branch.created_at)}
-						</span>
-						<span>
-							Updated {formatDateTime(branch.updated_at)}
-						</span>
+						<span>Created {formatDateTime(branch.created_at)}</span>
+						<span>Updated {formatDateTime(branch.updated_at)}</span>
 					</CardContent>
 				</Card>
 			</section>
@@ -397,27 +395,14 @@ export default function BranchDetailPage({
 					<Card>
 						<CardHeader>
 							<CardTitle>Branch details</CardTitle>
-							<CardDescription>
-								Data from{" "}
-								<code className="rounded bg-muted px-1 py-0.5 text-xs">
-									GET /api/v1/branches/{"{branch_id}"}
-								</code>
-								.
-							</CardDescription>
 						</CardHeader>
 						<CardContent className="flex flex-col gap-4">
 							<dl className="grid gap-3 sm:grid-cols-2">
 								<div>
 									<dt className="text-xs font-medium text-muted-foreground">
-										Branch ID
+										Branch name
 									</dt>
-									<dd className="font-mono text-sm">{branch.id}</dd>
-								</div>
-								<div>
-									<dt className="text-xs font-medium text-muted-foreground">
-										Business ID
-									</dt>
-									<dd className="font-mono text-sm">{branch.business_id}</dd>
+									<dd className="text-sm">{branch.name}</dd>
 								</div>
 								<div>
 									<dt className="text-xs font-medium text-muted-foreground">
@@ -440,12 +425,6 @@ export default function BranchDetailPage({
 
 				<TabsContent value="tables" className="flex flex-col gap-4">
 					<div className="flex flex-wrap items-center justify-between gap-3">
-						<p className="text-sm text-muted-foreground">
-							Tables from{" "}
-							<code className="rounded bg-muted px-1 py-0.5 text-xs">
-								GET /api/v1/branches/{"{branch_id}"}/tables
-							</code>
-						</p>
 						<Button type="button" onClick={() => setCreateOpen(true)}>
 							<PlusIcon data-icon="inline-start" aria-hidden="true" />
 							Add Table
@@ -504,13 +483,6 @@ export default function BranchDetailPage({
 				</TabsContent>
 
 				<TabsContent value="team" className="flex flex-col gap-4">
-					<p className="text-sm text-muted-foreground">
-						Employees on this branch from{" "}
-						<code className="rounded bg-muted px-1 py-0.5 text-xs">
-							GET /api/v1/business/{"{business_id}"}/employees
-						</code>{" "}
-						(filtered by branch).
-					</p>
 					{employeesError ? (
 						<Alert variant="destructive">
 							<AlertTitle>Could not load employees</AlertTitle>
@@ -538,8 +510,12 @@ export default function BranchDetailPage({
 								<TableHeader>
 									<TableRow>
 										<TableHead>Name</TableHead>
-										<TableHead className="hidden sm:table-cell">Active</TableHead>
-										<TableHead className="hidden md:table-cell">Phone</TableHead>
+										<TableHead className="hidden sm:table-cell">
+											Active
+										</TableHead>
+										<TableHead className="hidden md:table-cell">
+											Phone
+										</TableHead>
 									</TableRow>
 								</TableHeader>
 								<TableBody>
@@ -568,13 +544,6 @@ export default function BranchDetailPage({
 					<Card>
 						<CardHeader>
 							<CardTitle>Edit branch</CardTitle>
-							<CardDescription>
-								Updates via{" "}
-								<code className="rounded bg-muted px-1 py-0.5 text-xs">
-									PUT /api/v1/branches/{"{branch_id}"}
-								</code>
-								.
-							</CardDescription>
 						</CardHeader>
 						<CardContent>
 							{settingsForm ? (
@@ -583,7 +552,9 @@ export default function BranchDetailPage({
 									className="flex flex-col gap-4"
 								>
 									<FieldGroup className="flex flex-col gap-4">
-										<Field data-invalid={settingsFieldErrors.name ? true : undefined}>
+										<Field
+											data-invalid={settingsFieldErrors.name ? true : undefined}
+										>
 											<FieldLabel htmlFor="branch-name">Branch name</FieldLabel>
 											<Input
 												id="branch-name"
@@ -687,11 +658,6 @@ export default function BranchDetailPage({
 					<form onSubmit={handleCreateTable}>
 						<DialogHeader>
 							<DialogTitle>Add table</DialogTitle>
-							<DialogDescription>
-								Creates a table via{" "}
-								<code className="text-xs">POST /api/v1/tables</code> for this
-								branch.
-							</DialogDescription>
 						</DialogHeader>
 						<FieldGroup className="py-4">
 							<Field>

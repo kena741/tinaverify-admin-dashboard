@@ -85,7 +85,6 @@ import {
 	TableRow,
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
-import { cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
 
 type CreateFormState = {
@@ -452,7 +451,7 @@ export default function BranchesPage() {
 										<TableHead className="hidden min-w-0 lg:table-cell">
 											Updated
 										</TableHead>
-										<TableHead className="text-right">Actions</TableHead>
+										<TableHead className="text-end">Actions</TableHead>
 									</TableRow>
 								</TableHeader>
 								<TableBody>
@@ -504,13 +503,7 @@ export default function BranchesPage() {
 																type="button"
 																variant="ghost"
 																size="icon-sm"
-																className={cn(
-																	"text-muted-foreground opacity-0 transition-opacity hover:bg-muted hover:text-foreground",
-																	"group-hover/row:opacity-100",
-																	"focus-visible:opacity-100",
-																	branchActionsMenuId === branch.id &&
-																		"opacity-100",
-																)}
+																className="text-muted-foreground hover:bg-muted hover:text-foreground"
 																aria-label="Branch actions"
 															/>
 														}

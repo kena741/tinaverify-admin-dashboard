@@ -1,236 +1,596 @@
 "use client";
 
-import { useState } from "react";
+import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
+import {
+	ArrowRightIcon,
+	Building2Icon,
+	CreditCardIcon,
+	LayoutGridIcon,
+	Loader2Icon,
+	MapPinIcon,
+	ShoppingBagIcon,
+	TablePropertiesIcon,
+	UsersIcon,
+} from "lucide-react";
 
-export default function AdminDashboard() {
-  const [selectedPeriod, setSelectedPeriod] = useState("today");
+import {
+	branchManagementApi,
+	useListAllUserBranchesQuery,
+} from "../../services/branch-management/branchManagementApi";
+import { ordersApi } from "../../services/orders/ordersApi";
+import { tablesApi } from "../../services/tables/tablesApi";
+import type {
+	EmployeeOutput,
+	OrderTransactionSummaryResponse,
+} from "../../services/types";
+import { useAppDispatch } from "../../store/hooks";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { buttonVariants } from "@/components/ui/button";
+import {
+	Card,
+	CardContent,
+	CardDescription,
+	CardHeader,
+	CardTitle,
+} from "@/components/ui/card";
+import { Field, FieldLabel } from "@/components/ui/field";
+import {
+	Select,
+	SelectContent,
+	SelectGroup,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@/components/ui/select";
+import { Separator } from "@/components/ui/separator";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+	Table,
+	TableBody,
+	TableCell,
+	TableHead,
+	TableHeader,
+	TableRow,
+} from "@/components/ui/table";
+import { cn } from "@/lib/utils";
 
-  // Mock data
-  const stats = {
-    totalRestaurants: 24,
-    totalBranches: 67,
-    activeStaff: 142,
-    transactionsToday: 1247,
-  };
+type Period = "today" | "week" | "month" | "year";
 
-  const paymentSuccessRate = [
-    { branch: "Addis Café - Bole", rate: 98.5 },
-    { branch: "Blue Nile Hotel", rate: 97.2 },
-    { branch: "Kaldi's Coffee - Meskel", rate: 96.8 },
-    { branch: "Habesha Restaurant", rate: 95.4 },
-    { branch: "Tomoca - Piazza", rate: 94.1 },
-  ];
-
-  const revenueData = [
-    { date: "Mon", restaurant: "Addis Café", revenue: 45000 },
-    { date: "Tue", restaurant: "Addis Café", revenue: 52000 },
-    { date: "Wed", restaurant: "Addis Café", revenue: 48000 },
-    { date: "Thu", restaurant: "Addis Café", revenue: 61000 },
-    { date: "Fri", restaurant: "Addis Café", revenue: 75000 },
-    { date: "Sat", restaurant: "Addis Café", revenue: 89000 },
-    { date: "Sun", restaurant: "Addis Café", revenue: 92000 },
-  ];
-
-  const recentActivity = [
-    { id: 1, type: "login", message: "Waiter John Doe logged in at Addis Café - Bole", time: "2 minutes ago", status: "success" },
-    { id: 2, type: "payment", message: "Payment failed at Blue Nile Hotel - Table 12", time: "15 minutes ago", status: "error" },
-    { id: 3, type: "restaurant", message: "New restaurant 'Habesha Restaurant' added", time: "1 hour ago", status: "info" },
-    { id: 4, type: "branch", message: "New branch 'Kaldi's Coffee - Meskel' activated", time: "2 hours ago", status: "success" },
-    { id: 5, type: "login", message: "Admin Sarah logged in", time: "3 hours ago", status: "success" },
-    { id: 6, type: "payment", message: "Telebirr connection restored at Tomoca - Piazza", time: "4 hours ago", status: "success" },
-  ];
-
-  const maxRevenue = Math.max(...revenueData.map(d => d.revenue));
-
-  return (
-    <div className="space-y-6">
-      {/* Page header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
-          <p className="mt-1 text-sm text-gray-500">Welcome back! Here's what's happening with your restaurants.</p>
-        </div>
-        <div className="flex items-center space-x-2">
-          <select
-            value={selectedPeriod}
-            onChange={(e) => setSelectedPeriod(e.target.value)}
-            className="px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="today">Today</option>
-            <option value="week">This Week</option>
-            <option value="month">This Month</option>
-            <option value="year">This Year</option>
-          </select>
-        </div>
-      </div>
-
-      {/* Summary cards */}
-      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">Total Restaurants</p>
-              <p className="mt-2 text-3xl font-bold text-gray-900">{stats.totalRestaurants}</p>
-              <p className="mt-1 text-xs text-green-600">+3 this month</p>
-            </div>
-            <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-              <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-              </svg>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">Total Branches</p>
-              <p className="mt-2 text-3xl font-bold text-gray-900">{stats.totalBranches}</p>
-              <p className="mt-1 text-xs text-green-600">+5 this month</p>
-            </div>
-            <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
-              <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-              </svg>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">Active Staff</p>
-              <p className="mt-2 text-3xl font-bold text-gray-900">{stats.activeStaff}</p>
-              <p className="mt-1 text-xs text-gray-500">142 online now</p>
-            </div>
-            <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-              <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
-              </svg>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">Transactions Today</p>
-              <p className="mt-2 text-3xl font-bold text-gray-900">{stats.transactionsToday.toLocaleString()}</p>
-              <p className="mt-1 text-xs text-green-600">+12% from yesterday</p>
-            </div>
-            <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center">
-              <svg className="w-6 h-6 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
-              </svg>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Charts section */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        {/* Payment Success Rate */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-lg font-semibold text-gray-900">Payment Success Rate by Branch</h2>
-          </div>
-          <div className="space-y-4">
-            {paymentSuccessRate.map((item, index) => (
-              <div key={index}>
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium text-gray-700">{item.branch}</span>
-                  <span className="text-sm font-semibold text-gray-900">{item.rate}%</span>
-                </div>
-                <div className="w-full bg-gray-200 rounded-full h-2.5">
-                  <div
-                    className={`h-2.5 rounded-full ${
-                      item.rate >= 97
-                        ? "bg-green-500"
-                        : item.rate >= 95
-                        ? "bg-yellow-500"
-                        : "bg-red-500"
-                    }`}
-                    style={{ width: `${item.rate}%` }}
-                  />
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Revenue Chart */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-lg font-semibold text-gray-900">Total Revenue (This Week)</h2>
-          </div>
-          <div className="space-y-4">
-            <div className="flex items-end justify-between h-48 space-x-2">
-              {revenueData.map((item, index) => (
-                <div key={index} className="flex-1 flex flex-col items-center">
-                  <div className="w-full flex items-end justify-center" style={{ height: "100%" }}>
-                    <div
-                      className="w-full bg-blue-500 rounded-t-lg hover:bg-blue-600 transition-colors cursor-pointer"
-                      style={{ height: `${(item.revenue / maxRevenue) * 100}%` }}
-                      title={`${item.date}: ETB ${item.revenue.toLocaleString()}`}
-                    />
-                  </div>
-                  <span className="mt-2 text-xs text-gray-600">{item.date}</span>
-                </div>
-              ))}
-            </div>
-            <div className="pt-4 border-t border-gray-200">
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-gray-600">Total Revenue</span>
-                <span className="font-semibold text-gray-900">ETB {revenueData.reduce((sum, d) => sum + d.revenue, 0).toLocaleString()}</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Recent Activity */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-lg font-semibold text-gray-900">Recent Activity</h2>
-          <button className="text-sm text-blue-600 hover:text-blue-700 font-medium">View all</button>
-        </div>
-        <div className="space-y-4">
-          {recentActivity.map((activity) => (
-            <div key={activity.id} className="flex items-start space-x-4 p-4 rounded-lg hover:bg-gray-50 transition-colors">
-              <div
-                className={`shrink-0 w-10 h-10 rounded-lg flex items-center justify-center ${
-                  activity.status === "error"
-                    ? "bg-red-100"
-                    : activity.status === "success"
-                    ? "bg-green-100"
-                    : "bg-blue-100"
-                }`}
-              >
-                {activity.type === "login" && (
-                  <svg className={`w-5 h-5 ${activity.status === "success" ? "text-green-600" : "text-red-600"}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                  </svg>
-                )}
-                {activity.type === "payment" && (
-                  <svg className={`w-5 h-5 ${activity.status === "error" ? "text-red-600" : "text-green-600"}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
-                  </svg>
-                )}
-                {(activity.type === "restaurant" || activity.type === "branch") && (
-                  <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                  </svg>
-                )}
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm text-gray-900">{activity.message}</p>
-                <p className="mt-1 text-xs text-gray-500">{activity.time}</p>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
+function getPeriodRange(period: Period): { start: string; end: string } {
+	const end = new Date();
+	const start = new Date();
+	switch (period) {
+		case "today":
+			start.setHours(0, 0, 0, 0);
+			break;
+		case "week":
+			start.setDate(end.getDate() - 6);
+			start.setHours(0, 0, 0, 0);
+			break;
+		case "month":
+			start.setMonth(end.getMonth() - 1);
+			start.setHours(0, 0, 0, 0);
+			break;
+		case "year":
+			start.setFullYear(end.getFullYear() - 1);
+			start.setHours(0, 0, 0, 0);
+			break;
+	}
+	return {
+		start: start.toISOString(),
+		end: end.toISOString(),
+	};
 }
 
+function periodLabel(period: Period): string {
+	switch (period) {
+		case "today":
+			return "Today";
+		case "week":
+			return "Last 7 days";
+		case "month":
+			return "Last 30 days";
+		case "year":
+			return "Last year";
+	}
+}
+
+function formatAmount(value: number): string {
+	return value.toLocaleString(undefined, {
+		minimumFractionDigits: 0,
+		maximumFractionDigits: 2,
+	});
+}
+
+function getErrorMessage(error: unknown, fallback: string): string {
+	if (
+		typeof error === "object" &&
+		error !== null &&
+		"data" in error &&
+		(error as { data?: { detail?: unknown } }).data?.detail
+	) {
+		const detail = (error as { data: { detail: unknown } }).data.detail;
+		if (typeof detail === "string") return detail;
+		if (Array.isArray(detail)) {
+			const messages = detail
+				.map((item) =>
+					typeof item === "object" &&
+					item !== null &&
+					"msg" in item &&
+					typeof item.msg === "string"
+						? item.msg
+						: null,
+				)
+				.filter(Boolean);
+			if (messages.length > 0) return messages.join(", ");
+		}
+	}
+	if (error instanceof Error) return error.message;
+	return fallback;
+}
+
+type RevenueByBusinessRow = {
+	businessId: string;
+	businessName: string;
+	amount: number;
+	txCount: number;
+};
+
+export default function AdminDashboard() {
+	const dispatch = useAppDispatch();
+	const [period, setPeriod] = useState<Period>("week");
+
+	const {
+		data: branchBundle,
+		isLoading: branchesLoading,
+		isError: branchesError,
+		error: branchesQueryError,
+	} = useListAllUserBranchesQuery();
+
+	const businesses = useMemo(
+		() => branchBundle?.myBusinesses ?? [],
+		[branchBundle],
+	);
+	const branches = useMemo(() => branchBundle?.branches ?? [], [branchBundle]);
+
+	const businessIdsKey = useMemo(
+		() => businesses.map((b) => b.id).join(","),
+		[businesses],
+	);
+	const branchIdsKey = useMemo(
+		() => branches.map((b) => b.id).join(","),
+		[branches],
+	);
+
+	const [employees, setEmployees] = useState<EmployeeOutput[]>([]);
+	const [revenueRows, setRevenueRows] = useState<RevenueByBusinessRow[]>([]);
+	const [totalTables, setTotalTables] = useState<number | null>(null);
+	const [aggregatesLoading, setAggregatesLoading] = useState(false);
+	const [aggregatesError, setAggregatesError] = useState<string | null>(null);
+
+	useEffect(() => {
+		if (businesses.length === 0) {
+			setEmployees([]);
+			setRevenueRows([]);
+			setTotalTables(null);
+			setAggregatesLoading(false);
+			return;
+		}
+
+		let cancelled = false;
+		const range = getPeriodRange(period);
+
+		setAggregatesLoading(true);
+		setAggregatesError(null);
+
+		const run = async () => {
+			try {
+				const employeeResults = await Promise.allSettled(
+					businesses.map((b) =>
+						dispatch(
+							branchManagementApi.endpoints.listBusinessEmployees.initiate({
+								businessId: b.id,
+							}),
+						).unwrap(),
+					),
+				);
+
+				const txResults = await Promise.allSettled(
+					businesses.map((b) =>
+						dispatch(
+							ordersApi.endpoints.listOrderTransactionsSummary.initiate({
+								businessId: b.id,
+								startDate: range.start,
+								endDate: range.end,
+								branchId: null,
+								createdByUserIds: [],
+							}),
+						).unwrap(),
+					),
+				);
+
+				const tableResults =
+					branches.length === 0
+						? []
+						: await Promise.allSettled(
+								branches.map((br) =>
+									dispatch(
+										tablesApi.endpoints.listBranchTables.initiate({
+											branchId: br.id,
+										}),
+									).unwrap(),
+								),
+							);
+
+				if (cancelled) return;
+
+				const mergedEmployees: EmployeeOutput[] = [];
+				for (const r of employeeResults) {
+					if (r.status === "fulfilled") mergedEmployees.push(...r.value);
+				}
+
+				const revenue: RevenueByBusinessRow[] = businesses.map((b, i) => {
+					const r = txResults[i];
+					let rows: OrderTransactionSummaryResponse[] = [];
+					if (r.status === "fulfilled") rows = r.value;
+					const amount = rows.reduce((sum, row) => sum + row.amount, 0);
+					return {
+						businessId: b.id,
+						businessName: b.name,
+						amount,
+						txCount: rows.length,
+					};
+				});
+
+				let tablesCount = 0;
+				for (const r of tableResults) {
+					if (r.status === "fulfilled") tablesCount += r.value.length;
+				}
+
+				setEmployees(mergedEmployees);
+				setRevenueRows(revenue);
+				setTotalTables(branches.length === 0 ? 0 : tablesCount);
+
+				const failedEmp = employeeResults.filter(
+					(r) => r.status === "rejected",
+				);
+				const failedTx = txResults.filter((r) => r.status === "rejected");
+				const failedTbl = tableResults.filter((r) => r.status === "rejected");
+				if (
+					failedEmp.length > 0 ||
+					failedTx.length > 0 ||
+					failedTbl.length > 0
+				) {
+					setAggregatesError(
+						"Some data could not be loaded. Totals may be incomplete.",
+					);
+				}
+			} catch (e) {
+				if (!cancelled) {
+					setAggregatesError(
+						e instanceof Error ? e.message : "Could not load dashboard data.",
+					);
+				}
+			} finally {
+				if (!cancelled) setAggregatesLoading(false);
+			}
+		};
+
+		void run();
+		return () => {
+			cancelled = true;
+		};
+	}, [businessIdsKey, branchIdsKey, period, dispatch, businesses, branches]);
+
+	const activeEmployees = useMemo(() => {
+		const active = employees.filter((e) => e.is_active);
+		return new Set(active.map((e) => e.user_id)).size;
+	}, [employees]);
+
+	const txTotals = useMemo(() => {
+		const count = revenueRows.reduce((s, r) => s + r.txCount, 0);
+		const amount = revenueRows.reduce((s, r) => s + r.amount, 0);
+		return { count, amount };
+	}, [revenueRows]);
+
+	const maxBusinessAmount = useMemo(
+		() => Math.max(1, ...revenueRows.map((r) => r.amount)),
+		[revenueRows],
+	);
+
+	const businessNameById = useMemo(() => {
+		const m = new Map<string, string>();
+		for (const b of businesses) m.set(b.id, b.name);
+		return m;
+	}, [businesses]);
+
+	const loadError = branchesError
+		? getErrorMessage(
+				branchesQueryError,
+				"Could not load businesses and branches.",
+			)
+		: null;
+
+	if (loadError) {
+		return (
+			<main className="flex flex-col gap-4">
+				<Alert variant="destructive">
+					<AlertTitle>Could not load dashboard</AlertTitle>
+					<AlertDescription>{loadError}</AlertDescription>
+				</Alert>
+			</main>
+		);
+	}
+
+	return (
+		<main className="flex flex-col gap-6">
+			<header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+				<div className="flex flex-col gap-1">
+					<h1 className="text-balance text-2xl font-semibold tracking-tight sm:text-3xl">
+						Dashboard
+					</h1>
+					<p className="text-sm text-muted-foreground">
+						Overview of your businesses, branches, and activity.
+					</p>
+				</div>
+				<Field className="w-full min-w-0 sm:max-w-xs">
+					<FieldLabel htmlFor="dashboard-period">Period</FieldLabel>
+					<Select value={period} onValueChange={(v) => setPeriod(v as Period)}>
+						<SelectTrigger id="dashboard-period" className="w-full">
+							<SelectValue placeholder="Period" />
+						</SelectTrigger>
+						<SelectContent>
+							<SelectGroup>
+								<SelectItem value="today">Today</SelectItem>
+								<SelectItem value="week">Last 7 days</SelectItem>
+								<SelectItem value="month">Last 30 days</SelectItem>
+								<SelectItem value="year">Last year</SelectItem>
+							</SelectGroup>
+						</SelectContent>
+					</Select>
+				</Field>
+			</header>
+
+			{aggregatesError ? (
+				<Alert>
+					<AlertTitle>Partial data</AlertTitle>
+					<AlertDescription>{aggregatesError}</AlertDescription>
+				</Alert>
+			) : null}
+
+			<section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+				<Card>
+					<CardHeader className="flex flex-row items-center justify-between pb-2">
+						<CardTitle className="text-base font-medium">Businesses</CardTitle>
+						<Building2Icon
+							className="text-muted-foreground"
+							aria-hidden="true"
+						/>
+					</CardHeader>
+					<CardContent>
+						{branchesLoading || aggregatesLoading ? (
+							<Skeleton className="h-9 w-16" />
+						) : (
+							<p className="text-3xl font-semibold tabular-nums">
+								{businesses.length}
+							</p>
+						)}
+					</CardContent>
+				</Card>
+
+				<Card>
+					<CardHeader className="flex flex-row items-center justify-between pb-2">
+						<CardTitle className="text-base font-medium">Branches</CardTitle>
+						<MapPinIcon className="text-muted-foreground" aria-hidden="true" />
+					</CardHeader>
+					<CardContent>
+						{branchesLoading || aggregatesLoading ? (
+							<Skeleton className="h-9 w-16" />
+						) : (
+							<p className="text-3xl font-semibold tabular-nums">
+								{branches.length}
+							</p>
+						)}
+					</CardContent>
+				</Card>
+
+				<Card>
+					<CardHeader className="flex flex-row items-center justify-between pb-2">
+						<CardTitle className="text-base font-medium">Team</CardTitle>
+						<UsersIcon className="text-muted-foreground" aria-hidden="true" />
+					</CardHeader>
+					<CardContent>
+						{branchesLoading || aggregatesLoading ? (
+							<Skeleton className="h-9 w-16" />
+						) : (
+							<p className="text-3xl font-semibold tabular-nums">
+								{activeEmployees}
+							</p>
+						)}
+					</CardContent>
+				</Card>
+
+				<Card>
+					<CardHeader className="flex flex-row items-center justify-between pb-2">
+						<CardTitle className="text-base font-medium">
+							Transactions
+						</CardTitle>
+						<CreditCardIcon
+							className="text-muted-foreground"
+							aria-hidden="true"
+						/>
+					</CardHeader>
+					<CardContent>
+						{branchesLoading || aggregatesLoading ? (
+							<div className="flex flex-col gap-2">
+								<Skeleton className="h-9 w-24" />
+								<Skeleton className="h-4 w-32" />
+							</div>
+						) : (
+							<>
+								<p className="text-3xl font-semibold tabular-nums">
+									{txTotals.count.toLocaleString()}
+								</p>
+							</>
+						)}
+					</CardContent>
+				</Card>
+			</section>
+
+			<section className="grid gap-4 lg:grid-cols-2">
+				<Card className="min-w-0">
+					<CardHeader>
+						<CardTitle>Revenue by business</CardTitle>
+					</CardHeader>
+					<CardContent className="flex flex-col gap-4">
+						{branchesLoading || aggregatesLoading ? (
+							<div className="flex flex-col gap-3">
+								<Skeleton className="h-10 w-full" />
+								<Skeleton className="h-10 w-full" />
+								<Skeleton className="h-10 w-full" />
+							</div>
+						) : revenueRows.length === 0 ? (
+							<p className="text-sm text-muted-foreground">
+								No transaction rows in this period.
+							</p>
+						) : (
+							<div className="flex flex-col gap-4">
+								{revenueRows.map((row) => (
+									<div key={row.businessId} className="flex flex-col gap-2">
+										<div className="flex items-center justify-between gap-2 text-sm">
+											<span className="truncate font-medium">
+												{row.businessName}
+											</span>
+											<span className="shrink-0 tabular-nums text-muted-foreground">
+												ETB {formatAmount(row.amount)}
+											</span>
+										</div>
+										<div
+											className="h-2 w-full overflow-hidden rounded-full bg-muted"
+											aria-hidden="true"
+										>
+											<div
+												className="h-full rounded-full bg-primary transition-[width]"
+												style={{
+													width: `${(row.amount / maxBusinessAmount) * 100}%`,
+												}}
+											/>
+										</div>
+										<p className="text-xs text-muted-foreground">
+											{row.txCount.toLocaleString()} transactions
+										</p>
+									</div>
+								))}
+							</div>
+						)}
+					</CardContent>
+				</Card>
+
+				<Card className="min-w-0">
+					<CardHeader>
+						<CardTitle>Tables</CardTitle>
+					</CardHeader>
+					<CardContent>
+						{branchesLoading || aggregatesLoading ? (
+							<Skeleton className="h-10 w-28" />
+						) : totalTables === null ? (
+							<p className="text-sm text-muted-foreground">—</p>
+						) : (
+							<p className="text-3xl font-semibold tabular-nums">
+								{totalTables}
+							</p>
+						)}
+					</CardContent>
+				</Card>
+			</section>
+
+			<section className="flex flex-col gap-4">
+				<div className="flex flex-col gap-1">
+					<h2 className="text-lg font-semibold tracking-tight">Branches</h2>
+					<p className="text-sm text-muted-foreground">
+						Manage locations and open detail pages.
+					</p>
+				</div>
+				<Card>
+					<CardContent className="pt-6">
+						{branchesLoading ? (
+							<div className="flex items-center gap-2 text-sm text-muted-foreground">
+								<Loader2Icon className="animate-spin" aria-hidden="true" />
+								Loading branches…
+							</div>
+						) : branches.length === 0 ? (
+							<p className="text-sm text-muted-foreground">
+								No branches yet. Create a business and branch to get started.
+							</p>
+						) : (
+							<div className="overflow-x-auto">
+								<Table>
+									<TableHeader>
+										<TableRow>
+											<TableHead>Branch</TableHead>
+											<TableHead className="hidden sm:table-cell">
+												Business
+											</TableHead>
+											<TableHead className="hidden md:table-cell">
+												Status
+											</TableHead>
+											<TableHead className="text-end">
+												<span className="sr-only">Actions</span>
+											</TableHead>
+										</TableRow>
+									</TableHeader>
+									<TableBody>
+										{branches.map((br) => (
+											<TableRow key={br.id}>
+												<TableCell className="font-medium">
+													<Link
+														href={`/admin/branches/${br.id}`}
+														className="text-primary underline-offset-4 hover:underline"
+													>
+														{br.name}
+													</Link>
+												</TableCell>
+												<TableCell className="hidden text-muted-foreground sm:table-cell">
+													{businessNameById.get(br.business_id) ?? "—"}
+												</TableCell>
+												<TableCell className="hidden md:table-cell">
+													<div className="flex flex-wrap gap-1">
+														{br.is_archived ? (
+															<Badge variant="outline">Archived</Badge>
+														) : (
+															<Badge>Active</Badge>
+														)}
+														{br.is_head_quarter ? (
+															<Badge variant="secondary">HQ</Badge>
+														) : null}
+													</div>
+												</TableCell>
+												<TableCell className="text-end">
+													<Link
+														href={`/admin/branches/${br.id}`}
+														className={cn(
+															buttonVariants({ variant: "ghost", size: "sm" }),
+															"gap-1",
+														)}
+													>
+														Open
+														<ArrowRightIcon
+															data-icon="inline-end"
+															aria-hidden="true"
+														/>
+													</Link>
+												</TableCell>
+											</TableRow>
+										))}
+									</TableBody>
+								</Table>
+							</div>
+						)}
+					</CardContent>
+				</Card>
+			</section>
+		</main>
+	);
+}
