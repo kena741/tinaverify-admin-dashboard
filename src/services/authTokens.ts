@@ -1,4 +1,4 @@
-const BACKEND_ORIGIN = process.env.NEXT_PUBLIC_BACKEND_BASE_URL!.replace(
+const BACKEND_ORIGIN = "https://zuludine-backend-596135030502.europe-west3.run.app".replace(
 	/\/$/,
 	"",
 );
