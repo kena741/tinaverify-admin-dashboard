@@ -1,107 +1,163 @@
 "use client";
 
-import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import {
+	createContext,
+	useContext,
+	useState,
+	useEffect,
+	ReactNode,
+} from "react";
 import { useRouter } from "next/navigation";
-import { useAppDispatch, useAppSelector } from "../../store/hooks";
-import { loginAdmin, logoutAdmin, getCurrentAdmin, PlatformAdmin } from "../../features/auth/authSlice";
-
-type UserRole = "system_admin" | "branch_admin";
+import {
+	useLazyReadMeQuery,
+	useLoginUserMutation,
+} from "../../services/auth/authApi";
+import type { UserOutput } from "../../services/types";
+import {
+	clearStoredTokens,
+	getStoredAccessToken,
+	getStoredRefreshToken,
+	setStoredTokens,
+	refreshAccessToken,
+} from "../../services/authTokens";
 
 interface User {
-  id: string;
-  name: string;
-  email: string;
-  role: UserRole;
-  branchId?: string;
-  branchName?: string;
+	id: string;
+	name: string;
+	email: string | null;
+	isSuperuser: boolean;
+	branchId?: string;
+	branchName?: string;
 }
 
 interface AuthContextType {
-  user: User | null;
-  login: (email: string, password: string) => Promise<boolean>;
-  logout: () => void;
-  isSystemAdmin: () => boolean;
-  isBranchAdmin: () => boolean;
+	user: User | null;
+	login: (email: string, password: string) => Promise<boolean>;
+	logout: () => void;
+	isSystemAdmin: () => boolean;
+	isBranchAdmin: () => boolean;
+	loading: boolean;
+	error: string | null;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Helper to convert PlatformAdmin to User
-const platformAdminToUser = (admin: PlatformAdmin): User => {
-  return {
-    id: admin.user_id || admin.id || '', // Use user_id as the primary identifier
-    name: admin.name,
-    email: admin.email,
-    role: admin.role.toLowerCase() as UserRole,
-  };
+const backendUserToUser = (u: UserOutput): User => {
+	const first = u.user_information?.first_name?.trim() || "";
+	const last = u.user_information?.last_name?.trim() || "";
+	const name = `${first} ${last}`.trim() || u.username || u.phone_number;
+
+	return {
+		id: u.id,
+		name,
+		email: u.email,
+		isSuperuser: u.is_superuser,
+	};
 };
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const dispatch = useAppDispatch();
-  const { admin, isAuthenticated, loading, error } = useAppSelector((state: any) => state.auth);
-  const router = useRouter();
-  const [user, setUser] = useState<User | null>(null);
+	const router = useRouter();
+	const [user, setUser] = useState<User | null>(null);
+	const [error, setError] = useState<string | null>(null);
+	const [loginUser, { isLoading: isLoggingIn }] = useLoginUserMutation();
+	const [readMe, { isFetching: isReadingMe }] = useLazyReadMeQuery();
 
-  // Sync Redux admin state to local user state
-  useEffect(() => {
-    if (admin) {
-      setUser(platformAdminToUser(admin));
-    } else {
-      setUser(null);
-    }
-  }, [admin]);
+	// Check for existing session on mount
+	useEffect(() => {
+		const checkSession = async () => {
+			try {
+				if (typeof window === "undefined") return;
 
-  // Check for existing session on mount
-  useEffect(() => {
-    const checkSession = async () => {
-      try {
-        await dispatch(getCurrentAdmin()).unwrap();
-      } catch (error) {
-        // No active session, clear any stored data
-        setUser(null);
-      }
-    };
-    checkSession();
-  }, [dispatch]);
+				const hasAccess = Boolean(getStoredAccessToken());
+				const hasRefresh = Boolean(getStoredRefreshToken());
+				if (!hasAccess && !hasRefresh) {
+					setUser(null);
+					return;
+				}
+				if (!hasAccess && hasRefresh) {
+					const ok = await refreshAccessToken();
+					if (!ok) {
+						setUser(null);
+						return;
+					}
+				}
 
-  const login = async (email: string, password: string): Promise<boolean> => {
-    try {
-      await dispatch(loginAdmin({ email, password })).unwrap();
-      return true;
-    } catch (error: any) {
-      console.error("Login error:", error);
-      return false;
-    }
-  };
+				const me = await readMe().unwrap();
+				setUser(backendUserToUser(me));
+			} catch {
+				clearStoredTokens();
+				setUser(null);
+			}
+		};
+		checkSession();
+	}, [readMe]);
 
-  const logout = async () => {
-    try {
-      await dispatch(logoutAdmin()).unwrap();
-      setUser(null);
-      router.push("/login");
-    } catch (error) {
-      console.error("Logout error:", error);
-      // Still clear local state even if logout fails
-      setUser(null);
-      router.push("/login");
-    }
-  };
+	const login = async (email: string, password: string): Promise<boolean> => {
+		try {
+			setError(null);
 
-  const isSystemAdmin = () => user?.role === "system_admin";
-  const isBranchAdmin = () => user?.role === "branch_admin";
+			const auth = await loginUser({ username: email, password }).unwrap();
+			if (typeof window !== "undefined") {
+				setStoredTokens(auth.access_token, auth.refresh_token);
+			}
+			setUser(backendUserToUser(auth.user));
+			return true;
+		} catch (e: unknown) {
+			const err = e as {
+				data?: { detail?: string; message?: string };
+				error?: string;
+				message?: string;
+			};
+			setError(
+				err.data?.detail ||
+					err.data?.message ||
+					err.error ||
+					err.message ||
+					"Login failed",
+			);
+			return false;
+		}
+	};
 
-  return (
-    <AuthContext.Provider value={{ user, login, logout, isSystemAdmin, isBranchAdmin }}>
-      {children}
-    </AuthContext.Provider>
-  );
+	const logout = async () => {
+		try {
+			setError(null);
+			clearStoredTokens();
+			setUser(null);
+			router.push("/login");
+		} catch (error) {
+			console.error("Logout error:", error);
+			clearStoredTokens();
+			setUser(null);
+			router.push("/login");
+		}
+	};
+
+	const isSystemAdmin = () => Boolean(user?.isSuperuser);
+	const isBranchAdmin = () => Boolean(user && !user.isSuperuser);
+	const loading = isLoggingIn || isReadingMe;
+
+	return (
+		<AuthContext.Provider
+			value={{
+				user,
+				login,
+				logout,
+				isSystemAdmin,
+				isBranchAdmin,
+				loading,
+				error,
+			}}
+		>
+			{children}
+		</AuthContext.Provider>
+	);
 }
 
 export function useAuth() {
-  const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error("useAuth must be used within an AuthProvider");
-  }
-  return context;
+	const context = useContext(AuthContext);
+	if (context === undefined) {
+		throw new Error("useAuth must be used within an AuthProvider");
+	}
+	return context;
 }
-

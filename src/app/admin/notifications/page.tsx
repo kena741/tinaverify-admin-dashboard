@@ -182,7 +182,7 @@ export default function NotificationsPage() {
             >
               <div className="flex items-start space-x-4">
                 <div
-                  className={`flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center ${
+                  className={`shrink-0 w-10 h-10 rounded-lg flex items-center justify-center ${
                     notif.critical
                       ? "bg-red-100"
                       : notif.type.includes("payment")

@@ -1,29 +1,38 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState, useEffect, use } from "react";
+import { useState, useEffect, use, useMemo } from "react";
 import Link from "next/link";
 import { useAppDispatch, useAppSelector } from "../../../../store/hooks";
 import { fetchRestaurantById } from "../../../../features/restaurants/restaurantsSlice";
-import { fetchBranches } from "../../../../features/branches/branchesSlice";
+import { useListBusinessBranchesQuery } from "../../../../services/branch-management/branchManagementApi";
+import { branchFromOutput } from "../../../../services/types";
 import { fetchStaff } from "../../../../features/staff/staffSlice";
+import { tabNavButtonClass, tabPanelEnterClass } from "@/lib/tab-animation";
+import { cn } from "@/lib/utils";
 
 export default function RestaurantDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
   const dispatch = useAppDispatch();
+  const { id } = use(params);
+
   const { selectedRestaurant, loading, error } = useAppSelector((state: any) => state.restaurants);
-  const { branches, loading: branchesLoading } = useAppSelector((state: any) => state.branches);
+  const { data: branchRows, isLoading: branchesLoading } =
+    useListBusinessBranchesQuery(
+      { businessId: id },
+      { skip: !id },
+    );
+  const branches = useMemo(
+    () => (branchRows ?? []).map(branchFromOutput),
+    [branchRows],
+  );
   const { staff: restaurantStaff, loading: staffLoading } = useAppSelector((state: any) => state.staff);
   const [activeTab, setActiveTab] = useState("overview");
-
-  // Unwrap params Promise using React.use()
-  const { id } = use(params);
 
   // Fetch restaurant by ID and its branches on component mount
   useEffect(() => {
     if (id) {
       dispatch(fetchRestaurantById(id));
-      dispatch(fetchBranches(id)); // Fetch branches for this restaurant
       dispatch(fetchStaff({ restaurantId: id })); // Fetch staff for this restaurant
     }
   }, [dispatch, id]);
@@ -35,7 +44,7 @@ export default function RestaurantDetailPage({ params }: { params: Promise<{ id:
   };
 
   // Filter branches for this restaurant (in case all branches are fetched)
-  const restaurantBranches = branches.filter((branch: any) => branch.restaurant_id === id);
+  const restaurantBranches = branches;
 
   // Get branch name for staff member
   const getBranchName = (branchId?: string) => {
@@ -147,7 +156,10 @@ export default function RestaurantDetailPage({ params }: { params: Promise<{ id:
                   {restaurant.status === "ACTIVE" ? "Active" : "Inactive"}
                 </span>
                 <span className="text-xs text-gray-500">
-                  Created: {new Date(restaurant.created_at).toLocaleDateString()}
+                  Created:{" "}
+                  {restaurant.created_at
+                    ? new Date(restaurant.created_at).toLocaleDateString()
+                    : "—"}
                 </span>
               </div>
             </div>
@@ -229,61 +241,46 @@ export default function RestaurantDetailPage({ params }: { params: Promise<{ id:
       {/* Tabs */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200">
         <div className="border-b border-gray-200">
-          <nav className="-mb-px flex space-x-8 px-6">
+          <nav className="-mb-px flex flex-wrap gap-8 px-6">
             <button
+              type="button"
               onClick={() => setActiveTab("overview")}
-              className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                activeTab === "overview"
-                  ? "border-blue-500 text-blue-600"
-                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-              }`}
+              className={tabNavButtonClass(activeTab === "overview")}
             >
               Overview
             </button>
             <button
+              type="button"
               onClick={() => setActiveTab("branches")}
-              className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                activeTab === "branches"
-                  ? "border-blue-500 text-blue-600"
-                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-              }`}
+              className={tabNavButtonClass(activeTab === "branches")}
             >
               Branches ({restaurantBranches.length})
             </button>
             <button
+              type="button"
               onClick={() => setActiveTab("staff")}
-              className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                activeTab === "staff"
-                  ? "border-blue-500 text-blue-600"
-                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-              }`}
+              className={tabNavButtonClass(activeTab === "staff")}
             >
               Staff ({restaurantStaff.length})
             </button>
             <button
+              type="button"
               onClick={() => setActiveTab("analytics")}
-              className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                activeTab === "analytics"
-                  ? "border-blue-500 text-blue-600"
-                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-              }`}
+              className={tabNavButtonClass(activeTab === "analytics")}
             >
               Analytics
             </button>
             <button
+              type="button"
               onClick={() => setActiveTab("transactions")}
-              className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                activeTab === "transactions"
-                  ? "border-blue-500 text-blue-600"
-                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-              }`}
+              className={tabNavButtonClass(activeTab === "transactions")}
             >
               Transactions
             </button>
           </nav>
         </div>
 
-        <div className="p-6">
+        <div key={activeTab} className={cn("p-6", tabPanelEnterClass)}>
           {/* Overview Tab */}
           {activeTab === "overview" && (
             <div className="space-y-6">
@@ -556,7 +553,7 @@ export default function RestaurantDetailPage({ params }: { params: Promise<{ id:
                     <div key={index} className="flex-1 flex flex-col items-center">
                       <div className="w-full flex items-end justify-center" style={{ height: "100%" }}>
                         <div
-                          className="w-full bg-gradient-to-t from-blue-500 to-blue-400 rounded-t-lg hover:from-blue-600 hover:to-blue-500 transition-colors cursor-pointer"
+                          className="w-full bg-linear-to-t from-blue-500 to-blue-400 rounded-t-lg hover:from-blue-600 hover:to-blue-500 transition-colors cursor-pointer"
                           style={{ height: `${(item.revenue / maxMonthlyRevenue) * 100}%` }}
                           title={`${item.month}: ETB ${item.revenue.toLocaleString()}`}
                         />
@@ -575,7 +572,7 @@ export default function RestaurantDetailPage({ params }: { params: Promise<{ id:
                     <div key={index} className="flex-1 flex flex-col items-center">
                       <div className="w-full flex items-end justify-center" style={{ height: "100%" }}>
                         <div
-                          className="w-full bg-gradient-to-t from-green-500 to-green-400 rounded-t-lg hover:from-green-600 hover:to-green-500 transition-colors cursor-pointer"
+                          className="w-full bg-linear-to-t from-green-500 to-green-400 rounded-t-lg hover:from-green-600 hover:to-green-500 transition-colors cursor-pointer"
                           style={{ height: `${(item.revenue / maxHourlyRevenue) * 100}%` }}
                           title={`${item.hour}: ETB ${item.revenue.toLocaleString()}`}
                         />

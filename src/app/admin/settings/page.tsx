@@ -2,6 +2,9 @@
 
 import { useState } from "react";
 
+import { tabNavButtonClass, tabPanelEnterClass } from "@/lib/tab-animation";
+import { cn } from "@/lib/utils";
+
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState("health");
 
@@ -55,40 +58,32 @@ export default function SettingsPage() {
 
       {/* Tabs */}
       <div className="border-b border-gray-200">
-        <nav className="-mb-px flex space-x-8">
+        <nav className="-mb-px flex gap-8">
           <button
+            type="button"
             onClick={() => setActiveTab("health")}
-            className={`py-4 px-1 border-b-2 font-medium text-sm ${
-              activeTab === "health"
-                ? "border-blue-500 text-blue-600"
-                : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-            }`}
+            className={tabNavButtonClass(activeTab === "health")}
           >
             Platform Health
           </button>
           <button
+            type="button"
             onClick={() => setActiveTab("configuration")}
-            className={`py-4 px-1 border-b-2 font-medium text-sm ${
-              activeTab === "configuration"
-                ? "border-blue-500 text-blue-600"
-                : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-            }`}
+            className={tabNavButtonClass(activeTab === "configuration")}
           >
             Configuration
           </button>
           <button
+            type="button"
             onClick={() => setActiveTab("logs")}
-            className={`py-4 px-1 border-b-2 font-medium text-sm ${
-              activeTab === "logs"
-                ? "border-blue-500 text-blue-600"
-                : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-            }`}
+            className={tabNavButtonClass(activeTab === "logs")}
           >
             Error Logs
           </button>
         </nav>
       </div>
 
+      <div key={activeTab} className={cn(tabPanelEnterClass)}>
       {/* Platform Health Tab */}
       {activeTab === "health" && (
         <div className="space-y-6">
@@ -274,6 +269,7 @@ export default function SettingsPage() {
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 }

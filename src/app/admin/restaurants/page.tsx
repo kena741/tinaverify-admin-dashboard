@@ -1,24 +1,27 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { useAppDispatch, useAppSelector } from "../../../store/hooks";
 import { fetchRestaurants } from "../../../features/restaurants/restaurantsSlice";
-import { fetchBranches } from "../../../features/branches/branchesSlice";
+import { useListAllUserBranchesQuery } from "../../../services/branch-management/branchManagementApi";
+import { branchFromOutput } from "../../../services/types";
 
 export default function RestaurantsPage() {
   const dispatch = useAppDispatch();
   const { restaurants, loading, error } = useAppSelector((state: any) => state.restaurants);
-  const { branches } = useAppSelector((state: any) => state.branches);
+  const { data: allBranchesData } = useListAllUserBranchesQuery();
+  const branches = useMemo(
+    () => (allBranchesData?.branches ?? []).map(branchFromOutput),
+    [allBranchesData?.branches],
+  );
   
   const [showAddModal, setShowAddModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
 
-  // Fetch restaurants and branches on component mount
   useEffect(() => {
     dispatch(fetchRestaurants());
-    dispatch(fetchBranches()); // Fetch all branches to count per restaurant
   }, [dispatch]);
 
   // Helper function to get branch count for a restaurant
@@ -142,7 +145,9 @@ export default function RestaurantsPage() {
                       {getBranchCount(restaurant.id)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {new Date(restaurant.created_at).toLocaleDateString()}
+                      {restaurant.created_at
+                        ? new Date(restaurant.created_at).toLocaleDateString()
+                        : "—"}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       <div className="flex items-center justify-end space-x-2">
