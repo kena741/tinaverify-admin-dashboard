@@ -1,6 +1,13 @@
 "use client";
 
 import { useState, useEffect, useMemo, useCallback } from "react";
+import {
+	CheckIcon,
+	Loader2Icon,
+	PlusIcon,
+	SearchIcon,
+	UsersIcon,
+} from "lucide-react";
 import { useAppDispatch, useAppSelector } from "../../../store/hooks";
 import { useListAllUserBranchesQuery } from "../../../services/branch-management/branchManagementApi";
 import { branchFromOutput } from "../../../services/types";
@@ -13,6 +20,56 @@ import {
 } from "../../../features/staff/staffSlice";
 import { employeeUserDisplayName } from "../../../../lib/userDisplay";
 import type { EmployeeOutput } from "../../../services/types";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+	Card,
+	CardAction,
+	CardContent,
+	CardDescription,
+	CardFooter,
+	CardHeader,
+	CardTitle,
+} from "@/components/ui/card";
+import {
+	Dialog,
+	DialogContent,
+	DialogDescription,
+	DialogFooter,
+	DialogHeader,
+	DialogTitle,
+} from "@/components/ui/dialog";
+import {
+	Field,
+	FieldDescription,
+	FieldError,
+	FieldGroup,
+	FieldLabel,
+} from "@/components/ui/field";
+import {
+	InputGroup,
+	InputGroupAddon,
+	InputGroupInput,
+} from "@/components/ui/input-group";
+import {
+	Select,
+	SelectContent,
+	SelectGroup,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@/components/ui/select";
+import { Separator } from "@/components/ui/separator";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+	Table,
+	TableBody,
+	TableCell,
+	TableHead,
+	TableHeader,
+	TableRow,
+} from "@/components/ui/table";
 
 type BranchRow = { id: string; name: string; restaurant_id: string };
 
@@ -24,7 +81,10 @@ export default function StaffPage() {
 		() => (branchesData?.branches ?? []).map(branchFromOutput),
 		[branchesData?.branches],
 	);
-	const myBusinesses = branchesData?.myBusinesses ?? [];
+	const myBusinesses = useMemo(
+		() => branchesData?.myBusinesses ?? [],
+		[branchesData?.myBusinesses],
+	);
 	const { restaurants } = useAppSelector(
 		(state: { restaurants: { restaurants: { id: string; name: string }[] } }) =>
 			state.restaurants,
@@ -190,23 +250,29 @@ export default function StaffPage() {
 		? `${businessLabel(selectedBranch.restaurant_id)} — ${selectedBranch.name}`
 		: "";
 
+	const canAddStaff =
+		!!selectedBranchId &&
+		!rolesLoading &&
+		businessRoles.length > 0 &&
+		branchesForSelectedBusiness.length > 0;
+
 	return (
-		<div className="space-y-6">
-			<div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-				<div>
-					<h1 className="text-3xl font-bold text-gray-900">Staff Management</h1>
-					<p className="mt-1 text-sm text-gray-500">
+		<div className="flex flex-col gap-6">
+			<div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+				<div className="min-w-0">
+					<div className="flex items-center gap-2">
+						<UsersIcon aria-hidden="true" />
+						<h1 className="text-pretty text-2xl leading-tight font-semibold">
+							Staff Management
+						</h1>
+					</div>
+					<p className="mt-1 text-sm text-muted-foreground">
 						Select a branch to load roles and employees for that location.
 					</p>
 				</div>
-				<button
+				<Button
 					type="button"
-					disabled={
-						!selectedBranchId ||
-						rolesLoading ||
-						businessRoles.length === 0 ||
-						branchesForSelectedBusiness.length === 0
-					}
+					disabled={!canAddStaff}
 					onClick={() => {
 						setFormError("");
 						setCreateSuccess(null);
@@ -220,402 +286,458 @@ export default function StaffPage() {
 						});
 						setShowAddModal(true);
 					}}
-					className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-300"
 				>
-					<svg
-						className="size-5"
-						fill="none"
-						stroke="currentColor"
-						viewBox="0 0 24 24"
-					>
-						<path
-							strokeLinecap="round"
-							strokeLinejoin="round"
-							strokeWidth={2}
-							d="M12 6v6m0 0v6m0-6h6m-6 0H6"
-						/>
-					</svg>
+					<PlusIcon data-icon="inline-start" aria-hidden="true" />
 					Add Staff
-				</button>
+				</Button>
 			</div>
 
-			<div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-				<label className="block text-sm font-medium text-gray-700">
-					Branch
-				</label>
-				{branchesLoading ? (
-					<p className="mt-2 text-sm text-gray-500">Loading branches…</p>
-				) : (
-					<select
-						value={selectedBranchId}
-						onChange={(e) => {
-							setSelectedBranchId(e.target.value);
+			<Card>
+				<CardHeader>
+					<CardTitle>Employees</CardTitle>
+					<CardDescription>
+						Pick a branch, then manage employees and roles for that location.
+					</CardDescription>
+					<CardAction>
+						<div className="text-sm text-muted-foreground">
+							{selectedBranchId
+								? loading
+									? "Loading…"
+									: `${filteredEmployees.length} employees`
+								: null}
+						</div>
+					</CardAction>
+				</CardHeader>
+				<CardContent className="flex flex-col gap-4">
+					<FieldGroup>
+						<Field>
+							<FieldLabel htmlFor="branch">Branch</FieldLabel>
+							{branchesLoading ? (
+								<div className="flex items-center gap-2 text-sm text-muted-foreground">
+									<Loader2Icon className="animate-spin" aria-hidden="true" />
+									Loading branches…
+								</div>
+							) : (
+								<Select
+									value={selectedBranchId}
+									onValueChange={(value) => {
+										setSelectedBranchId(value ?? "");
+										dispatch(clearError());
+									}}
+								>
+									<SelectTrigger id="branch" className="w-full sm:max-w-lg">
+										<SelectValue placeholder="Select a branch">
+											{(() => {
+												const selectedBranch = branchOptions.find(
+													(b) => b.id === selectedBranchId,
+												);
+												return selectedBranch
+													? `${businessLabel(selectedBranch.restaurant_id)} — ${selectedBranch.name}`
+													: "";
+											})()}
+										</SelectValue>
+									</SelectTrigger>
+									<SelectContent align="start">
+										<SelectGroup>
+											{branchOptions.map((b) => (
+												<SelectItem key={b.id} value={b.id}>
+													{businessLabel(b.restaurant_id)} — {b.name}
+												</SelectItem>
+											))}
+										</SelectGroup>
+									</SelectContent>
+								</Select>
+							)}
+						</Field>
+					</FieldGroup>
+
+					{!selectedBranchId && (
+						<Alert className="border-none">
+							<AlertTitle>Select a branch</AlertTitle>
+							<AlertDescription>
+								Choose a branch above to load roles and employees.
+							</AlertDescription>
+						</Alert>
+					)}
+
+					{selectedBranchId &&
+						branchesForSelectedBusiness.length === 0 &&
+						!branchesLoading && (
+							<Alert>
+								<AlertTitle>No branches for this business</AlertTitle>
+								<AlertDescription>
+									Add a branch first, then come back to create staff users.
+								</AlertDescription>
+							</Alert>
+						)}
+
+					{selectedBranchId && (
+						<>
+							<Separator />
+							<div className="flex flex-col gap-1">
+								<div className="text-sm leading-none font-medium">Employees</div>
+								<div className="text-sm text-muted-foreground">
+									Search and filter employees for the selected branch.
+								</div>
+							</div>
+
+							<div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+								<InputGroup>
+									<InputGroupAddon align="inline-start">
+										<SearchIcon aria-hidden="true" />
+									</InputGroupAddon>
+									<InputGroupInput
+										name="q"
+										value={searchTerm}
+										onChange={(e) => setSearchTerm(e.target.value)}
+										placeholder="Search by role, branch, user name…"
+										autoComplete="off"
+									/>
+								</InputGroup>
+
+								<Select
+									value={roleFilter}
+									onValueChange={(value) => setRoleFilter(value ?? "all")}
+								>
+									<SelectTrigger className="w-full">
+										<SelectValue placeholder="All roles" />
+									</SelectTrigger>
+									<SelectContent align="start">
+										<SelectGroup>
+											<SelectItem value="all">All roles</SelectItem>
+											{businessRoles.map((r) => (
+												<SelectItem key={r.id} value={r.id}>
+													{r.name}
+												</SelectItem>
+											))}
+										</SelectGroup>
+									</SelectContent>
+								</Select>
+
+								<Select
+									value={statusFilter}
+									onValueChange={(value) => setStatusFilter(value ?? "all")}
+								>
+									<SelectTrigger className="w-full">
+										<SelectValue placeholder="All statuses" />
+									</SelectTrigger>
+									<SelectContent align="start">
+										<SelectGroup>
+											<SelectItem value="all">All statuses</SelectItem>
+											<SelectItem value="active">Active</SelectItem>
+											<SelectItem value="inactive">Inactive</SelectItem>
+										</SelectGroup>
+									</SelectContent>
+								</Select>
+							</div>
+
+							{staffError && (
+								<Alert variant="destructive">
+									<AlertTitle>Couldn’t load staff</AlertTitle>
+									<AlertDescription>{staffError}</AlertDescription>
+								</Alert>
+							)}
+
+							{createSuccess && (
+								<Alert>
+									<AlertTitle className="flex items-center gap-2">
+										<CheckIcon aria-hidden="true" />
+										Employee created
+									</AlertTitle>
+									<AlertDescription>
+										<div className="flex flex-col gap-2">
+											<div className="text-sm">
+												Phone:{" "}
+												<span className="font-medium">
+													{createSuccess.phone_number}
+												</span>
+											</div>
+											<div className="flex flex-wrap items-center gap-2">
+												<span className="text-sm">Temporary password:</span>
+												<Badge variant="secondary" render={<code />}>
+													{createSuccess.temporary_password}
+												</Badge>
+												<Button
+													type="button"
+													variant="outline"
+													size="sm"
+													onClick={() => setCreateSuccess(null)}
+												>
+													Dismiss
+												</Button>
+											</div>
+										</div>
+									</AlertDescription>
+								</Alert>
+							)}
+
+							{loading ? (
+								<div className="flex flex-col gap-2">
+									<Skeleton className="h-10 w-full" />
+									<Skeleton className="h-10 w-full" />
+									<Skeleton className="h-10 w-full" />
+									<Skeleton className="h-10 w-full" />
+									<div className="flex items-center gap-2 text-sm text-muted-foreground">
+										<Loader2Icon className="animate-spin" aria-hidden="true" />
+										Loading employees…
+									</div>
+								</div>
+							) : (
+								<Table>
+									<TableHeader>
+										<TableRow>
+											<TableHead>Role</TableHead>
+											<TableHead>Branch</TableHead>
+											<TableHead>Status</TableHead>
+											<TableHead className="min-w-0">User</TableHead>
+										</TableRow>
+									</TableHeader>
+									<TableBody>
+										{filteredEmployees.length === 0 ? (
+											<TableRow>
+												<TableCell colSpan={4} className="py-10 text-center">
+													<div className="text-sm text-muted-foreground">
+														No employees found for this branch.
+													</div>
+												</TableCell>
+											</TableRow>
+										) : (
+											filteredEmployees.map((emp) => (
+												<TableRow key={emp.id}>
+													<TableCell>
+														{roleNameById[emp.role_id] ?? emp.role_id}
+													</TableCell>
+													<TableCell>
+														{branchNameById[emp.branch_id] ?? emp.branch_id}
+													</TableCell>
+													<TableCell>
+														<Badge
+															variant={emp.is_active ? "secondary" : "outline"}
+														>
+															{emp.is_active ? "Active" : "Inactive"}
+														</Badge>
+													</TableCell>
+													<TableCell className="min-w-0">
+														<span className="truncate">
+															{employeeUserDisplayName(emp)}
+														</span>
+													</TableCell>
+												</TableRow>
+											))
+										)}
+									</TableBody>
+								</Table>
+							)}
+						</>
+					)}
+				</CardContent>
+			</Card>
+
+			<Dialog
+				open={showAddModal}
+				onOpenChange={(open) => {
+					setShowAddModal(open);
+					if (!open) setFormError("");
+				}}
+			>
+				<DialogContent>
+					<DialogHeader>
+						<DialogTitle>Add employee</DialogTitle>
+						<DialogDescription>
+							Create a staff user for the current business and assign them to a
+							branch.
+						</DialogDescription>
+					</DialogHeader>
+
+					{formError && (
+						<Alert variant="destructive">
+							<AlertTitle>Can’t create employee</AlertTitle>
+							<AlertDescription>{formError}</AlertDescription>
+						</Alert>
+					)}
+
+					<form
+						onSubmit={async (e) => {
+							e.preventDefault();
+							setFormError("");
 							dispatch(clearError());
+							if (!formData.phone_number || !formData.role_id || !formData.branch_id) {
+								setFormError("Phone, role, and branch are required.");
+								return;
+							}
+							setSubmitting(true);
+							try {
+								const body = {
+									phone_number: formData.phone_number.trim(),
+									role_id: formData.role_id,
+									branch_id: formData.branch_id,
+									email: formData.email.trim() || null,
+									username: formData.username.trim() || null,
+								};
+								const res = await dispatch(createEmployeeUser(body)).unwrap();
+								setCreateSuccess({
+									temporary_password: res.temporary_password,
+									phone_number: res.phone_number,
+								});
+								setFormData({
+									phone_number: "",
+									role_id: "",
+									branch_id: selectedBranchId,
+									email: "",
+									username: "",
+								});
+								setShowAddModal(false);
+								loadBusinessData(selectedBusinessId);
+							} catch (err: unknown) {
+								const msg =
+									typeof err === "string"
+										? err
+										: err instanceof Error
+											? err.message
+											: "Failed to create employee";
+								setFormError(msg);
+							} finally {
+								setSubmitting(false);
+							}
 						}}
-						className="mt-1 w-full max-w-lg rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+						className="flex flex-col gap-5"
 					>
-						<option value="">Select a branch</option>
-						{branchOptions.map((b) => (
-							<option key={b.id} value={b.id}>
-								{businessLabel(b.restaurant_id)} — {b.name}
-							</option>
-						))}
-					</select>
-				)}
-				{selectedBranchId && (
-					<p className="mt-2 text-xs text-gray-500">{selectedBranchLabel}</p>
-				)}
-			</div>
-
-			{!selectedBranchId && (
-				<div className="rounded-lg border border-dashed border-gray-300 bg-gray-50 p-8 text-center text-gray-600">
-					Choose a branch to load roles and employees.
-				</div>
-			)}
-
-			{selectedBranchId &&
-				branchesForSelectedBusiness.length === 0 &&
-				!branchesLoading && (
-					<div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-						No branches found for this business. Add a branch first.
-					</div>
-				)}
-
-			{selectedBranchId && (
-				<div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-					<div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-						<div className="relative">
-							<div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-								<svg
-									className="size-5 text-gray-400"
-									fill="none"
-									stroke="currentColor"
-									viewBox="0 0 24 24"
-								>
-									<path
-										strokeLinecap="round"
-										strokeLinejoin="round"
-										strokeWidth={2}
-										d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+						<FieldGroup>
+							<Field data-invalid={!!formError && !formData.phone_number}>
+								<FieldLabel htmlFor="phone_number">Phone number</FieldLabel>
+								<InputGroup>
+									<InputGroupInput
+										id="phone_number"
+										name="phone_number"
+										type="tel"
+										inputMode="tel"
+										autoComplete="tel"
+										required
+										placeholder="+251911234567…"
+										value={formData.phone_number}
+										onChange={(e) =>
+											setFormData({ ...formData, phone_number: e.target.value })
+										}
+										aria-invalid={!!formError && !formData.phone_number}
 									/>
-								</svg>
-							</div>
-							<input
-								type="text"
-								placeholder="Search by role, branch, user name…"
-								value={searchTerm}
-								onChange={(e) => setSearchTerm(e.target.value)}
-								className="block w-full rounded-lg border border-gray-300 bg-white py-2 pr-3 pl-10 text-sm text-gray-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-							/>
-						</div>
-						<select
-							value={roleFilter}
-							onChange={(e) => setRoleFilter(e.target.value)}
-							className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm text-gray-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-						>
-							<option value="all">All roles</option>
-							{businessRoles.map((r) => (
-								<option key={r.id} value={r.id}>
-									{r.name}
-								</option>
-							))}
-						</select>
-						<select
-							value={statusFilter}
-							onChange={(e) => setStatusFilter(e.target.value)}
-							className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm text-gray-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-						>
-							<option value="all">All status</option>
-							<option value="active">Active</option>
-							<option value="inactive">Inactive</option>
-						</select>
-					</div>
-				</div>
-			)}
+								</InputGroup>
+								<FieldDescription>
+									Use the employee’s reachable phone number.
+								</FieldDescription>
+							</Field>
 
-			{staffError && (
-				<div className="rounded-lg border border-red-200 bg-red-50 p-4">
-					<p className="text-sm text-red-800">{staffError}</p>
-				</div>
-			)}
-
-			{createSuccess && (
-				<div className="rounded-lg border border-green-200 bg-green-50 p-4">
-					<p className="text-sm font-medium text-green-900">Employee created</p>
-					<p className="mt-1 text-sm text-green-800">
-						Phone: {createSuccess.phone_number} — Temporary password:{" "}
-						<code className="rounded bg-green-100 px-1">
-							{createSuccess.temporary_password}
-						</code>
-					</p>
-					<button
-						type="button"
-						className="mt-2 text-sm text-green-800 underline"
-						onClick={() => setCreateSuccess(null)}
-					>
-						Dismiss
-					</button>
-				</div>
-			)}
-
-			{selectedBranchId && (
-				<div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
-					<div className="overflow-x-auto">
-						{loading ? (
-							<div className="p-8 text-center">
-								<div className="inline-block size-8 animate-spin rounded-full border-b-2 border-blue-600" />
-								<p className="mt-4 text-sm text-gray-500">Loading employees…</p>
-							</div>
-						) : (
-							<table className="min-w-full divide-y divide-gray-200">
-								<thead className="bg-gray-50">
-									<tr>
-										<th className="px-6 py-3 text-left text-xs font-medium tracking-wider text-gray-500 uppercase">
-											Role
-										</th>
-										<th className="px-6 py-3 text-left text-xs font-medium tracking-wider text-gray-500 uppercase">
-											Branch name
-										</th>
-										<th className="px-6 py-3 text-left text-xs font-medium tracking-wider text-gray-500 uppercase">
-											Status
-										</th>
-										<th className="px-6 py-3 text-left text-xs font-medium tracking-wider text-gray-500 uppercase">
-											User name
-										</th>
-									</tr>
-								</thead>
-								<tbody className="divide-y divide-gray-200 bg-white">
-									{filteredEmployees.length === 0 ? (
-										<tr>
-											<td
-												colSpan={4}
-												className="px-6 py-8 text-center text-gray-500"
-											>
-												No employees found for this branch.
-											</td>
-										</tr>
-									) : (
-										filteredEmployees.map((emp) => (
-											<tr key={emp.id} className="hover:bg-gray-50">
-												<td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-													{roleNameById[emp.role_id] ?? emp.role_id}
-												</td>
-												<td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-													{branchNameById[emp.branch_id] ?? emp.branch_id}
-												</td>
-												<td className="px-6 py-4 whitespace-nowrap">
-													<span
-														className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${
-															emp.is_active
-																? "bg-green-100 text-green-800"
-																: "bg-gray-100 text-gray-800"
-														}`}
-													>
-														{emp.is_active ? "Active" : "Inactive"}
-													</span>
-												</td>
-												<td className="px-6 py-4 text-sm text-gray-900">
-													{employeeUserDisplayName(emp)}
-												</td>
-											</tr>
-										))
-									)}
-								</tbody>
-							</table>
-						)}
-					</div>
-				</div>
-			)}
-
-			{showAddModal && selectedBranchId && selectedBusinessId && (
-				<div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-600/50 p-4">
-					<div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-xl bg-white p-6 shadow-xl">
-						<div className="mb-4 flex items-center justify-between">
-							<h3 className="text-xl font-semibold text-gray-900">
-								Add employee
-							</h3>
-							<button
-								type="button"
-								onClick={() => {
-									setShowAddModal(false);
-									setFormError("");
-								}}
-								className="text-gray-400 hover:text-gray-500"
-							>
-								<svg
-									className="size-6"
-									fill="none"
-									stroke="currentColor"
-									viewBox="0 0 24 24"
-								>
-									<path
-										strokeLinecap="round"
-										strokeLinejoin="round"
-										strokeWidth={2}
-										d="M6 18L18 6M6 6l12 12"
-									/>
-								</svg>
-							</button>
-						</div>
-						{formError && (
-							<div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3">
-								<p className="text-sm text-red-800">{formError}</p>
-							</div>
-						)}
-						<form
-							onSubmit={async (e) => {
-								e.preventDefault();
-								setFormError("");
-								dispatch(clearError());
-								if (
-									!formData.phone_number ||
-									!formData.role_id ||
-									!formData.branch_id
-								) {
-									setFormError("Phone, role, and branch are required.");
-									return;
-								}
-								setSubmitting(true);
-								try {
-									const body = {
-										phone_number: formData.phone_number.trim(),
-										role_id: formData.role_id,
-										branch_id: formData.branch_id,
-										email: formData.email.trim() || null,
-										username: formData.username.trim() || null,
-									};
-									const res = await dispatch(createEmployeeUser(body)).unwrap();
-									setCreateSuccess({
-										temporary_password: res.temporary_password,
-										phone_number: res.phone_number,
-									});
-									setFormData({
-										phone_number: "",
-										role_id: "",
-										branch_id: selectedBranchId,
-										email: "",
-										username: "",
-									});
-									setShowAddModal(false);
-									loadBusinessData(selectedBusinessId);
-								} catch (err: unknown) {
-									const msg =
-										typeof err === "string"
-											? err
-											: err instanceof Error
-												? err.message
-												: "Failed to create employee";
-									setFormError(msg);
-								} finally {
-									setSubmitting(false);
-								}
-							}}
-							className="flex flex-col gap-4"
-						>
-							<div>
-								<label className="mb-1 block text-sm font-medium text-gray-700">
-									Phone number *
-								</label>
-								<input
-									type="tel"
-									required
-									value={formData.phone_number}
-									onChange={(e) =>
-										setFormData({ ...formData, phone_number: e.target.value })
-									}
-									className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-									placeholder="+251911234567"
-								/>
-							</div>
-							<div>
-								<label className="mb-1 block text-sm font-medium text-gray-700">
-									Role *
-								</label>
-								<select
-									required
+							<Field data-invalid={!!formError && !formData.role_id}>
+								<FieldLabel htmlFor="role_id">Role</FieldLabel>
+								<Select
 									value={formData.role_id}
-									onChange={(e) =>
-										setFormData({ ...formData, role_id: e.target.value })
+									onValueChange={(value) =>
+										setFormData({ ...formData, role_id: value ?? "" })
 									}
-									className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none"
 								>
-									<option value="">Select role</option>
-									{businessRoles.map((r) => (
-										<option key={r.id} value={r.id}>
-											{r.name}
-										</option>
-									))}
-								</select>
-							</div>
-							<div>
-								<label className="mb-1 block text-sm font-medium text-gray-700">
-									Branch *
-								</label>
-								<select
-									required
+									<SelectTrigger id="role_id" className="w-full" aria-invalid={!!formError && !formData.role_id}>
+										<SelectValue placeholder="Select role" />
+									</SelectTrigger>
+									<SelectContent align="start">
+										<SelectGroup>
+											{businessRoles.map((r) => (
+												<SelectItem key={r.id} value={r.id}>
+													{r.name}
+												</SelectItem>
+											))}
+										</SelectGroup>
+									</SelectContent>
+								</Select>
+								<FieldError>
+									{!!formError && !formData.role_id ? "Role is required." : null}
+								</FieldError>
+							</Field>
+
+							<Field data-invalid={!!formError && !formData.branch_id}>
+								<FieldLabel htmlFor="branch_id">Branch</FieldLabel>
+								<Select
 									value={formData.branch_id}
-									onChange={(e) =>
-										setFormData({ ...formData, branch_id: e.target.value })
+									onValueChange={(value) =>
+										setFormData({ ...formData, branch_id: value ?? "" })
 									}
-									className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none"
 								>
-									<option value="">Select branch</option>
-									{branchesForSelectedBusiness.map((b) => (
-										<option key={b.id} value={b.id}>
-											{b.name}
-										</option>
-									))}
-								</select>
-							</div>
-							<div>
-								<label className="mb-1 block text-sm font-medium text-gray-700">
-									Email (optional)
-								</label>
-								<input
-									type="email"
-									value={formData.email}
-									onChange={(e) =>
-										setFormData({ ...formData, email: e.target.value })
-									}
-									className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-								/>
-							</div>
-							<div>
-								<label className="mb-1 block text-sm font-medium text-gray-700">
-									Username (optional)
-								</label>
-								<input
-									type="text"
-									value={formData.username}
-									onChange={(e) =>
-										setFormData({ ...formData, username: e.target.value })
-									}
-									className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-								/>
-							</div>
-							<p className="text-xs text-gray-500">
-								This temporary password should be shared with the employee.
-							</p>
-							<div className="flex gap-3 pt-2">
-								<button
-									type="button"
-									onClick={() => setShowAddModal(false)}
-									className="flex-1 rounded-lg border border-gray-300 px-4 py-2 font-medium text-gray-700 hover:bg-gray-50"
-								>
-									Cancel
-								</button>
-								<button
-									type="submit"
-									disabled={submitting}
-									className="flex-1 rounded-lg bg-blue-600 px-4 py-2 font-medium text-white hover:bg-blue-700 disabled:bg-gray-400"
-								>
-									{submitting ? "Creating…" : "Create employee"}
-								</button>
-							</div>
-						</form>
-					</div>
-				</div>
-			)}
+									<SelectTrigger id="branch_id" className="w-full" aria-invalid={!!formError && !formData.branch_id}>
+										<SelectValue placeholder="Select branch" />
+									</SelectTrigger>
+									<SelectContent align="start">
+										<SelectGroup>
+											{branchesForSelectedBusiness.map((b) => (
+												<SelectItem key={b.id} value={b.id}>
+													{b.name}
+												</SelectItem>
+											))}
+										</SelectGroup>
+									</SelectContent>
+								</Select>
+								<FieldError>
+									{!!formError && !formData.branch_id ? "Branch is required." : null}
+								</FieldError>
+							</Field>
+
+							<Field>
+								<FieldLabel htmlFor="email">Email (optional)</FieldLabel>
+								<InputGroup>
+									<InputGroupInput
+										id="email"
+										name="email"
+										type="email"
+										autoComplete="email"
+										inputMode="email"
+										spellCheck={false}
+										placeholder="name@company.com…"
+										value={formData.email}
+										onChange={(e) =>
+											setFormData({ ...formData, email: e.target.value })
+										}
+									/>
+								</InputGroup>
+							</Field>
+
+							<Field>
+								<FieldLabel htmlFor="username">Username (optional)</FieldLabel>
+								<InputGroup>
+									<InputGroupInput
+										id="username"
+										name="username"
+										type="text"
+										autoComplete="off"
+										spellCheck={false}
+										placeholder="employee.username…"
+										value={formData.username}
+										onChange={(e) =>
+											setFormData({ ...formData, username: e.target.value })
+										}
+									/>
+								</InputGroup>
+								<FieldDescription>
+									Temporary password will be shown after creation.
+								</FieldDescription>
+							</Field>
+						</FieldGroup>
+
+						<DialogFooter>
+							<Button
+								type="button"
+								variant="outline"
+								onClick={() => setShowAddModal(false)}
+								disabled={submitting}
+							>
+								Cancel
+							</Button>
+							<Button type="submit" disabled={submitting}>
+								{submitting && (
+									<Loader2Icon data-icon="inline-start" className="animate-spin" aria-hidden="true" />
+								)}
+								{submitting ? "Creating…" : "Create employee"}
+							</Button>
+						</DialogFooter>
+					</form>
+				</DialogContent>
+			</Dialog>
 		</div>
 	);
 }
