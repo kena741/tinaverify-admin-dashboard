@@ -28,7 +28,6 @@ import {
 	CardAction,
 	CardContent,
 	CardDescription,
-	CardFooter,
 	CardHeader,
 	CardTitle,
 } from "@/components/ui/card";
@@ -246,10 +245,6 @@ export default function StaffPage() {
 
 	const loading = employeesLoading || rolesLoading;
 
-	const selectedBranchLabel = selectedBranch
-		? `${businessLabel(selectedBranch.restaurant_id)} — ${selectedBranch.name}`
-		: "";
-
 	const canAddStaff =
 		!!selectedBranchId &&
 		!rolesLoading &&
@@ -375,7 +370,9 @@ export default function StaffPage() {
 						<>
 							<Separator />
 							<div className="flex flex-col gap-1">
-								<div className="text-sm leading-none font-medium">Employees</div>
+								<div className="text-sm leading-none font-medium">
+									Employees
+								</div>
 								<div className="text-sm text-muted-foreground">
 									Search and filter employees for the selected branch.
 								</div>
@@ -561,7 +558,11 @@ export default function StaffPage() {
 							e.preventDefault();
 							setFormError("");
 							dispatch(clearError());
-							if (!formData.phone_number || !formData.role_id || !formData.branch_id) {
+							if (
+								!formData.phone_number ||
+								!formData.role_id ||
+								!formData.branch_id
+							) {
 								setFormError("Phone, role, and branch are required.");
 								return;
 							}
@@ -634,8 +635,15 @@ export default function StaffPage() {
 										setFormData({ ...formData, role_id: value ?? "" })
 									}
 								>
-									<SelectTrigger id="role_id" className="w-full" aria-invalid={!!formError && !formData.role_id}>
-										<SelectValue placeholder="Select role" />
+									<SelectTrigger
+										id="role_id"
+										className="w-full"
+										aria-invalid={!!formError && !formData.role_id}
+									>
+										<SelectValue placeholder="Select role">
+											{businessRoles.find((r) => r.id === formData.role_id)
+												?.name ?? ""}
+										</SelectValue>
 									</SelectTrigger>
 									<SelectContent align="start">
 										<SelectGroup>
@@ -648,7 +656,9 @@ export default function StaffPage() {
 									</SelectContent>
 								</Select>
 								<FieldError>
-									{!!formError && !formData.role_id ? "Role is required." : null}
+									{!!formError && !formData.role_id
+										? "Role is required."
+										: null}
 								</FieldError>
 							</Field>
 
@@ -660,8 +670,16 @@ export default function StaffPage() {
 										setFormData({ ...formData, branch_id: value ?? "" })
 									}
 								>
-									<SelectTrigger id="branch_id" className="w-full" aria-invalid={!!formError && !formData.branch_id}>
-										<SelectValue placeholder="Select branch" />
+									<SelectTrigger
+										id="branch_id"
+										className="w-full"
+										aria-invalid={!!formError && !formData.branch_id}
+									>
+										<SelectValue placeholder="Select branch">
+											{branchesForSelectedBusiness.find(
+												(b) => b.id === formData.branch_id,
+											)?.name ?? ""}
+										</SelectValue>
 									</SelectTrigger>
 									<SelectContent align="start">
 										<SelectGroup>
@@ -674,7 +692,9 @@ export default function StaffPage() {
 									</SelectContent>
 								</Select>
 								<FieldError>
-									{!!formError && !formData.branch_id ? "Branch is required." : null}
+									{!!formError && !formData.branch_id
+										? "Branch is required."
+										: null}
 								</FieldError>
 							</Field>
 
@@ -730,7 +750,11 @@ export default function StaffPage() {
 							</Button>
 							<Button type="submit" disabled={submitting}>
 								{submitting && (
-									<Loader2Icon data-icon="inline-start" className="animate-spin" aria-hidden="true" />
+									<Loader2Icon
+										data-icon="inline-start"
+										className="animate-spin"
+										aria-hidden="true"
+									/>
 								)}
 								{submitting ? "Creating…" : "Create employee"}
 							</Button>

@@ -257,3 +257,90 @@ export type OrderTransactionSummaryResponse = {
 	transaction_id: string;
 	amount: number;
 };
+
+/** OpenAPI `SubscriptionPlanOutputSchema` */
+export type SubscriptionPlanOutput = {
+	id: string;
+	name: string;
+	code: string;
+	monthly_transaction_limit: number;
+	price: string;
+	duration_days: number;
+	is_archived: boolean;
+};
+
+/** OpenAPI `SubscriptionOutputSchema` */
+export type SubscriptionOutput = {
+	id: string;
+	business_id: string;
+	plan_id: string;
+	status: string;
+	transaction_id: string;
+};
+
+/** OpenAPI `SubscriptionPaySchema` */
+export type SubscriptionPayRequest = {
+	plan_id: string;
+};
+
+/** OpenAPI `SubscriptionPayOutputSchema` */
+export type SubscriptionPayResponse = {
+	checkout_url: string;
+	tx_ref: string;
+};
+
+/** OpenAPI `SubscriptionCheckoutSchema` — `POST /api/v1/subscriptions/checkout` */
+export type SubscriptionCheckoutRequest = {
+	plan_id: string;
+};
+
+/** OpenAPI `SubscriptionCheckoutOutputSchema` */
+export type SubscriptionCheckoutResponse = {
+	checkout_url: string;
+	tx_ref: string;
+};
+
+/** OpenAPI `UsageOutputSchema` — `GET /api/v1/subscriptions/usage` */
+export type UsageOutput = {
+	subscription_id: string;
+	credits_limit: number;
+	credits_used: number;
+	remaining_credits: number;
+};
+
+/** OpenAPI `CampaignCreateSchema` — `POST /api/v1/admin/referrals/campaigns` */
+export type CampaignCreateRequest = {
+	code: string;
+	description: string;
+};
+
+/** OpenAPI `CampaignOutputSchema` */
+export type CampaignOutput = {
+	code: string;
+	description: string;
+	is_active: boolean;
+};
+
+/** OpenAPI `ReferralPerformanceSchema` — `GET /api/v1/admin/referrals/performance` */
+export type ReferralPerformance = {
+	code: string;
+	description: string;
+	is_active: boolean;
+	total_signups: number;
+	active_subscriptions: number;
+};
+
+/** OpenAPI `DeactivateBusinessRequest` — `POST /api/v1/business/{business_id}/deactivate` */
+export type DeactivateBusinessRequest = {
+	is_active: boolean;
+};
+
+/** OpenAPI `UpdateEmployeeRoleRequest` — `PUT /api/v1/business/{business_id}/employees/{employee_id}` */
+export type UpdateEmployeeRoleRequest = {
+	role_id: string;
+};
+
+/** OpenAPI `PermissionCreateSchema` — `POST /api/v1/permissions/{permission_id}` */
+export type PermissionCreateRequest = {
+	action: string;
+};

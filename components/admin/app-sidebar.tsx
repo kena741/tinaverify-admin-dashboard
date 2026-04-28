@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import type { LucideIcon } from "lucide-react";
 import {
 	BarChart3,
+	BadgeCheck,
 	Bell,
 	Building2,
 	ClipboardList,
@@ -53,6 +54,7 @@ const systemAdminNavigation: {
 	{ name: "Tables", href: "/admin/tables", icon: TableProperties },
 	{ name: "Bank Accounts", href: "/admin/bank-accounts", icon: Landmark },
 	{ name: "Transactions", href: "/admin/transactions", icon: CreditCard },
+	{ name: "Subscription", href: "/admin/subscription", icon: BadgeCheck },
 	{ name: "Notifications", href: "/admin/notifications", icon: Bell },
 	{ name: "Reports", href: "/admin/reports", icon: BarChart3 },
 	{ name: "Settings", href: "/admin/settings", icon: Settings },
@@ -71,6 +73,7 @@ const branchAdminNavigation: {
 	{ name: "Bank Accounts", href: "/admin/bank-accounts", icon: Landmark },
 	{ name: "Transactions", href: "/admin/transactions", icon: CreditCard },
 	{ name: "Staff", href: "/admin/staff", icon: Users },
+	{ name: "Subscription", href: "/admin/subscription", icon: BadgeCheck },
 	{ name: "Notifications", href: "/admin/notifications", icon: Bell },
 ];
 

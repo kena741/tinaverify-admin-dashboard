@@ -562,7 +562,12 @@ export default function BranchesPage() {
 									Business
 								</FieldLabel>
 								<Select
-									value={createForm.businessId}
+									value={
+										myBusinesses.find(
+											(b: { id: string; name: string }) =>
+												b.id === createForm.businessId,
+										)?.name ?? ""
+									}
 									onValueChange={(value) =>
 										setCreateForm((c) => ({
 											...c,

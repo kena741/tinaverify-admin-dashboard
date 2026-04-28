@@ -6,6 +6,7 @@ import { branchManagementApi } from "../services/branch-management/branchManagem
 import { menuApi } from "../services/menu/menuApi";
 import { ordersApi } from "../services/orders/ordersApi";
 import { tablesApi } from "../services/tables/tablesApi";
+import { subscriptionApi } from "../services/subscription/subscriptionApi";
 
 // Import all reducers
 import authReducer from "../features/auth/authSlice";
@@ -35,6 +36,7 @@ const appReducer = combineReducers({
 	[menuApi.reducerPath]: menuApi.reducer,
 	[ordersApi.reducerPath]: ordersApi.reducer,
 	[tablesApi.reducerPath]: tablesApi.reducer,
+	[subscriptionApi.reducerPath]: subscriptionApi.reducer,
 });
 
 // Reset the store when resetStore action is dispatched
@@ -64,6 +66,7 @@ export const store = configureStore({
 			menuApi.middleware,
 			ordersApi.middleware,
 			tablesApi.middleware,
+			subscriptionApi.middleware,
 		),
 });
 
