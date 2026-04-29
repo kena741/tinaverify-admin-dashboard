@@ -2,12 +2,15 @@
 
 import { useMemo, useState } from "react";
 import {
+	CalendarIcon,
 	ChevronsUpDownIcon,
 	CreditCardIcon,
 	Loader2Icon,
 	PercentIcon,
 	ReceiptIcon,
 } from "lucide-react";
+import { endOfDay, format, startOfDay } from "date-fns";
+import type { DateRange } from "react-day-picker";
 
 import {
 	useListAllBusinessesQuery,
@@ -19,7 +22,10 @@ import {
 	useListTransactionsByBusinessQuery,
 	useUpdateTransactionStatusMutation,
 } from "../../../services/transactions/transactionsApi";
-import type { BusinessOutput, VerifiedTransactionOutput } from "../../../services/types";
+import type {
+	BusinessOutput,
+	VerifiedTransactionOutput,
+} from "../../../services/types";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -38,6 +44,7 @@ import {
 	CommandItem,
 	CommandList,
 } from "@/components/ui/command";
+import { Calendar } from "@/components/ui/calendar";
 import { Input } from "@/components/ui/input";
 import {
 	Popover,
@@ -70,9 +77,14 @@ import {
 } from "@/components/ui/table";
 const BRANCH_ALL = "__all__";
 
-type DatePreset = "today" | "last_7_days" | "last_30_days" | "this_month";
+type BuiltInDatePreset =
+	| "today"
+	| "last_7_days"
+	| "last_30_days"
+	| "this_month";
+type DateRangePreset = BuiltInDatePreset | "custom";
 
-function isoRangeForPreset(preset: DatePreset): {
+function isoRangeForPreset(preset: BuiltInDatePreset): {
 	startDate: string;
 	endDate: string;
 } {
@@ -102,6 +114,29 @@ function isoRangeForPreset(preset: DatePreset): {
 	}
 
 	return { startDate: start.toISOString(), endDate: end.toISOString() };
+}
+
+function rangeFromBuiltIn(preset: BuiltInDatePreset): DateRange {
+	const { startDate, endDate } = isoRangeForPreset(preset);
+	return {
+		from: new Date(startDate),
+		to: new Date(endDate),
+	};
+}
+
+function isoFromCustomRange(
+	range: DateRange | undefined,
+): { startDate: string; endDate: string } | null {
+	if (!range?.from) return null;
+	const from = startOfDay(range.from);
+	const to = range.to ? endOfDay(range.to) : endOfDay(range.from);
+	return { startDate: from.toISOString(), endDate: to.toISOString() };
+}
+
+function formatCustomRangeLabel(range: DateRange | undefined): string {
+	if (!range?.from) return "Pick start and end dates";
+	if (!range.to) return `${format(range.from, "MMM d, yyyy")} – …`;
+	return `${format(range.from, "MMM d, yyyy")} – ${format(range.to, "MMM d, yyyy")}`;
 }
 
 function normalizeStatusDraft(status: string): "verified" | "failed" {
@@ -159,7 +194,12 @@ export default function TransactionsPage() {
 		null,
 	);
 	const [branchId, setBranchId] = useState<string>(BRANCH_ALL);
-	const [datePreset, setDatePreset] = useState<DatePreset>("last_7_days");
+	const [dateRangePreset, setDateRangePreset] =
+		useState<DateRangePreset>("last_7_days");
+	const [customDateRange, setCustomDateRange] = useState<DateRange | undefined>(
+		() => rangeFromBuiltIn("last_7_days"),
+	);
+	const [customRangePopoverOpen, setCustomRangePopoverOpen] = useState(false);
 	const [statusFilter, setStatusFilter] = useState<string>("all");
 	const [searchTerm, setSearchTerm] = useState("");
 	const [detailTransactionId, setDetailTransactionId] = useState<string | null>(
@@ -169,10 +209,14 @@ export default function TransactionsPage() {
 		"verified",
 	);
 
-	const { startDate, endDate } = useMemo(
-		() => isoRangeForPreset(datePreset),
-		[datePreset],
-	);
+	const { startDate, endDate } = useMemo(() => {
+		if (dateRangePreset === "custom") {
+			const iso = isoFromCustomRange(customDateRange);
+			if (iso) return iso;
+			return isoRangeForPreset("last_7_days");
+		}
+		return isoRangeForPreset(dateRangePreset);
+	}, [dateRangePreset, customDateRange]);
 
 	const {
 		data: businesses,
@@ -236,7 +280,9 @@ export default function TransactionsPage() {
 
 	const listLoading =
 		!!selectedBusinessId &&
-		(useBranchEndpoint ? loadingBranchTx || fetchingBranchTx : loadingBusinessTx || fetchingBusinessTx);
+		(useBranchEndpoint
+			? loadingBranchTx || fetchingBranchTx
+			: loadingBusinessTx || fetchingBusinessTx);
 	const listError = useBranchEndpoint ? errorBranchTx : errorBusinessTx;
 
 	const filteredTransactions = useMemo(() => {
@@ -303,7 +349,8 @@ export default function TransactionsPage() {
 		{ skip: !detailTransactionId },
 	);
 
-	const [updateStatus, updateStatusState] = useUpdateTransactionStatusMutation();
+	const [updateStatus, updateStatusState] =
+		useUpdateTransactionStatusMutation();
 
 	const refetchList = () => {
 		if (useBranchEndpoint) void refetchBranchTx();
@@ -315,8 +362,8 @@ export default function TransactionsPage() {
 			<div className="flex flex-col gap-1">
 				<h1 className="text-2xl font-semibold tracking-tight">Transactions</h1>
 				<p className="text-sm text-muted-foreground">
-					Select a business to load verified payment transactions. Optionally narrow
-					by branch, date range, and status.
+					Select a business to load verified payment transactions. Optionally
+					narrow by branch, date range, and status.
 				</p>
 			</div>
 
@@ -343,8 +390,9 @@ export default function TransactionsPage() {
 				<CardHeader className="flex flex-col gap-1">
 					<CardTitle>Filters</CardTitle>
 					<CardDescription>
-						Choose a business (searchable), then optionally a branch and time
-						range.
+						Choose a business (searchable), then optionally a branch. Use a
+						preset range or open Custom range to pick start and end dates in the
+						calendar.
 					</CardDescription>
 				</CardHeader>
 				<CardContent className="flex flex-col gap-4">
@@ -405,7 +453,9 @@ export default function TransactionsPage() {
 														className="[&>svg:last-child]:hidden"
 													>
 														<span className="flex min-w-0 flex-1 flex-col gap-0.5 text-left">
-															<span className="truncate font-medium">{b.name}</span>
+															<span className="truncate font-medium">
+																{b.name}
+															</span>
 															<span className="truncate text-xs text-muted-foreground">
 																TIN {b.tin_number}
 															</span>
@@ -460,29 +510,85 @@ export default function TransactionsPage() {
 							) : null}
 						</div>
 
-						<div className="flex min-w-48 flex-1 flex-col gap-2">
+						<div className="flex min-w-48 flex-[1_1_100%] flex-col gap-2 lg:min-w-72">
 							<span className="text-sm font-medium" id="date-filter-label">
 								Date range
 							</span>
-							<Select
-								value={datePreset}
-								onValueChange={(v) => {
-									if (v) setDatePreset(v as DatePreset);
-								}}
-							>
-								<SelectTrigger
-									className="h-10 w-full"
-									aria-labelledby="date-filter-label"
+							<div className="flex flex-col gap-2 sm:flex-row sm:items-stretch">
+								<Select
+									value={dateRangePreset}
+									onValueChange={(v) => {
+										if (!v) return;
+										if (v === "custom") {
+											setDateRangePreset("custom");
+											setCustomDateRange((prev) =>
+												prev?.from
+													? prev
+													: rangeFromBuiltIn(
+															dateRangePreset === "custom"
+																? "last_7_days"
+																: dateRangePreset,
+														),
+											);
+											setCustomRangePopoverOpen(true);
+											return;
+										}
+										setDateRangePreset(v as BuiltInDatePreset);
+									}}
 								>
-									<SelectValue />
-								</SelectTrigger>
-								<SelectContent>
-									<SelectItem value="today">Today</SelectItem>
-									<SelectItem value="last_7_days">Last 7 days</SelectItem>
-									<SelectItem value="last_30_days">Last 30 days</SelectItem>
-									<SelectItem value="this_month">This month</SelectItem>
-								</SelectContent>
-							</Select>
+									<SelectTrigger
+										className="h-10 w-full sm:min-w-48 sm:flex-1"
+										aria-labelledby="date-filter-label"
+									>
+										<SelectValue />
+									</SelectTrigger>
+									<SelectContent>
+										<SelectItem value="today">Today</SelectItem>
+										<SelectItem value="last_7_days">Last 7 days</SelectItem>
+										<SelectItem value="last_30_days">Last 30 days</SelectItem>
+										<SelectItem value="this_month">This month</SelectItem>
+										<SelectItem value="custom">Custom range…</SelectItem>
+									</SelectContent>
+								</Select>
+								{dateRangePreset === "custom" ? (
+									<Popover
+										open={customRangePopoverOpen}
+										onOpenChange={setCustomRangePopoverOpen}
+									>
+										<PopoverTrigger
+											render={
+												<Button
+													type="button"
+													variant="outline"
+													className="h-10 w-full justify-between gap-2 font-normal sm:min-w-56 sm:flex-1"
+													aria-label="Open calendar to choose start and end dates"
+												/>
+											}
+										>
+											<span className="min-w-0 truncate text-left">
+												{formatCustomRangeLabel(customDateRange)}
+											</span>
+											<CalendarIcon data-icon="inline-end" aria-hidden />
+										</PopoverTrigger>
+										<PopoverContent className="w-auto p-0" align="start">
+											<Calendar
+												mode="range"
+												defaultMonth={customDateRange?.from ?? new Date()}
+												selected={customDateRange}
+												onSelect={(next) => {
+													setCustomDateRange(next);
+													if (next?.from && next?.to) {
+														setCustomRangePopoverOpen(false);
+													}
+												}}
+												numberOfMonths={2}
+												disabled={{ after: endOfDay(new Date()) }}
+												initialFocus
+											/>
+										</PopoverContent>
+									</Popover>
+								) : null}
+							</div>
 						</div>
 
 						<div className="flex min-w-48 flex-1 flex-col gap-2">
@@ -533,7 +639,12 @@ export default function TransactionsPage() {
 						<span className="wrap-break-word">
 							{getErrorMessage(listError, "Request failed.")}
 						</span>
-						<Button type="button" variant="outline" size="sm" onClick={refetchList}>
+						<Button
+							type="button"
+							variant="outline"
+							size="sm"
+							onClick={refetchList}
+						>
 							Try again
 						</Button>
 					</AlertDescription>
@@ -587,16 +698,6 @@ export default function TransactionsPage() {
 			</div>
 
 			<Card>
-				<CardHeader>
-					<CardTitle>Results</CardTitle>
-					<CardDescription>
-						{selectedBusinessId
-							? useBranchEndpoint
-								? "Transactions for the selected branch and date range."
-								: "Transactions for the whole business and date range."
-							: "Select a business to load transactions."}
-					</CardDescription>
-				</CardHeader>
 				<CardContent className="flex flex-col gap-4">
 					{!selectedBusinessId ? (
 						<p className="py-8 text-center text-sm text-muted-foreground">
@@ -609,90 +710,88 @@ export default function TransactionsPage() {
 							))}
 						</div>
 					) : (
-						<div className="overflow-x-auto rounded-md border">
-							<Table aria-label="Payment transactions">
-								<TableHeader>
+						<Table aria-label="Payment transactions">
+							<TableHeader>
+								<TableRow>
+									<TableHead>Reference</TableHead>
+									<TableHead>Amount</TableHead>
+									<TableHead>Status</TableHead>
+									<TableHead>Sender name</TableHead>
+									<TableHead>Sender bank account</TableHead>
+									<TableHead>Receiving bank name</TableHead>
+									<TableHead>Receiving bank account</TableHead>
+									<TableHead>Receipt</TableHead>
+								</TableRow>
+							</TableHeader>
+							<TableBody>
+								{filteredTransactions.length === 0 ? (
 									<TableRow>
-										<TableHead>Reference</TableHead>
-										<TableHead>Amount</TableHead>
-										<TableHead>Status</TableHead>
-										<TableHead>Sender name</TableHead>
-										<TableHead>Sender bank account</TableHead>
-										<TableHead>Receiving bank name</TableHead>
-										<TableHead>Receiving bank account</TableHead>
-										<TableHead>Receipt</TableHead>
+										<TableCell
+											colSpan={8}
+											className="py-10 text-center text-muted-foreground"
+										>
+											No transactions match your filters.
+										</TableCell>
 									</TableRow>
-								</TableHeader>
-								<TableBody>
-									{filteredTransactions.length === 0 ? (
-										<TableRow>
-											<TableCell
-												colSpan={8}
-												className="py-10 text-center text-muted-foreground"
-											>
-												No transactions match your filters.
+								) : (
+									filteredTransactions.map((t) => (
+										<TableRow
+											key={t.id}
+											className="cursor-pointer"
+											onClick={() => {
+												setDetailTransactionId(t.id);
+												setStatusDraft(normalizeStatusDraft(t.status));
+											}}
+										>
+											<TableCell className="font-mono text-sm">
+												{t.reference_number}
+											</TableCell>
+											<TableCell>
+												<span className="font-medium tabular-nums">
+													{t.currency} {parseAmount(t.amount).toLocaleString()}
+												</span>
+											</TableCell>
+											<TableCell>
+												<Badge variant={statusBadgeVariant(t.status)}>
+													{t.status}
+												</Badge>
+											</TableCell>
+											<TableCell className="max-w-48 truncate text-sm">
+												{t.sender_name ?? "—"}
+											</TableCell>
+											<TableCell className="max-w-44 font-mono text-xs">
+												<span className="wrap-break-word">
+													{t.sender_account ?? "—"}
+												</span>
+											</TableCell>
+											<TableCell className="max-w-48 truncate text-sm">
+												{t.receiver_name ?? "—"}
+											</TableCell>
+											<TableCell className="max-w-44 font-mono text-xs">
+												<span className="wrap-break-word">
+													{t.receiver_account ?? "—"}
+												</span>
+											</TableCell>
+											<TableCell className="text-sm">
+												{t.receipt_url ? (
+													<a
+														href={t.receipt_url}
+														target="_blank"
+														rel="noopener noreferrer"
+														className="text-primary underline-offset-4 hover:underline"
+														onClick={(e) => e.stopPropagation()}
+													>
+														Open receipt
+													</a>
+												) : (
+													<span className="text-muted-foreground">—</span>
+												)}
 											</TableCell>
 										</TableRow>
-									) : (
-										filteredTransactions.map((t) => (
-											<TableRow
-												key={t.id}
-												className="cursor-pointer"
-												onClick={() => {
-													setDetailTransactionId(t.id);
-													setStatusDraft(normalizeStatusDraft(t.status));
-												}}
-											>
-												<TableCell className="font-mono text-sm">
-													{t.reference_number}
-												</TableCell>
-												<TableCell>
-													<span className="font-medium tabular-nums">
-														{t.currency} {parseAmount(t.amount).toLocaleString()}
-													</span>
-												</TableCell>
-												<TableCell>
-													<Badge variant={statusBadgeVariant(t.status)}>
-														{t.status}
-													</Badge>
-												</TableCell>
-												<TableCell className="max-w-48 truncate text-sm">
-													{t.sender_name ?? "—"}
-												</TableCell>
-												<TableCell className="max-w-44 font-mono text-xs">
-													<span className="wrap-break-word">
-														{t.sender_account ?? "—"}
-													</span>
-												</TableCell>
-												<TableCell className="max-w-48 truncate text-sm">
-													{t.receiver_name ?? "—"}
-												</TableCell>
-												<TableCell className="max-w-44 font-mono text-xs">
-													<span className="wrap-break-word">
-														{t.receiver_account ?? "—"}
-													</span>
-												</TableCell>
-												<TableCell className="text-sm">
-													{t.receipt_url ? (
-														<a
-															href={t.receipt_url}
-															target="_blank"
-															rel="noopener noreferrer"
-															className="text-primary underline-offset-4 hover:underline"
-															onClick={(e) => e.stopPropagation()}
-														>
-															Open receipt
-														</a>
-													) : (
-														<span className="text-muted-foreground">—</span>
-													)}
-												</TableCell>
-											</TableRow>
-										))
-									)}
-								</TableBody>
-							</Table>
-						</div>
+									))
+								)}
+							</TableBody>
+						</Table>
 					)}
 				</CardContent>
 			</Card>
@@ -707,9 +806,7 @@ export default function TransactionsPage() {
 					<SheetHeader className="border-b border-border pb-4">
 						<SheetTitle>Transaction</SheetTitle>
 						<SheetDescription>
-							{detailTransactionId
-								? `ID ${detailTransactionId}`
-								: "Loading…"}
+							{detailTransactionId ? `ID ${detailTransactionId}` : "Loading…"}
 						</SheetDescription>
 					</SheetHeader>
 
@@ -763,7 +860,9 @@ export default function TransactionsPage() {
 							<dl className="flex flex-col gap-3 text-sm">
 								<div className="flex flex-col gap-0.5">
 									<dt className="text-muted-foreground">Reference</dt>
-									<dd className="font-mono">{detailTransaction.reference_number}</dd>
+									<dd className="font-mono">
+										{detailTransaction.reference_number}
+									</dd>
 								</div>
 								<div className="flex flex-col gap-0.5">
 									<dt className="text-muted-foreground">Amount</dt>
