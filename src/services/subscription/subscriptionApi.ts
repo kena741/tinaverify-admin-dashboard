@@ -1,13 +1,12 @@
-"use client";
-
 import { createApi } from "@reduxjs/toolkit/query/react";
 
 import { getStoredAccessToken } from "../authTokens";
 import { backendBaseQuery } from "../baseQuery";
 import type {
+	SubscriptionCheckoutResponse,
 	SubscriptionOutput,
-	SubscriptionPayResponse,
 	SubscriptionPlanOutput,
+	UsageOutput,
 } from "../types";
 
 function bearerHeaders(accessToken?: string | null) {
@@ -23,7 +22,12 @@ function bearerHeaders(accessToken?: string | null) {
 export const subscriptionApi = createApi({
 	reducerPath: "subscriptionApi",
 	baseQuery: backendBaseQuery,
-	tagTypes: ["SubscriptionPlans", "CurrentSubscription"],
+	tagTypes: [
+		"SubscriptionPlans",
+		"Subscription",
+		"SubscriptionHistory",
+		"SubscriptionUsage",
+	],
 	endpoints: (builder) => ({
 		/** `GET /api/v1/subscription-plans` */
 		listSubscriptionPlans: builder.query<
@@ -38,31 +42,65 @@ export const subscriptionApi = createApi({
 			providesTags: [{ type: "SubscriptionPlans" as const, id: "LIST" }],
 		}),
 
-		/** `GET /api/v1/subscriptions/current?business_id=...` */
-		getCurrentSubscription: builder.query<
+		/** `GET /api/v1/subscriptions/me` */
+		getActiveSubscription: builder.query<
 			SubscriptionOutput | null,
 			{ businessId: string }
 		>({
 			query: ({ businessId }) => ({
-				url: "/api/v1/subscriptions/current",
+				url: "/api/v1/subscriptions/me",
 				params: { business_id: businessId },
 				headers: bearerHeaders(),
 			}),
 			providesTags: (_result, _err, { businessId }) => [
-				{ type: "CurrentSubscription" as const, id: businessId },
+				{ type: "Subscription" as const, id: businessId },
+			],
+		}),
+
+		/** `GET /api/v1/subscriptions/history` */
+		listSubscriptionHistory: builder.query<
+			SubscriptionOutput[],
+			{ businessId: string }
+		>({
+			query: ({ businessId }) => ({
+				url: "/api/v1/subscriptions/history",
+				params: { business_id: businessId },
+				headers: bearerHeaders(),
+			}),
+			providesTags: (result, _err, { businessId }) =>
+				result
+					? [
+							{ type: "SubscriptionHistory" as const, id: businessId },
+							...result.map((s) => ({
+								type: "SubscriptionHistory" as const,
+								id: `${businessId}_${s.id}`,
+							})),
+						]
+					: [{ type: "SubscriptionHistory" as const, id: businessId }],
+		}),
+
+		/** `GET /api/v1/subscriptions/usage` */
+		getSubscriptionUsage: builder.query<UsageOutput, { businessId: string }>({
+			query: ({ businessId }) => ({
+				url: "/api/v1/subscriptions/usage",
+				params: { business_id: businessId },
+				headers: bearerHeaders(),
+			}),
+			providesTags: (_result, _err, { businessId }) => [
+				{ type: "SubscriptionUsage" as const, id: businessId },
 			],
 		}),
 
 		/**
-		 * `POST /api/v1/subscriptions/pay?business_id=...`
-		 * Body: `{ plan_id }`
+		 * `POST /api/v1/subscriptions/checkout`
+		 * Body: `{ plan_id }` per `SubscriptionCheckoutSchema`.
 		 */
-		paySubscription: builder.mutation<
-			SubscriptionPayResponse,
+		checkoutSubscription: builder.mutation<
+			SubscriptionCheckoutResponse,
 			{ businessId: string; planId: string }
 		>({
 			query: ({ businessId, planId }) => ({
-				url: "/api/v1/subscriptions/pay",
+				url: "/api/v1/subscriptions/checkout",
 				method: "POST",
 				params: { business_id: businessId },
 				body: { plan_id: planId },
@@ -72,7 +110,9 @@ export const subscriptionApi = createApi({
 				},
 			}),
 			invalidatesTags: (_result, _err, { businessId }) => [
-				{ type: "CurrentSubscription" as const, id: businessId },
+				{ type: "Subscription" as const, id: businessId },
+				{ type: "SubscriptionHistory" as const, id: businessId },
+				{ type: "SubscriptionUsage" as const, id: businessId },
 			],
 		}),
 	}),
@@ -80,7 +120,10 @@ export const subscriptionApi = createApi({
 
 export const {
 	useListSubscriptionPlansQuery,
-	useGetCurrentSubscriptionQuery,
-	usePaySubscriptionMutation,
+	useGetActiveSubscriptionQuery,
+	useLazyGetActiveSubscriptionQuery,
+	useListSubscriptionHistoryQuery,
+	useGetSubscriptionUsageQuery,
+	useLazyGetSubscriptionUsageQuery,
+	useCheckoutSubscriptionMutation,
 } = subscriptionApi;
-

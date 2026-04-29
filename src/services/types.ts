@@ -303,7 +303,6 @@ export type OrderTransactionSummaryResponse = {
 export type SubscriptionPlanOutput = {
 	id: string;
 	name: string;
-	code: string;
 	monthly_transaction_limit: number;
 	price: string;
 	duration_days: number;
@@ -316,18 +315,9 @@ export type SubscriptionOutput = {
 	business_id: string;
 	plan_id: string;
 	status: string;
-	transaction_id: string;
-};
-
-/** OpenAPI `SubscriptionPaySchema` */
-export type SubscriptionPayRequest = {
-	plan_id: string;
-};
-
-/** OpenAPI `SubscriptionPayOutputSchema` */
-export type SubscriptionPayResponse = {
-	checkout_url: string;
-	tx_ref: string;
+	started_at?: string | null;
+	ended_at?: string | null;
+	chapa_transaction_reference?: string | null;
 };
 
 /** OpenAPI `SubscriptionCheckoutSchema` — `POST /api/v1/subscriptions/checkout` */
