@@ -9,12 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-	Tabs,
-	TabsContent,
-	TabsList,
-	TabsTrigger,
-} from "@/components/ui/tabs";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
 	Table,
 	TableBody,
@@ -101,9 +96,9 @@ export default function BusinessDetailClient({
 	const [updateEmployeeRole, updateEmployeeRoleState] =
 		useUpdateEmployeeRoleMutation();
 
-	const [employeeRoleDraft, setEmployeeRoleDraft] = useState<Record<string, string>>(
-		{},
-	);
+	const [employeeRoleDraft, setEmployeeRoleDraft] = useState<
+		Record<string, string>
+	>({});
 
 	const roleById = useMemo(() => {
 		const items = roles ?? [];
@@ -180,7 +175,9 @@ export default function BusinessDetailClient({
 						<div className="flex items-center gap-2">
 							<button
 								type="button"
-								className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+								className={cn(
+									buttonVariants({ variant: "outline", size: "sm" }),
+								)}
 								onClick={() => router.back()}
 							>
 								Back
@@ -212,18 +209,26 @@ export default function BusinessDetailClient({
 							<ArrowLeft data-icon="inline-start" />
 							Back
 						</button>
-						{businessFetching ? <Badge variant="outline">Updating…</Badge> : null}
+						{businessFetching ? (
+							<Badge variant="outline">Updating…</Badge>
+						) : null}
 					</div>
 
-					<h1 className="text-2xl font-semibold tracking-tight">{business.name}</h1>
+					<h1 className="text-2xl font-semibold tracking-tight">
+						{business.name}
+					</h1>
 					<div className="flex flex-wrap items-center gap-2">
 						{business.is_active ? (
 							<Badge variant="secondary">Active</Badge>
 						) : (
 							<Badge variant="outline">Inactive</Badge>
 						)}
-						{business.is_archived ? <Badge variant="outline">Archived</Badge> : null}
-						<span className="text-sm text-muted-foreground">TIN: {business.tin_number}</span>
+						{business.is_archived ? (
+							<Badge variant="outline">Archived</Badge>
+						) : null}
+						<span className="text-sm text-muted-foreground">
+							TIN: {business.tin_number}
+						</span>
 					</div>
 				</div>
 
@@ -249,10 +254,13 @@ export default function BusinessDetailClient({
 						<AlertDialogContent>
 							<AlertDialogHeader>
 								<AlertDialogTitle>
-									{business.is_active ? "Deactivate business?" : "Activate business?"}
+									{business.is_active
+										? "Deactivate business?"
+										: "Activate business?"}
 								</AlertDialogTitle>
 								<AlertDialogDescription>
-									This changes whether the business is active. You can toggle it back later.
+									This changes whether the business is active. You can toggle it
+									back later.
 								</AlertDialogDescription>
 							</AlertDialogHeader>
 							<AlertDialogFooter>
@@ -273,7 +281,9 @@ export default function BusinessDetailClient({
 
 					<AlertDialog>
 						<AlertDialogTrigger
-							className={cn(buttonVariants({ variant: "destructive", size: "sm" }))}
+							className={cn(
+								buttonVariants({ variant: "destructive", size: "sm" }),
+							)}
 							disabled={deleteBusinessState.isLoading}
 						>
 							<Trash2 data-icon="inline-start" />
@@ -282,7 +292,9 @@ export default function BusinessDetailClient({
 						<AlertDialogContent>
 							<AlertDialogHeader>
 								<AlertDialogTitle>Delete business?</AlertDialogTitle>
-								<AlertDialogDescription>This action cannot be undone.</AlertDialogDescription>
+								<AlertDialogDescription>
+									This action cannot be undone.
+								</AlertDialogDescription>
 							</AlertDialogHeader>
 							<AlertDialogFooter>
 								<AlertDialogCancel>Cancel</AlertDialogCancel>
@@ -323,7 +335,9 @@ export default function BusinessDetailClient({
 								</div>
 								<div className="flex flex-col gap-1 min-w-0">
 									<span className="text-sm text-muted-foreground">Owner</span>
-									<span className="font-medium truncate">{business.owner_id}</span>
+									<span className="font-medium truncate">
+										{business.owner_id}
+									</span>
 								</div>
 								<div className="flex flex-col gap-1">
 									<span className="text-sm text-muted-foreground">Status</span>
@@ -342,7 +356,9 @@ export default function BusinessDetailClient({
 							<CardTitle>Employees</CardTitle>
 							<button
 								type="button"
-								className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+								className={cn(
+									buttonVariants({ variant: "outline", size: "sm" }),
+								)}
 								onClick={() => refetchEmployees()}
 								disabled={employeesLoading}
 							>
@@ -357,7 +373,9 @@ export default function BusinessDetailClient({
 										<span className="wrap-break-word">Request failed.</span>
 										<button
 											type="button"
-											className={cn(buttonVariants({ variant: "link", size: "sm" }))}
+											className={cn(
+												buttonVariants({ variant: "link", size: "sm" }),
+											)}
 											onClick={() => refetchEmployees()}
 										>
 											Try again
@@ -378,13 +396,14 @@ export default function BusinessDetailClient({
 										<TableRow>
 											<TableHead>Employee</TableHead>
 											<TableHead>Role</TableHead>
+											<TableHead>Branch</TableHead>
 											<TableHead className="text-right">Actions</TableHead>
 										</TableRow>
 									</TableHeader>
 									<TableBody>
 										{employeeRows.length === 0 ? (
 											<TableRow>
-												<TableCell colSpan={3} className="py-10 text-center">
+												<TableCell colSpan={4} className="py-10 text-center">
 													<span className="text-sm text-muted-foreground">
 														No employees found.
 													</span>
@@ -392,7 +411,8 @@ export default function BusinessDetailClient({
 											</TableRow>
 										) : (
 											employeeRows.map((emp: EmployeeOutput) => {
-												const selectedRoleId = employeeRoleDraft[emp.id] ?? emp.role_id;
+												const selectedRoleId =
+													employeeRoleDraft[emp.id] ?? emp.role_id;
 												const selectedRole = roleById.get(selectedRoleId);
 
 												return (
@@ -437,10 +457,20 @@ export default function BusinessDetailClient({
 																</SelectContent>
 															</Select>
 														</TableCell>
+														<TableCell>
+															<span className="font-medium truncate">
+																{emp.branch?.name ?? "—"}
+															</span>
+														</TableCell>
 														<TableCell className="text-right">
 															<button
 																type="button"
-																className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+																className={cn(
+																	buttonVariants({
+																		variant: "outline",
+																		size: "sm",
+																	}),
+																)}
 																disabled={
 																	updateEmployeeRoleState.isLoading ||
 																	!selectedRoleId ||
@@ -472,4 +502,3 @@ export default function BusinessDetailClient({
 		</div>
 	);
 }
-
