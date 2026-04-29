@@ -52,7 +52,7 @@ const systemAdminNavigation: {
 	// { name: "Staff", href: "/admin/staff", icon: Users },
 	// { name: "Menu", href: "/admin/menu", icon: UtensilsCrossed },
 	// { name: "Tables", href: "/admin/tables", icon: TableProperties },
-	{ name: "Bank Accounts", href: "/admin/bank-accounts", icon: Landmark },
+	// { name: "Bank Accounts", href: "/admin/bank-accounts", icon: Landmark },
 	{ name: "Transactions", href: "/admin/transactions", icon: CreditCard },
 	{ name: "Subscription", href: "/admin/subscription", icon: BadgeCheck },
 	// { name: "Notifications", href: "/admin/notifications", icon: Bell },
