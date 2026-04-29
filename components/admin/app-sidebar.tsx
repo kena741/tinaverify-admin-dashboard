@@ -46,16 +46,16 @@ const systemAdminNavigation: {
 	icon: LucideIcon;
 }[] = [
 	{ name: "Dashboard", href: "/admin", icon: LayoutDashboard },
-	{ name: "Orders", href: "/admin/orders", icon: ClipboardList },
+	// { name: "Orders", href: "/admin/orders", icon: ClipboardList },
 	{ name: "Business", href: "/admin/business", icon: Building2 },
-	{ name: "Branch", href: "/admin/branches/", icon: MapPin },
-	{ name: "Staff", href: "/admin/staff", icon: Users },
-	{ name: "Menu", href: "/admin/menu", icon: UtensilsCrossed },
-	{ name: "Tables", href: "/admin/tables", icon: TableProperties },
+	// { name: "Branch", href: "/admin/branches/", icon: MapPin },
+	// { name: "Staff", href: "/admin/staff", icon: Users },
+	// { name: "Menu", href: "/admin/menu", icon: UtensilsCrossed },
+	// { name: "Tables", href: "/admin/tables", icon: TableProperties },
 	{ name: "Bank Accounts", href: "/admin/bank-accounts", icon: Landmark },
 	{ name: "Transactions", href: "/admin/transactions", icon: CreditCard },
 	{ name: "Subscription", href: "/admin/subscription", icon: BadgeCheck },
-	{ name: "Notifications", href: "/admin/notifications", icon: Bell },
+	// { name: "Notifications", href: "/admin/notifications", icon: Bell },
 	{ name: "Reports", href: "/admin/reports", icon: BarChart3 },
 	{ name: "Settings", href: "/admin/settings", icon: Settings },
 ];

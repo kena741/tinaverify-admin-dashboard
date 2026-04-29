@@ -41,10 +41,17 @@ import {
 	useDeleteBusinessMutation,
 	useGetBusinessQuery,
 	useListBusinessEmployeesQuery,
+	useListBusinessBranchesQuery,
 	useSetBusinessActiveMutation,
 	useUpdateEmployeeRoleMutation,
 } from "../../../../services/branch-management/branchManagementApi";
-import type { EmployeeOutput, RoleOutput } from "../../../../services/types";
+import { useListBankAccountsQuery } from "../../../../services/bank-accounts/bankAccountsApi";
+import type {
+	BankAccountResponse,
+	BranchOutput,
+	EmployeeOutput,
+	RoleOutput,
+} from "../../../../services/types";
 import { useListRolesQuery } from "../../../../services/role/roleApi";
 import { cn } from "@/lib/utils";
 
@@ -80,6 +87,30 @@ export default function BusinessDetailClient({
 		error: employeesError,
 		refetch: refetchEmployees,
 	} = useListBusinessEmployeesQuery(
+		{ businessId },
+		{
+			skip: missingBusinessId,
+		},
+	);
+
+	const {
+		data: branches,
+		isLoading: branchesLoading,
+		error: branchesError,
+		refetch: refetchBranches,
+	} = useListBusinessBranchesQuery(
+		{ businessId },
+		{
+			skip: missingBusinessId,
+		},
+	);
+
+	const {
+		data: bankAccounts,
+		isLoading: bankAccountsLoading,
+		error: bankAccountsError,
+		refetch: refetchBankAccounts,
+	} = useListBankAccountsQuery(
 		{ businessId },
 		{
 			skip: missingBusinessId,
@@ -316,13 +347,12 @@ export default function BusinessDetailClient({
 				<TabsList>
 					<TabsTrigger value="overview">Overview</TabsTrigger>
 					<TabsTrigger value="employees">Employees</TabsTrigger>
+					<TabsTrigger value="branches">Branches</TabsTrigger>
+					<TabsTrigger value="bank-accounts">Bank Accounts</TabsTrigger>
 				</TabsList>
 
 				<TabsContent value="overview">
 					<Card>
-						<CardHeader>
-							<CardTitle>Business information</CardTitle>
-						</CardHeader>
 						<CardContent className="flex flex-col gap-4">
 							<div className="grid gap-4 sm:grid-cols-2">
 								<div className="flex flex-col gap-1">
@@ -352,19 +382,6 @@ export default function BusinessDetailClient({
 
 				<TabsContent value="employees">
 					<Card>
-						<CardHeader className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-							<CardTitle>Employees</CardTitle>
-							<button
-								type="button"
-								className={cn(
-									buttonVariants({ variant: "outline", size: "sm" }),
-								)}
-								onClick={() => refetchEmployees()}
-								disabled={employeesLoading}
-							>
-								Refresh
-							</button>
-						</CardHeader>
 						<CardContent className="flex flex-col gap-4">
 							{employeesError ? (
 								<Alert variant="destructive">
@@ -491,6 +508,128 @@ export default function BusinessDetailClient({
 													</TableRow>
 												);
 											})
+										)}
+									</TableBody>
+								</Table>
+							)}
+						</CardContent>
+					</Card>
+				</TabsContent>
+
+				<TabsContent value="branches">
+					<Card>
+						<CardContent className="flex flex-col gap-4">
+							<Table>
+								<TableHeader>
+									<TableRow>
+										<TableHead>Branch</TableHead>
+										<TableHead>Headquarters</TableHead>
+										<TableHead>Address</TableHead>
+									</TableRow>
+								</TableHeader>
+								<TableBody>
+									{branchesLoading ? (
+										<TableRow>
+											<TableCell colSpan={1} className="py-10 text-center">
+												<span className="text-sm text-muted-foreground">
+													Loading branches…
+												</span>
+											</TableCell>
+										</TableRow>
+									) : branches?.length === 0 ? (
+										<TableRow>
+											<TableCell colSpan={1} className="py-10 text-center">
+												<span className="text-sm text-muted-foreground">
+													No branches found.
+												</span>
+											</TableCell>
+										</TableRow>
+									) : (
+										branches?.map((branch: BranchOutput) => (
+											<TableRow key={branch.id}>
+												<TableCell>{branch.name}</TableCell>
+												<TableCell>
+													{branch.is_head_quarter ? "Yes" : "No"}
+												</TableCell>
+												<TableCell>{branch.address ?? "—"}</TableCell>
+											</TableRow>
+										))
+									)}
+								</TableBody>
+							</Table>
+						</CardContent>
+					</Card>
+				</TabsContent>
+
+				<TabsContent value="bank-accounts">
+					<Card>
+						<CardContent className="flex flex-col gap-4">
+							{bankAccountsError ? (
+								<Alert variant="destructive">
+									<AlertTitle>Failed to load bank accounts</AlertTitle>
+									<AlertDescription className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+										<span className="wrap-break-word">Request failed.</span>
+										<button
+											type="button"
+											className={cn(
+												buttonVariants({ variant: "link", size: "sm" }),
+											)}
+											onClick={() => refetchBankAccounts()}
+										>
+											Try again
+										</button>
+									</AlertDescription>
+								</Alert>
+							) : null}
+
+							{bankAccountsLoading ? (
+								<div className="flex flex-col gap-2">
+									{Array.from({ length: 6 }).map((_, i) => (
+										<Skeleton key={i} className="h-10 w-full" />
+									))}
+								</div>
+							) : (
+								<Table>
+									<TableHeader>
+										<TableRow>
+											<TableHead>Bank</TableHead>
+											<TableHead>Account name</TableHead>
+											<TableHead>Account number</TableHead>
+											<TableHead>Status</TableHead>
+										</TableRow>
+									</TableHeader>
+									<TableBody>
+										{(bankAccounts ?? []).length === 0 ? (
+											<TableRow>
+												<TableCell colSpan={4} className="py-10 text-center">
+													<span className="text-sm text-muted-foreground">
+														No bank accounts linked to this business.
+													</span>
+												</TableCell>
+											</TableRow>
+										) : (
+											(bankAccounts ?? []).map((account: BankAccountResponse) => (
+												<TableRow
+													key={`${account.bank_name}-${account.account_number}-${account.account_name}`}
+												>
+													<TableCell className="font-medium">
+														{account.bank_name}
+													</TableCell>
+													<TableCell>{account.account_name}</TableCell>
+													<TableCell className="font-mono text-sm">
+														{account.account_number}
+													</TableCell>
+													<TableCell>
+														<Badge
+															variant={
+																account.is_archived ? "secondary" : "default"
+															}
+														>
+															{account.is_archived ? "Archived" : "Active"}
+														</Badge>
+													</TableCell>
+												</TableRow>
+											))
 										)}
 									</TableBody>
 								</Table>
