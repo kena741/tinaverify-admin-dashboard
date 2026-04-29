@@ -223,6 +223,28 @@ export type BankAccountResponse = {
 	is_archived: boolean;
 };
 
+/** OpenAPI `VerifiedTransactionOutputSchema` */
+export type VerifiedTransactionOutput = {
+	id: string;
+	reference_number: string;
+	business_id: string;
+	amount: string;
+	currency: string;
+	bank_account_id?: string | null;
+	sender_name?: string | null;
+	sender_account?: string | null;
+	receiver_name?: string | null;
+	receiver_account?: string | null;
+	status: string;
+	error_message?: string | null;
+	receipt_url?: string | null;
+};
+
+/** OpenAPI body for `PATCH /api/v1/transactions/{transaction_id}/status` */
+export type UpdateTransactionStatusRequest = {
+	status: "verified" | "failed";
+};
+
 /** OpenAPI `TableInputSchema` — `POST /api/v1/tables` */
 export type TableInputRequest = {
 	branch_id: string;
