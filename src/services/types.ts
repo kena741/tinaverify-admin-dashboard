@@ -45,6 +45,7 @@ export type BusinessOutput = {
   name: string;
   tin_number: string;
   owner_id: string;
+  is_active: boolean;
   is_archived: boolean;
 };
 

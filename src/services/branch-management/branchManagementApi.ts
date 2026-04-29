@@ -30,8 +30,17 @@ export type ListAllUserBranchesResult = {
 export const branchManagementApi = createApi({
 	reducerPath: "branchManagementApi",
 	baseQuery: backendBaseQuery,
-	tagTypes: ["Branch", "MyBusinesses", "Employee", "Role"],
+	tagTypes: ["Branch", "MyBusinesses", "Business", "Employee", "Role"],
 	endpoints: (builder) => ({
+		/** `GET /api/v1/business` */
+		listAllBusinesses: builder.query<BusinessOutput[], void>({
+			query: () => ({
+				url: "/api/v1/business",
+				headers: bearerHeaders(),
+			}),
+			providesTags: [{ type: "Business", id: "LIST" }],
+		}),
+
 		listMyBusinesses: builder.query<BusinessOutput[], void>({
 			query: () => ({
 				url: "/api/v1/users/me/business",
@@ -106,7 +115,11 @@ export const branchManagementApi = createApi({
 					...bearerHeaders(accessToken),
 				},
 			}),
-			invalidatesTags: [{ type: "MyBusinesses", id: "LIST" }, { type: "Branch", id: "LIST" }],
+			invalidatesTags: [
+				{ type: "MyBusinesses", id: "LIST" },
+				{ type: "Business", id: "LIST" },
+				{ type: "Branch", id: "LIST" },
+			],
 		}),
 
 		/** `GET /api/v1/business/roles?business_id=` */
@@ -225,6 +238,7 @@ export const branchManagementApi = createApi({
 });
 
 export const {
+	useListAllBusinessesQuery,
 	useListMyBusinessesQuery,
 	useListAllUserBranchesQuery,
 	useListBusinessRolesQuery,

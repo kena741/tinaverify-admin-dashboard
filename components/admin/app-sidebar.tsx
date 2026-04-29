@@ -47,7 +47,7 @@ const systemAdminNavigation: {
 }[] = [
 	{ name: "Dashboard", href: "/admin", icon: LayoutDashboard },
 	{ name: "Orders", href: "/admin/orders", icon: ClipboardList },
-	{ name: "Restaurants", href: "/admin/restaurants", icon: Building2 },
+	{ name: "Business", href: "/admin/business", icon: Building2 },
 	{ name: "Branch", href: "/admin/branches/", icon: MapPin },
 	{ name: "Staff", href: "/admin/staff", icon: Users },
 	{ name: "Menu", href: "/admin/menu", icon: UtensilsCrossed },
