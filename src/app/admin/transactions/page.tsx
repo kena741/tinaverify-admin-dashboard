@@ -1,204 +1,895 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import {
+	ChevronsUpDownIcon,
+	CreditCardIcon,
+	Loader2Icon,
+	PercentIcon,
+	ReceiptIcon,
+} from "lucide-react";
 
-export default function TransactionsPage() {
-  const [searchTerm, setSearchTerm] = useState("");
-  const [dateRange, setDateRange] = useState("today");
-  const [restaurantFilter, setRestaurantFilter] = useState("all");
-  const [branchFilter, setBranchFilter] = useState("all");
-  const [statusFilter, setStatusFilter] = useState("all");
+import {
+	useListAllBusinessesQuery,
+	useListBusinessBranchesQuery,
+} from "../../../services/branch-management/branchManagementApi";
+import {
+	useGetTransactionQuery,
+	useListTransactionsByBranchQuery,
+	useListTransactionsByBusinessQuery,
+	useUpdateTransactionStatusMutation,
+} from "../../../services/transactions/transactionsApi";
+import type { BusinessOutput, VerifiedTransactionOutput } from "../../../services/types";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+	Card,
+	CardContent,
+	CardDescription,
+	CardHeader,
+	CardTitle,
+} from "@/components/ui/card";
+import {
+	Command,
+	CommandEmpty,
+	CommandGroup,
+	CommandInput,
+	CommandItem,
+	CommandList,
+} from "@/components/ui/command";
+import { Input } from "@/components/ui/input";
+import {
+	Popover,
+	PopoverContent,
+	PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@/components/ui/select";
+import { Separator } from "@/components/ui/separator";
+import {
+	Sheet,
+	SheetContent,
+	SheetDescription,
+	SheetHeader,
+	SheetTitle,
+} from "@/components/ui/sheet";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+	Table,
+	TableBody,
+	TableCell,
+	TableHead,
+	TableHeader,
+	TableRow,
+} from "@/components/ui/table";
+const BRANCH_ALL = "__all__";
 
-  const transactions = [
-    { id: "TXN-001", restaurant: "Addis Café", branch: "Bole Branch", table: 5, waiter: "John Doe", amount: 450, status: "success", telebirrId: "TB-123456", timestamp: "2024-01-15 14:30" },
-    { id: "TXN-002", restaurant: "Blue Nile Hotel", branch: "Main Branch", table: 12, waiter: "Sarah Mengistu", amount: 1200, status: "failed", telebirrId: "TB-123457", timestamp: "2024-01-15 14:25" },
-    { id: "TXN-003", restaurant: "Kaldi's Coffee", branch: "Meskel Square", table: 8, waiter: "Daniel Tesfaye", amount: 320, status: "success", telebirrId: "TB-123458", timestamp: "2024-01-15 14:20" },
-    { id: "TXN-004", restaurant: "Addis Café", branch: "Bishoftu Branch", table: 3, waiter: "Meron Tadesse", amount: 680, status: "pending", telebirrId: "TB-123459", timestamp: "2024-01-15 14:15" },
-    { id: "TXN-005", restaurant: "Habesha Restaurant", branch: "Main Branch", table: 15, waiter: "Alemayehu Mekonnen", amount: 950, status: "success", telebirrId: "TB-123460", timestamp: "2024-01-15 14:10" },
-    { id: "TXN-006", restaurant: "Tomoca", branch: "Piazza Branch", table: 2, waiter: "John Doe", amount: 150, status: "success", telebirrId: "TB-123461", timestamp: "2024-01-15 14:05" },
-  ];
+type DatePreset = "today" | "last_7_days" | "last_30_days" | "this_month";
 
-  const restaurants = ["All Restaurants", "Addis Café", "Blue Nile Hotel", "Kaldi's Coffee", "Habesha Restaurant", "Tomoca"];
+function isoRangeForPreset(preset: DatePreset): {
+	startDate: string;
+	endDate: string;
+} {
+	const end = new Date();
+	const start = new Date();
 
-  const filteredTransactions = transactions.filter((txn) => {
-    const matchesSearch = txn.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         txn.table.toString().includes(searchTerm) ||
-                         txn.waiter.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesRestaurant = restaurantFilter === "all" || txn.restaurant === restaurantFilter;
-    const matchesBranch = branchFilter === "all" || txn.branch === branchFilter;
-    const matchesStatus = statusFilter === "all" || txn.status === statusFilter;
-    return matchesSearch && matchesRestaurant && matchesBranch && matchesStatus;
-  });
+	switch (preset) {
+		case "today":
+			start.setHours(0, 0, 0, 0);
+			end.setHours(23, 59, 59, 999);
+			break;
+		case "last_7_days":
+			start.setDate(start.getDate() - 6);
+			start.setHours(0, 0, 0, 0);
+			end.setHours(23, 59, 59, 999);
+			break;
+		case "last_30_days":
+			start.setDate(start.getDate() - 29);
+			start.setHours(0, 0, 0, 0);
+			end.setHours(23, 59, 59, 999);
+			break;
+		case "this_month":
+			start.setDate(1);
+			start.setHours(0, 0, 0, 0);
+			end.setHours(23, 59, 59, 999);
+			break;
+	}
 
-  return (
-    <div className="space-y-6">
-      {/* Page header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Transactions</h1>
-          <p className="mt-1 text-sm text-gray-500">View and manage all payment transactions</p>
-        </div>
-        <button className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium flex items-center space-x-2">
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-          </svg>
-          <span>Export</span>
-        </button>
-      </div>
-
-      {/* Filters */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-          <div className="md:col-span-2">
-            <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                </svg>
-              </div>
-              <input
-                type="text"
-                placeholder="Search by ID, table, or waiter..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-          </div>
-          <select
-            value={dateRange}
-            onChange={(e) => setDateRange(e.target.value)}
-            className="px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="today">Today</option>
-            <option value="week">This Week</option>
-            <option value="month">This Month</option>
-            <option value="custom">Custom Range</option>
-          </select>
-          <select
-            value={restaurantFilter}
-            onChange={(e) => setRestaurantFilter(e.target.value)}
-            className="px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            {restaurants.map((restaurant) => (
-              <option key={restaurant} value={restaurant === "All Restaurants" ? "all" : restaurant}>
-                {restaurant}
-              </option>
-            ))}
-          </select>
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="all">All Status</option>
-            <option value="success">Success</option>
-            <option value="pending">Pending</option>
-            <option value="failed">Failed</option>
-          </select>
-        </div>
-      </div>
-
-      {/* Summary cards */}
-      <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">Total Transactions</p>
-              <p className="mt-2 text-2xl font-bold text-gray-900">{filteredTransactions.length}</p>
-            </div>
-            <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-              <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
-              </svg>
-            </div>
-          </div>
-        </div>
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">Total Amount</p>
-              <p className="mt-2 text-2xl font-bold text-gray-900">
-                ETB {filteredTransactions.reduce((sum, txn) => sum + txn.amount, 0).toLocaleString()}
-              </p>
-            </div>
-            <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-              <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </div>
-          </div>
-        </div>
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">Success Rate</p>
-              <p className="mt-2 text-2xl font-bold text-gray-900">
-                {filteredTransactions.length > 0
-                  ? Math.round((filteredTransactions.filter(t => t.status === "success").length / filteredTransactions.length) * 100)
-                  : 0}%
-              </p>
-            </div>
-            <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
-              <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-              </svg>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Transactions table */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Payment ID</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Restaurant / Branch</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Table</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Waiter</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Telebirr ID</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Timestamp</th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {filteredTransactions.map((txn) => (
-                <tr key={txn.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm font-medium text-gray-900">{txn.id}</div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm font-medium text-gray-900">{txn.restaurant}</div>
-                    <div className="text-sm text-gray-500">{txn.branch}</div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">Table {txn.table}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{txn.waiter}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">ETB {txn.amount.toLocaleString()}</td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span
-                      className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                        txn.status === "success"
-                          ? "bg-green-100 text-green-800"
-                          : txn.status === "pending"
-                          ? "bg-yellow-100 text-yellow-800"
-                          : "bg-red-100 text-red-800"
-                      }`}
-                    >
-                      {txn.status === "success" ? "Success" : txn.status === "pending" ? "Pending" : "Failed"}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-mono">{txn.telebirrId}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{txn.timestamp}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-  );
+	return { startDate: start.toISOString(), endDate: end.toISOString() };
 }
 
+function normalizeStatusDraft(status: string): "verified" | "failed" {
+	const s = status.toLowerCase();
+	if (s === "verified" || s === "failed") return s;
+	return "verified";
+}
+
+function parseAmount(value: string): number {
+	const n = Number.parseFloat(value);
+	return Number.isFinite(n) ? n : 0;
+}
+
+function statusBadgeVariant(
+	status: string,
+): "default" | "secondary" | "destructive" | "outline" {
+	const s = status.toLowerCase();
+	if (s === "failed" || s === "rejected") return "destructive";
+	if (s === "verified" || s === "success" || s === "completed")
+		return "default";
+	if (s === "pending" || s === "processing") return "secondary";
+	return "outline";
+}
+
+function getErrorMessage(error: unknown, fallback: string): string {
+	if (
+		typeof error === "object" &&
+		error !== null &&
+		"data" in error &&
+		(error as { data?: { detail?: unknown } }).data?.detail
+	) {
+		const detail = (error as { data: { detail: unknown } }).data.detail;
+		if (typeof detail === "string") return detail;
+		if (Array.isArray(detail)) {
+			const messages = detail
+				.map((item) =>
+					typeof item === "object" &&
+					item !== null &&
+					"msg" in item &&
+					typeof item.msg === "string"
+						? item.msg
+						: null,
+				)
+				.filter(Boolean);
+			if (messages.length > 0) return messages.join(", ");
+		}
+	}
+	if (error instanceof Error) return error.message;
+	return fallback;
+}
+
+export default function TransactionsPage() {
+	const [businessPopoverOpen, setBusinessPopoverOpen] = useState(false);
+	const [selectedBusinessId, setSelectedBusinessId] = useState<string | null>(
+		null,
+	);
+	const [branchId, setBranchId] = useState<string>(BRANCH_ALL);
+	const [datePreset, setDatePreset] = useState<DatePreset>("last_7_days");
+	const [statusFilter, setStatusFilter] = useState<string>("all");
+	const [searchTerm, setSearchTerm] = useState("");
+	const [detailTransactionId, setDetailTransactionId] = useState<string | null>(
+		null,
+	);
+	const [statusDraft, setStatusDraft] = useState<"verified" | "failed">(
+		"verified",
+	);
+
+	const { startDate, endDate } = useMemo(
+		() => isoRangeForPreset(datePreset),
+		[datePreset],
+	);
+
+	const {
+		data: businesses,
+		isLoading: businessesLoading,
+		error: businessesError,
+		refetch: refetchBusinesses,
+	} = useListAllBusinessesQuery();
+
+	const {
+		data: branches,
+		isLoading: branchesLoading,
+		error: branchesError,
+		refetch: refetchBranches,
+	} = useListBusinessBranchesQuery(
+		{ businessId: selectedBusinessId ?? "" },
+		{ skip: !selectedBusinessId },
+	);
+
+	const useBranchEndpoint =
+		selectedBusinessId !== null &&
+		branchId !== BRANCH_ALL &&
+		branchId.length > 0;
+
+	const {
+		data: transactionsByBusiness,
+		isLoading: loadingBusinessTx,
+		isFetching: fetchingBusinessTx,
+		error: errorBusinessTx,
+		refetch: refetchBusinessTx,
+	} = useListTransactionsByBusinessQuery(
+		{
+			businessId: selectedBusinessId ?? "",
+			startDate,
+			endDate,
+		},
+		{ skip: !selectedBusinessId || useBranchEndpoint },
+	);
+
+	const {
+		data: transactionsByBranch,
+		isLoading: loadingBranchTx,
+		isFetching: fetchingBranchTx,
+		error: errorBranchTx,
+		refetch: refetchBranchTx,
+	} = useListTransactionsByBranchQuery(
+		{
+			businessId: selectedBusinessId ?? "",
+			branchId,
+			startDate,
+			endDate,
+		},
+		{ skip: !selectedBusinessId || !useBranchEndpoint },
+	);
+
+	const rawTransactions = useMemo((): VerifiedTransactionOutput[] => {
+		if (useBranchEndpoint && transactionsByBranch !== undefined) {
+			return transactionsByBranch;
+		}
+		return transactionsByBusiness ?? [];
+	}, [useBranchEndpoint, transactionsByBranch, transactionsByBusiness]);
+
+	const listLoading =
+		!!selectedBusinessId &&
+		(useBranchEndpoint ? loadingBranchTx || fetchingBranchTx : loadingBusinessTx || fetchingBusinessTx);
+	const listError = useBranchEndpoint ? errorBranchTx : errorBusinessTx;
+
+	const filteredTransactions = useMemo(() => {
+		const q = searchTerm.trim().toLowerCase();
+		let rows = rawTransactions;
+		if (statusFilter !== "all") {
+			rows = rows.filter(
+				(t) => t.status.toLowerCase() === statusFilter.toLowerCase(),
+			);
+		}
+		if (!q) return rows;
+		return rows.filter((t) => {
+			const hay = [
+				t.reference_number,
+				t.amount,
+				t.currency,
+				t.status,
+				t.sender_name,
+				t.sender_account,
+				t.receiver_name,
+				t.receiver_account,
+				t.receipt_url,
+				t.id,
+			]
+				.filter(Boolean)
+				.join(" ")
+				.toLowerCase();
+			return hay.includes(q);
+		});
+	}, [rawTransactions, searchTerm, statusFilter]);
+
+	const totalAmount = useMemo(
+		() =>
+			filteredTransactions.reduce((sum, t) => sum + parseAmount(t.amount), 0),
+		[filteredTransactions],
+	);
+
+	const successCount = useMemo(
+		() =>
+			filteredTransactions.filter((t) => {
+				const s = t.status.toLowerCase();
+				return s === "verified" || s === "success" || s === "completed";
+			}).length,
+		[filteredTransactions],
+	);
+
+	const successRate =
+		filteredTransactions.length > 0
+			? Math.round((successCount / filteredTransactions.length) * 100)
+			: 0;
+
+	const selectedBusiness = useMemo(
+		() => businesses?.find((b) => b.id === selectedBusinessId) ?? null,
+		[businesses, selectedBusinessId],
+	);
+
+	const {
+		data: detailTransaction,
+		isLoading: detailLoading,
+		error: detailError,
+		refetch: refetchDetail,
+	} = useGetTransactionQuery(
+		{ transactionId: detailTransactionId ?? "" },
+		{ skip: !detailTransactionId },
+	);
+
+	const [updateStatus, updateStatusState] = useUpdateTransactionStatusMutation();
+
+	const refetchList = () => {
+		if (useBranchEndpoint) void refetchBranchTx();
+		else void refetchBusinessTx();
+	};
+
+	return (
+		<div className="flex flex-col gap-6">
+			<div className="flex flex-col gap-1">
+				<h1 className="text-2xl font-semibold tracking-tight">Transactions</h1>
+				<p className="text-sm text-muted-foreground">
+					Select a business to load verified payment transactions. Optionally narrow
+					by branch, date range, and status.
+				</p>
+			</div>
+
+			{businessesError ? (
+				<Alert variant="destructive">
+					<AlertTitle>Failed to load businesses</AlertTitle>
+					<AlertDescription className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+						<span className="wrap-break-word">
+							{getErrorMessage(businessesError, "Request failed.")}
+						</span>
+						<Button
+							type="button"
+							variant="outline"
+							size="sm"
+							onClick={() => refetchBusinesses()}
+						>
+							Try again
+						</Button>
+					</AlertDescription>
+				</Alert>
+			) : null}
+
+			<Card>
+				<CardHeader className="flex flex-col gap-1">
+					<CardTitle>Filters</CardTitle>
+					<CardDescription>
+						Choose a business (searchable), then optionally a branch and time
+						range.
+					</CardDescription>
+				</CardHeader>
+				<CardContent className="flex flex-col gap-4">
+					<div className="flex flex-col gap-4 lg:flex-row lg:flex-wrap lg:items-end">
+						<div className="flex min-w-0 flex-1 flex-col gap-2">
+							<span className="text-sm font-medium" id="business-filter-label">
+								Business
+							</span>
+							<Popover
+								open={businessPopoverOpen}
+								onOpenChange={setBusinessPopoverOpen}
+							>
+								<PopoverTrigger
+									render={
+										<Button
+											type="button"
+											variant="outline"
+											disabled={businessesLoading}
+											className="h-10 w-full min-w-0 justify-between"
+											aria-labelledby="business-filter-label"
+										/>
+									}
+								>
+									<span className="truncate text-left">
+										{businessesLoading ? (
+											<span className="text-muted-foreground">Loading…</span>
+										) : selectedBusiness ? (
+											selectedBusiness.name
+										) : (
+											<span className="text-muted-foreground">
+												Select business…
+											</span>
+										)}
+									</span>
+									<ChevronsUpDownIcon data-icon="inline-end" aria-hidden />
+								</PopoverTrigger>
+								<PopoverContent
+									className="w-(--anchor-width) min-w-72 p-0"
+									align="start"
+								>
+									<Command>
+										<CommandInput
+											placeholder="Search by name or TIN…"
+											aria-label="Search businesses"
+										/>
+										<CommandList>
+											<CommandEmpty>No business found.</CommandEmpty>
+											<CommandGroup heading="Businesses">
+												{(businesses ?? []).map((b: BusinessOutput) => (
+													<CommandItem
+														key={b.id}
+														value={`${b.name} ${b.tin_number} ${b.id}`}
+														onSelect={() => {
+															setSelectedBusinessId(b.id);
+															setBranchId(BRANCH_ALL);
+															setBusinessPopoverOpen(false);
+														}}
+														className="[&>svg:last-child]:hidden"
+													>
+														<span className="flex min-w-0 flex-1 flex-col gap-0.5 text-left">
+															<span className="truncate font-medium">{b.name}</span>
+															<span className="truncate text-xs text-muted-foreground">
+																TIN {b.tin_number}
+															</span>
+														</span>
+													</CommandItem>
+												))}
+											</CommandGroup>
+										</CommandList>
+									</Command>
+								</PopoverContent>
+							</Popover>
+						</div>
+
+						<div className="flex min-w-48 flex-1 flex-col gap-2">
+							<span className="text-sm font-medium" id="branch-filter-label">
+								Branch
+							</span>
+							<Select
+								value={branchId}
+								onValueChange={(v) => {
+									if (v != null && v !== "") setBranchId(v);
+								}}
+								disabled={!selectedBusinessId || branchesLoading}
+							>
+								<SelectTrigger
+									className="h-10 w-full"
+									aria-labelledby="branch-filter-label"
+								>
+									<SelectValue placeholder="All branches" />
+								</SelectTrigger>
+								<SelectContent>
+									<SelectItem value={BRANCH_ALL}>All branches</SelectItem>
+									{(branches ?? []).map((br) => (
+										<SelectItem key={br.id} value={br.id}>
+											{br.name}
+											{br.is_head_quarter ? " (HQ)" : ""}
+										</SelectItem>
+									))}
+								</SelectContent>
+							</Select>
+							{branchesError ? (
+								<p className="text-xs text-destructive">
+									{getErrorMessage(branchesError, "Branches failed to load.")}{" "}
+									<button
+										type="button"
+										className="underline underline-offset-2"
+										onClick={() => refetchBranches()}
+									>
+										Retry
+									</button>
+								</p>
+							) : null}
+						</div>
+
+						<div className="flex min-w-48 flex-1 flex-col gap-2">
+							<span className="text-sm font-medium" id="date-filter-label">
+								Date range
+							</span>
+							<Select
+								value={datePreset}
+								onValueChange={(v) => {
+									if (v) setDatePreset(v as DatePreset);
+								}}
+							>
+								<SelectTrigger
+									className="h-10 w-full"
+									aria-labelledby="date-filter-label"
+								>
+									<SelectValue />
+								</SelectTrigger>
+								<SelectContent>
+									<SelectItem value="today">Today</SelectItem>
+									<SelectItem value="last_7_days">Last 7 days</SelectItem>
+									<SelectItem value="last_30_days">Last 30 days</SelectItem>
+									<SelectItem value="this_month">This month</SelectItem>
+								</SelectContent>
+							</Select>
+						</div>
+
+						<div className="flex min-w-48 flex-1 flex-col gap-2">
+							<span className="text-sm font-medium" id="status-filter-label">
+								Status
+							</span>
+							<Select
+								value={statusFilter}
+								onValueChange={(v) => {
+									if (v != null && v !== "") setStatusFilter(v);
+								}}
+							>
+								<SelectTrigger
+									className="h-10 w-full"
+									aria-labelledby="status-filter-label"
+								>
+									<SelectValue placeholder="All statuses" />
+								</SelectTrigger>
+								<SelectContent>
+									<SelectItem value="all">All statuses</SelectItem>
+									<SelectItem value="verified">verified</SelectItem>
+									<SelectItem value="failed">failed</SelectItem>
+									<SelectItem value="pending">pending</SelectItem>
+								</SelectContent>
+							</Select>
+						</div>
+
+						<div className="flex min-w-0 flex-2 flex-col gap-2 lg:min-w-48">
+							<span className="text-sm font-medium" id="search-label">
+								Search results
+							</span>
+							<Input
+								aria-labelledby="search-label"
+								placeholder="Reference, amount, accounts…"
+								value={searchTerm}
+								onChange={(e) => setSearchTerm(e.target.value)}
+								className="h-10"
+							/>
+						</div>
+					</div>
+				</CardContent>
+			</Card>
+
+			{selectedBusinessId && listError ? (
+				<Alert variant="destructive">
+					<AlertTitle>Failed to load transactions</AlertTitle>
+					<AlertDescription className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+						<span className="wrap-break-word">
+							{getErrorMessage(listError, "Request failed.")}
+						</span>
+						<Button type="button" variant="outline" size="sm" onClick={refetchList}>
+							Try again
+						</Button>
+					</AlertDescription>
+				</Alert>
+			) : null}
+
+			<div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+				<Card>
+					<CardContent className="flex flex-row items-center gap-4 pt-6">
+						<div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted">
+							<CreditCardIcon className="text-muted-foreground" aria-hidden />
+						</div>
+						<div className="min-w-0 flex-1">
+							<p className="text-sm text-muted-foreground">Transactions</p>
+							<p className="text-2xl font-semibold tabular-nums">
+								{selectedBusinessId ? filteredTransactions.length : "—"}
+							</p>
+						</div>
+					</CardContent>
+				</Card>
+				<Card>
+					<CardContent className="flex flex-row items-center gap-4 pt-6">
+						<div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted">
+							<ReceiptIcon className="text-muted-foreground" aria-hidden />
+						</div>
+						<div className="min-w-0 flex-1">
+							<p className="text-sm text-muted-foreground">Total amount</p>
+							<p className="text-2xl font-semibold tabular-nums truncate">
+								{selectedBusinessId && filteredTransactions.length > 0
+									? `${filteredTransactions[0]?.currency ?? ""} ${totalAmount.toLocaleString()}`.trim()
+									: "—"}
+							</p>
+						</div>
+					</CardContent>
+				</Card>
+				<Card>
+					<CardContent className="flex flex-row items-center gap-4 pt-6">
+						<div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted">
+							<PercentIcon className="text-muted-foreground" aria-hidden />
+						</div>
+						<div className="min-w-0 flex-1">
+							<p className="text-sm text-muted-foreground">Success rate</p>
+							<p className="text-2xl font-semibold tabular-nums">
+								{selectedBusinessId && filteredTransactions.length > 0
+									? `${successRate}%`
+									: "—"}
+							</p>
+						</div>
+					</CardContent>
+				</Card>
+			</div>
+
+			<Card>
+				<CardHeader>
+					<CardTitle>Results</CardTitle>
+					<CardDescription>
+						{selectedBusinessId
+							? useBranchEndpoint
+								? "Transactions for the selected branch and date range."
+								: "Transactions for the whole business and date range."
+							: "Select a business to load transactions."}
+					</CardDescription>
+				</CardHeader>
+				<CardContent className="flex flex-col gap-4">
+					{!selectedBusinessId ? (
+						<p className="py-8 text-center text-sm text-muted-foreground">
+							Choose a business from the combobox above.
+						</p>
+					) : listLoading ? (
+						<div className="flex flex-col gap-2">
+							{Array.from({ length: 8 }).map((_, i) => (
+								<Skeleton key={i} className="h-10 w-full" />
+							))}
+						</div>
+					) : (
+						<div className="overflow-x-auto rounded-md border">
+							<Table aria-label="Payment transactions">
+								<TableHeader>
+									<TableRow>
+										<TableHead>Reference</TableHead>
+										<TableHead>Amount</TableHead>
+										<TableHead>Status</TableHead>
+										<TableHead>Sender name</TableHead>
+										<TableHead>Sender bank account</TableHead>
+										<TableHead>Receiving bank name</TableHead>
+										<TableHead>Receiving bank account</TableHead>
+										<TableHead>Receipt</TableHead>
+									</TableRow>
+								</TableHeader>
+								<TableBody>
+									{filteredTransactions.length === 0 ? (
+										<TableRow>
+											<TableCell
+												colSpan={8}
+												className="py-10 text-center text-muted-foreground"
+											>
+												No transactions match your filters.
+											</TableCell>
+										</TableRow>
+									) : (
+										filteredTransactions.map((t) => (
+											<TableRow
+												key={t.id}
+												className="cursor-pointer"
+												onClick={() => {
+													setDetailTransactionId(t.id);
+													setStatusDraft(normalizeStatusDraft(t.status));
+												}}
+											>
+												<TableCell className="font-mono text-sm">
+													{t.reference_number}
+												</TableCell>
+												<TableCell>
+													<span className="font-medium tabular-nums">
+														{t.currency} {parseAmount(t.amount).toLocaleString()}
+													</span>
+												</TableCell>
+												<TableCell>
+													<Badge variant={statusBadgeVariant(t.status)}>
+														{t.status}
+													</Badge>
+												</TableCell>
+												<TableCell className="max-w-48 truncate text-sm">
+													{t.sender_name ?? "—"}
+												</TableCell>
+												<TableCell className="max-w-44 font-mono text-xs">
+													<span className="wrap-break-word">
+														{t.sender_account ?? "—"}
+													</span>
+												</TableCell>
+												<TableCell className="max-w-48 truncate text-sm">
+													{t.receiver_name ?? "—"}
+												</TableCell>
+												<TableCell className="max-w-44 font-mono text-xs">
+													<span className="wrap-break-word">
+														{t.receiver_account ?? "—"}
+													</span>
+												</TableCell>
+												<TableCell className="text-sm">
+													{t.receipt_url ? (
+														<a
+															href={t.receipt_url}
+															target="_blank"
+															rel="noopener noreferrer"
+															className="text-primary underline-offset-4 hover:underline"
+															onClick={(e) => e.stopPropagation()}
+														>
+															Open receipt
+														</a>
+													) : (
+														<span className="text-muted-foreground">—</span>
+													)}
+												</TableCell>
+											</TableRow>
+										))
+									)}
+								</TableBody>
+							</Table>
+						</div>
+					)}
+				</CardContent>
+			</Card>
+
+			<Sheet
+				open={detailTransactionId !== null}
+				onOpenChange={(open) => {
+					if (!open) setDetailTransactionId(null);
+				}}
+			>
+				<SheetContent className="flex w-full flex-col gap-0 overflow-y-auto sm:max-w-lg">
+					<SheetHeader className="border-b border-border pb-4">
+						<SheetTitle>Transaction</SheetTitle>
+						<SheetDescription>
+							{detailTransactionId
+								? `ID ${detailTransactionId}`
+								: "Loading…"}
+						</SheetDescription>
+					</SheetHeader>
+
+					{detailLoading ? (
+						<div className="flex flex-col gap-3 p-4">
+							<Skeleton className="h-8 w-full" />
+							<Skeleton className="h-8 w-full" />
+							<Skeleton className="h-24 w-full" />
+						</div>
+					) : detailError ? (
+						<div className="flex flex-col gap-4 p-4">
+							<Alert variant="destructive">
+								<AlertTitle>Could not load transaction</AlertTitle>
+								<AlertDescription className="flex flex-col gap-2">
+									<span>{getErrorMessage(detailError, "Request failed.")}</span>
+									<Button
+										type="button"
+										variant="outline"
+										size="sm"
+										className="w-fit"
+										onClick={() => refetchDetail()}
+									>
+										Try again
+									</Button>
+								</AlertDescription>
+							</Alert>
+						</div>
+					) : detailTransaction ? (
+						<div className="flex flex-col gap-4 p-4">
+							<div className="flex flex-col gap-2">
+								<span className="text-xs font-medium text-muted-foreground">
+									Status
+								</span>
+								<div className="flex flex-wrap items-center gap-2">
+									<Badge
+										variant={statusBadgeVariant(detailTransaction.status)}
+										className="text-sm"
+									>
+										{detailTransaction.status}
+									</Badge>
+									{detailTransaction.error_message ? (
+										<span className="text-sm text-destructive">
+											{detailTransaction.error_message}
+										</span>
+									) : null}
+								</div>
+							</div>
+
+							<Separator />
+
+							<dl className="flex flex-col gap-3 text-sm">
+								<div className="flex flex-col gap-0.5">
+									<dt className="text-muted-foreground">Reference</dt>
+									<dd className="font-mono">{detailTransaction.reference_number}</dd>
+								</div>
+								<div className="flex flex-col gap-0.5">
+									<dt className="text-muted-foreground">Amount</dt>
+									<dd className="font-semibold tabular-nums">
+										{detailTransaction.currency}{" "}
+										{parseAmount(detailTransaction.amount).toLocaleString()}
+									</dd>
+								</div>
+								<div className="flex flex-col gap-0.5">
+									<dt className="text-muted-foreground">Business ID</dt>
+									<dd className="font-mono text-xs wrap-break-word">
+										{detailTransaction.business_id}
+									</dd>
+								</div>
+								{detailTransaction.bank_account_id ? (
+									<div className="flex flex-col gap-0.5">
+										<dt className="text-muted-foreground">Bank account</dt>
+										<dd className="font-mono text-xs">
+											{detailTransaction.bank_account_id}
+										</dd>
+									</div>
+								) : null}
+								<div className="grid gap-3 sm:grid-cols-2">
+									<div className="flex flex-col gap-0.5">
+										<dt className="text-muted-foreground">Sender</dt>
+										<dd className="min-w-0 wrap-break-word">
+											{detailTransaction.sender_name ?? "—"}
+										</dd>
+									</div>
+									<div className="flex flex-col gap-0.5">
+										<dt className="text-muted-foreground">Sender account</dt>
+										<dd className="font-mono text-xs wrap-break-word">
+											{detailTransaction.sender_account ?? "—"}
+										</dd>
+									</div>
+									<div className="flex flex-col gap-0.5">
+										<dt className="text-muted-foreground">Receiver</dt>
+										<dd className="min-w-0 wrap-break-word">
+											{detailTransaction.receiver_name ?? "—"}
+										</dd>
+									</div>
+									<div className="flex flex-col gap-0.5">
+										<dt className="text-muted-foreground">Receiver account</dt>
+										<dd className="font-mono text-xs wrap-break-word">
+											{detailTransaction.receiver_account ?? "—"}
+										</dd>
+									</div>
+								</div>
+								{detailTransaction.receipt_url ? (
+									<div className="flex flex-col gap-0.5">
+										<dt className="text-muted-foreground">Receipt</dt>
+										<dd>
+											<a
+												href={detailTransaction.receipt_url}
+												target="_blank"
+												rel="noopener noreferrer"
+												className="text-primary underline-offset-4 hover:underline"
+											>
+												Open receipt
+											</a>
+										</dd>
+									</div>
+								) : null}
+							</dl>
+
+							<Separator />
+
+							<div className="flex flex-col gap-2">
+								<span className="text-sm font-medium">Update status</span>
+								<p className="text-xs text-muted-foreground">
+									Patch transaction status (verified or failed) when you need to
+									reconcile manually.
+								</p>
+								<div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+									<Select
+										value={statusDraft}
+										onValueChange={(v) => {
+											if (v === "verified" || v === "failed") setStatusDraft(v);
+										}}
+									>
+										<SelectTrigger
+											className="sm:w-40"
+											aria-label="New transaction status"
+										>
+											<SelectValue />
+										</SelectTrigger>
+										<SelectContent>
+											<SelectItem value="verified">verified</SelectItem>
+											<SelectItem value="failed">failed</SelectItem>
+										</SelectContent>
+									</Select>
+									<Button
+										type="button"
+										size="sm"
+										className="gap-1.5"
+										disabled={
+											updateStatusState.isLoading ||
+											!detailTransactionId ||
+											!detailTransaction ||
+											statusDraft ===
+												normalizeStatusDraft(detailTransaction.status)
+										}
+										onClick={async () => {
+											if (!detailTransactionId) return;
+											const updated = await updateStatus({
+												transactionId: detailTransactionId,
+												body: { status: statusDraft },
+											}).unwrap();
+											setStatusDraft(normalizeStatusDraft(updated.status));
+										}}
+									>
+										{updateStatusState.isLoading ? (
+											<>
+												<Loader2Icon className="animate-spin" aria-hidden />
+												Saving…
+											</>
+										) : (
+											"Save status"
+										)}
+									</Button>
+								</div>
+							</div>
+						</div>
+					) : null}
+				</SheetContent>
+			</Sheet>
+		</div>
+	);
+}
