@@ -46,11 +46,11 @@ import {
 	useDeleteBusinessMutation,
 	useGetBusinessQuery,
 	useListBusinessEmployeesQuery,
-	useListBusinessRolesQuery,
 	useSetBusinessActiveMutation,
 	useUpdateEmployeeRoleMutation,
 } from "../../../../services/branch-management/branchManagementApi";
 import type { EmployeeOutput, RoleOutput } from "../../../../services/types";
+import { useListRolesQuery } from "../../../../services/role/roleApi";
 import { cn } from "@/lib/utils";
 
 function roleLabel(role?: RoleOutput | null) {
@@ -91,12 +91,9 @@ export default function BusinessDetailClient({
 		},
 	);
 
-	const { data: roles } = useListBusinessRolesQuery(
-		{ businessId },
-		{
-			skip: missingBusinessId,
-		},
-	);
+	const { data: roles } = useListRolesQuery(undefined, {
+		skip: missingBusinessId,
+	});
 
 	const [setBusinessActive, setBusinessActiveState] =
 		useSetBusinessActiveMutation();

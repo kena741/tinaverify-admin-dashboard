@@ -16,6 +16,7 @@ export type UserOutput = {
   email: string | null;
   is_superuser: boolean;
   is_active: boolean;
+	role: string | null;
   user_information?: {
     first_name: string;
     last_name: string;
@@ -82,10 +83,27 @@ export type RoleOutput = {
   name: string;
 };
 
+/** OpenAPI `RoleCreateSchema` — `POST /api/v1/roles` */
+export type RoleCreateRequest = {
+	name: string;
+};
+
+/** OpenAPI `PermissionResponseSchema` */
+export type PermissionOutput = {
+	id: string;
+	action: string;
+};
+
+/** OpenAPI `AssignPermissionSchema` — `POST /api/v1/roles/{role_id}/permissions` */
+export type AssignPermissionRequest = {
+	permission_ids: string[];
+};
+
 /** OpenAPI `EmployeeOutputSchema` */
 export type EmployeeOutput = {
   id: string;
   user_id: string;
+	employee_id: string;
   branch_id: string;
   role_id: string;
   is_active: boolean;

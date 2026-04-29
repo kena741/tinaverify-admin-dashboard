@@ -5,6 +5,7 @@ import { bankAccountsApi } from "../services/bank-accounts/bankAccountsApi";
 import { branchManagementApi } from "../services/branch-management/branchManagementApi";
 import { menuApi } from "../services/menu/menuApi";
 import { ordersApi } from "../services/orders/ordersApi";
+import { roleApi } from "../services/role/roleApi";
 import { tablesApi } from "../services/tables/tablesApi";
 import { subscriptionApi } from "../services/subscription/subscriptionApi";
 
@@ -35,6 +36,7 @@ const appReducer = combineReducers({
 	[branchManagementApi.reducerPath]: branchManagementApi.reducer,
 	[menuApi.reducerPath]: menuApi.reducer,
 	[ordersApi.reducerPath]: ordersApi.reducer,
+	[roleApi.reducerPath]: roleApi.reducer,
 	[tablesApi.reducerPath]: tablesApi.reducer,
 	[subscriptionApi.reducerPath]: subscriptionApi.reducer,
 });
@@ -65,6 +67,7 @@ export const store = configureStore({
 			branchManagementApi.middleware,
 			menuApi.middleware,
 			ordersApi.middleware,
+			roleApi.middleware,
 			tablesApi.middleware,
 			subscriptionApi.middleware,
 		),
