@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import {
 	Table,
 	TableBody,
@@ -153,27 +154,60 @@ export default function BusinessesPage() {
 										</TableRow>
 									) : (
 										filteredBusinesses.map((b) => (
+											// Each cell uses a Link so the entire row is effectively clickable
+											// while still using semantic navigation elements.
 											<TableRow key={b.id}>
-												<TableCell className="font-medium">{b.name}</TableCell>
-												<TableCell className="text-muted-foreground">
-													{b.tin_number}
+												<TableCell className="font-medium">
+													<Link
+														href={`/admin/business/${b.id}`}
+														className="block"
+													>
+														{b.name}
+													</Link>
 												</TableCell>
 												<TableCell className="text-muted-foreground">
-													<span className="max-w-[18rem] truncate">{b.owner_id}</span>
+													<Link
+														href={`/admin/business/${b.id}`}
+														className="block"
+													>
+														{b.tin_number}
+													</Link>
+												</TableCell>
+												<TableCell className="text-muted-foreground">
+													<Link
+														href={`/admin/business/${b.id}`}
+														className="block"
+													>
+														<span className="max-w-[18rem] truncate">
+															{b.owner_id}
+														</span>
+													</Link>
 												</TableCell>
 												<TableCell>
-													{b.is_active ? (
-														<Badge variant="secondary">Active</Badge>
-													) : (
-														<Badge variant="outline">Inactive</Badge>
-													)}
+													<Link
+														href={`/admin/business/${b.id}`}
+														className="block"
+														aria-label={`View ${b.name}`}
+													>
+														{b.is_active ? (
+															<Badge variant="secondary">Active</Badge>
+														) : (
+															<Badge variant="outline">Inactive</Badge>
+														)}
+													</Link>
 												</TableCell>
 												<TableCell>
-													{b.is_archived ? (
-														<Badge variant="outline">Archived</Badge>
-													) : (
-														<span className="text-sm text-muted-foreground">—</span>
-													)}
+													<Link
+														href={`/admin/business/${b.id}`}
+														className="block"
+														aria-label={`View ${b.name}`}
+													>
+														{b.is_archived ? (
+															<Badge variant="outline">Archived</Badge>
+														) : (
+															<span className="text-sm text-muted-foreground">—</span>
+														)}
+													</Link>
 												</TableCell>
 											</TableRow>
 										))

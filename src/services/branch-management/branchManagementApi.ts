@@ -8,8 +8,10 @@ import type {
 	BranchUpdateRequest,
 	BusinessCreateRequest,
 	BusinessOutput,
+	DeactivateBusinessRequest,
 	EmployeeOutput,
 	RoleOutput,
+	UpdateEmployeeRoleRequest,
 } from "../types";
 
 function bearerHeaders(accessToken?: string | null) {
@@ -39,6 +41,49 @@ export const branchManagementApi = createApi({
 				headers: bearerHeaders(),
 			}),
 			providesTags: [{ type: "Business", id: "LIST" }],
+		}),
+
+		/** `GET /api/v1/business/{business_id}` */
+		getBusiness: builder.query<BusinessOutput, { businessId: string }>({
+			query: ({ businessId }) => ({
+				url: `/api/v1/business/${businessId}`,
+				headers: bearerHeaders(),
+			}),
+			providesTags: (_result, _err, { businessId }) => [
+				{ type: "Business" as const, id: businessId },
+			],
+		}),
+
+		/** `DELETE /api/v1/business/{business_id}` */
+		deleteBusiness: builder.mutation<void, { businessId: string }>({
+			query: ({ businessId }) => ({
+				url: `/api/v1/business/${businessId}`,
+				method: "DELETE",
+				headers: bearerHeaders(),
+			}),
+			invalidatesTags: (_result, _err, { businessId }) => [
+				{ type: "Business", id: "LIST" },
+				{ type: "Business", id: businessId },
+				{ type: "Branch", id: "LIST" },
+				{ type: "Employee", id: businessId },
+			],
+		}),
+
+		/** `PATCH /api/v1/business/{business_id}/deactivate` */
+		setBusinessActive: builder.mutation<
+			void,
+			{ businessId: string; body: DeactivateBusinessRequest }
+		>({
+			query: ({ businessId, body }) => ({
+				url: `/api/v1/business/${businessId}/deactivate`,
+				method: "PATCH",
+				body,
+				headers: bearerHeaders(),
+			}),
+			invalidatesTags: (_result, _err, { businessId }) => [
+				{ type: "Business", id: "LIST" },
+				{ type: "Business", id: businessId },
+			],
 		}),
 
 		listMyBusinesses: builder.query<BusinessOutput[], void>({
@@ -145,6 +190,22 @@ export const branchManagementApi = createApi({
 			],
 		}),
 
+		/** `PUT /api/v1/business/{business_id}/employees/{employee_id}` */
+		updateEmployeeRole: builder.mutation<
+			EmployeeOutput,
+			{ businessId: string; employeeId: string; body: UpdateEmployeeRoleRequest }
+		>({
+			query: ({ businessId, employeeId, body }) => ({
+				url: `/api/v1/business/${businessId}/employees/${employeeId}`,
+				method: "PUT",
+				body,
+				headers: bearerHeaders(),
+			}),
+			invalidatesTags: (_result, _err, { businessId }) => [
+				{ type: "Employee", id: businessId },
+			],
+		}),
+
 		listBusinessBranches: builder.query<
 			BranchOutput[],
 			{ businessId: string; accessToken?: string | null }
@@ -239,10 +300,15 @@ export const branchManagementApi = createApi({
 
 export const {
 	useListAllBusinessesQuery,
+	useGetBusinessQuery,
+	useLazyGetBusinessQuery,
+	useDeleteBusinessMutation,
+	useSetBusinessActiveMutation,
 	useListMyBusinessesQuery,
 	useListAllUserBranchesQuery,
 	useListBusinessRolesQuery,
 	useListBusinessEmployeesQuery,
+	useUpdateEmployeeRoleMutation,
 	useCreateBusinessMutation,
 	useCreateBranchMutation,
 	useListBusinessBranchesQuery,
