@@ -25,10 +25,10 @@ export const roleApi = createApi({
 	baseQuery: backendBaseQuery,
 	tagTypes: ["Role", "RolePermissions"],
 	endpoints: (builder) => ({
-		/** `GET /api/v1/roles` */
+		/** `GET /api/v1/roles/admin` */
 		listRoles: builder.query<RoleOutput[], void>({
 			query: () => ({
-				url: "/api/v1/roles",
+				url: "/api/v1/roles/admin",
 				headers: bearerHeaders(),
 			}),
 			providesTags: (result) =>
@@ -38,6 +38,22 @@ export const roleApi = createApi({
 							...result.map((r) => ({ type: "Role" as const, id: r.id })),
 						]
 					: [{ type: "Role" as const, id: "LIST" }],
+		}),
+
+		/** `GET /api/v1/roles/list?business_id=...` */
+		listRolesByBusiness: builder.query<RoleOutput[], { businessId: string }>({
+			query: ({ businessId }) => ({
+				url: "/api/v1/roles/list",
+				params: { business_id: businessId },
+				headers: bearerHeaders(),
+			}),
+			providesTags: (result, _err, { businessId }) =>
+				result
+					? [
+							{ type: "Role" as const, id: `BUSINESS_${businessId}` },
+							...result.map((r) => ({ type: "Role" as const, id: r.id })),
+						]
+					: [{ type: "Role" as const, id: `BUSINESS_${businessId}` }],
 		}),
 
 		/** `POST /api/v1/roles` */
@@ -122,6 +138,7 @@ export const roleApi = createApi({
 
 export const {
 	useListRolesQuery,
+	useListRolesByBusinessQuery,
 	useCreateRoleMutation,
 	useGetRoleQuery,
 	useLazyGetRoleQuery,

@@ -235,12 +235,6 @@ export default function SubscriptionPage() {
 			) : null}
 
 			<Card>
-				<CardHeader>
-					<CardTitle>Business</CardTitle>
-					<CardDescription>
-						Search and select a business to load subscription data for that tenant.
-					</CardDescription>
-				</CardHeader>
 				<CardContent>
 					<FieldGroup className="grid gap-4 md:grid-cols-2">
 						<Field>
@@ -310,9 +304,6 @@ export default function SubscriptionPage() {
 									</Command>
 								</PopoverContent>
 							</Popover>
-							<FieldDescription>
-								Search all registered businesses (admin directory).
-							</FieldDescription>
 						</Field>
 
 						<Field>
@@ -350,13 +341,7 @@ export default function SubscriptionPage() {
 
 			{businessId ? (
 				<Card>
-					<CardHeader className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-						<div className="flex flex-col gap-1">
-							<CardTitle>Subscription usage</CardTitle>
-							<CardDescription>
-								Credit limits for the selected business’s current billing period.
-							</CardDescription>
-						</div>
+					<CardHeader className="justify-end">
 						{usageError ? (
 							<Button
 								type="button"

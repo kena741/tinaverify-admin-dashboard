@@ -35,7 +35,7 @@ export const subscriptionApi = createApi({
 			{ includeArchived?: boolean } | void
 		>({
 			query: (arg) => ({
-				url: "/api/v1/subscription-plans",
+				url: "/api/v1/subscription-plan",
 				params: arg?.includeArchived ? { include_archived: true } : undefined,
 				headers: bearerHeaders(),
 			}),
