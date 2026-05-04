@@ -52,6 +52,20 @@ function moneyLabel(price: string) {
 	return n.toLocaleString(undefined, { maximumFractionDigits: 2 });
 }
 
+/** Safe display for usage counters — API may omit fields or send strings. */
+function usageMetricLabel(value: unknown): string {
+	if (value === null || value === undefined) return "—";
+	if (typeof value === "number" && Number.isFinite(value)) {
+		return value.toLocaleString();
+	}
+	if (typeof value === "string" && value.trim() !== "") {
+		const n = Number(value);
+		if (Number.isFinite(n)) return n.toLocaleString();
+		return value;
+	}
+	return "—";
+}
+
 function getErrorMessage(error: unknown, fallback: string): string {
 	if (
 		typeof error === "object" &&
@@ -372,19 +386,19 @@ export default function SubscriptionPage() {
 								<div>
 									<dt className="text-muted-foreground">Limit</dt>
 									<dd className="tabular-nums font-medium">
-										{usage.credits_limit.toLocaleString()}
+										{usageMetricLabel(usage.credits_limit)}
 									</dd>
 								</div>
 								<div>
 									<dt className="text-muted-foreground">Used</dt>
 									<dd className="tabular-nums font-medium">
-										{usage.credits_used.toLocaleString()}
+										{usageMetricLabel(usage.credits_used)}
 									</dd>
 								</div>
 								<div>
 									<dt className="text-muted-foreground">Remaining</dt>
 									<dd className="tabular-nums font-medium">
-										{usage.remaining_credits.toLocaleString()}
+										{usageMetricLabel(usage.remaining_credits)}
 									</dd>
 								</div>
 							</dl>
@@ -599,10 +613,10 @@ export default function SubscriptionPage() {
 									<AlertDescription className="tabular-nums">
 										Remaining credits:{" "}
 										<strong>
-											{grantSuccess.remaining_credits.toLocaleString()}
+											{usageMetricLabel(grantSuccess.remaining_credits)}
 										</strong>{" "}
-										(limit {grantSuccess.credits_limit.toLocaleString()}, used{" "}
-										{grantSuccess.credits_used.toLocaleString()}).
+										(limit {usageMetricLabel(grantSuccess.credits_limit)}, used{" "}
+										{usageMetricLabel(grantSuccess.credits_used)}).
 									</AlertDescription>
 								</Alert>
 							) : null}
