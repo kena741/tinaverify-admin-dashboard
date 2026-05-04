@@ -4,10 +4,8 @@ import { useMemo, useState } from "react";
 import { ChevronsUpDownIcon } from "lucide-react";
 
 import { useListAllBusinessesQuery } from "../../../services/branch-management/branchManagementApi";
-import {
-	useCheckoutSubscriptionMutation,
-	useListSubscriptionPlansQuery,
-} from "../../../services/subscription/subscriptionApi";
+import { useCheckoutSubscriptionMutation } from "../../../services/subscription/subscriptionApi";
+import { useListSubscriptionPlansQuery } from "../../../services/subscription-plan/subscriptionPlanApi";
 import type { BusinessOutput } from "../../../services/types";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";

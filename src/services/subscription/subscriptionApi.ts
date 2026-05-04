@@ -3,9 +3,10 @@ import { createApi } from "@reduxjs/toolkit/query/react";
 import { getStoredAccessToken } from "../authTokens";
 import { backendBaseQuery } from "../baseQuery";
 import type {
+	SubscriptionCheckoutCustomRequest,
 	SubscriptionCheckoutResponse,
+	SubscriptionGrantCreditsRequest,
 	SubscriptionOutput,
-	SubscriptionPlanOutput,
 	UsageOutput,
 } from "../types";
 
@@ -22,26 +23,8 @@ function bearerHeaders(accessToken?: string | null) {
 export const subscriptionApi = createApi({
 	reducerPath: "subscriptionApi",
 	baseQuery: backendBaseQuery,
-	tagTypes: [
-		"SubscriptionPlans",
-		"Subscription",
-		"SubscriptionHistory",
-		"SubscriptionUsage",
-	],
+	tagTypes: ["Subscription", "SubscriptionHistory", "SubscriptionUsage"],
 	endpoints: (builder) => ({
-		/** `GET /api/v1/subscription-plans` */
-		listSubscriptionPlans: builder.query<
-			SubscriptionPlanOutput[],
-			{ includeArchived?: boolean } | void
-		>({
-			query: (arg) => ({
-				url: "/api/v1/subscription-plan",
-				params: arg?.includeArchived ? { include_archived: true } : undefined,
-				headers: bearerHeaders(),
-			}),
-			providesTags: [{ type: "SubscriptionPlans" as const, id: "LIST" }],
-		}),
-
 		/** `GET /api/v1/subscriptions/me` */
 		getActiveSubscription: builder.query<
 			SubscriptionOutput | null,
@@ -115,15 +98,65 @@ export const subscriptionApi = createApi({
 				{ type: "SubscriptionUsage" as const, id: businessId },
 			],
 		}),
+
+		/**
+		 * `POST /api/v1/subscriptions/checkout/custom`
+		 * Body: `SubscriptionCheckoutCustomRequest` per `SubscriptionCheckoutCustomSchema`.
+		 */
+		checkoutSubscriptionCustom: builder.mutation<
+			SubscriptionCheckoutResponse,
+			{ businessId: string; body: SubscriptionCheckoutCustomRequest }
+		>({
+			query: ({ businessId, body }) => ({
+				url: "/api/v1/subscriptions/checkout/custom",
+				method: "POST",
+				params: { business_id: businessId },
+				body,
+				headers: {
+					"Content-Type": "application/json",
+					...bearerHeaders(),
+				},
+			}),
+			invalidatesTags: (_result, _err, { businessId }) => [
+				{ type: "Subscription" as const, id: businessId },
+				{ type: "SubscriptionHistory" as const, id: businessId },
+				{ type: "SubscriptionUsage" as const, id: businessId },
+			],
+		}),
+
+		/**
+		 * `POST /api/v1/subscriptions/grant-credits`
+		 * Body: `SubscriptionGrantCreditsRequest` per `SubscriptionGrantCreditsSchema`.
+		 */
+		grantSubscriptionCredits: builder.mutation<
+			UsageOutput,
+			{ businessId: string; body: SubscriptionGrantCreditsRequest }
+		>({
+			query: ({ businessId, body }) => ({
+				url: "/api/v1/subscriptions/grant-credits",
+				method: "POST",
+				params: { business_id: businessId },
+				body,
+				headers: {
+					"Content-Type": "application/json",
+					...bearerHeaders(),
+				},
+			}),
+			invalidatesTags: (_result, _err, { businessId }) => [
+				{ type: "Subscription" as const, id: businessId },
+				{ type: "SubscriptionUsage" as const, id: businessId },
+			],
+		}),
 	}),
 });
 
 export const {
-	useListSubscriptionPlansQuery,
 	useGetActiveSubscriptionQuery,
 	useLazyGetActiveSubscriptionQuery,
 	useListSubscriptionHistoryQuery,
 	useGetSubscriptionUsageQuery,
 	useLazyGetSubscriptionUsageQuery,
 	useCheckoutSubscriptionMutation,
+	useCheckoutSubscriptionCustomMutation,
+	useGrantSubscriptionCreditsMutation,
 } = subscriptionApi;

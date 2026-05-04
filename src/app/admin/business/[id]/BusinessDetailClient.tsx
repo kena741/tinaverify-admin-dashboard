@@ -57,8 +57,8 @@ import {
 	useGetActiveSubscriptionQuery,
 	useGetSubscriptionUsageQuery,
 	useListSubscriptionHistoryQuery,
-	useListSubscriptionPlansQuery,
 } from "../../../../services/subscription/subscriptionApi";
+import { useListSubscriptionPlansQuery } from "../../../../services/subscription-plan/subscriptionPlanApi";
 import type {
 	BankAccountResponse,
 	BranchOutput,

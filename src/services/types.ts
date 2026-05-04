@@ -330,6 +330,22 @@ export type SubscriptionPlanOutput = {
 	is_archived: boolean;
 };
 
+/** OpenAPI `SubscriptionPlanCreateSchema` — `POST /api/v1/subscription-plan` */
+export type SubscriptionPlanCreate = {
+	name: string;
+	monthly_transaction_limit: number;
+	price: number | string;
+	duration_days?: number;
+};
+
+/** OpenAPI `SubscriptionPlanUpdateSchema` — `PATCH /api/v1/subscription-plan/{subscription_plan_id}` */
+export type SubscriptionPlanUpdate = {
+	name?: string | null;
+	monthly_transaction_limit?: number | null;
+	price?: number | string | null;
+	duration_days?: number | null;
+};
+
 /** OpenAPI `SubscriptionOutputSchema` */
 export type SubscriptionOutput = {
 	id: string;
@@ -350,6 +366,17 @@ export type SubscriptionCheckoutRequest = {
 export type SubscriptionCheckoutResponse = {
 	checkout_url: string;
 	tx_ref: string;
+};
+
+/** OpenAPI `SubscriptionCheckoutCustomSchema` — `POST /api/v1/subscriptions/checkout/custom` */
+export type SubscriptionCheckoutCustomRequest = {
+	credits: number | string;
+	amount: number | string;
+};
+
+/** OpenAPI `SubscriptionGrantCreditsSchema` — `POST /api/v1/subscriptions/grant-credits` */
+export type SubscriptionGrantCreditsRequest = {
+	credits: number;
 };
 
 /** OpenAPI `UsageOutputSchema` — `GET /api/v1/subscriptions/usage` */

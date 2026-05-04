@@ -8,6 +8,7 @@ import { ordersApi } from "../services/orders/ordersApi";
 import { roleApi } from "../services/role/roleApi";
 import { tablesApi } from "../services/tables/tablesApi";
 import { subscriptionApi } from "../services/subscription/subscriptionApi";
+import { subscriptionPlanApi } from "../services/subscription-plan/subscriptionPlanApi";
 import { transactionsApi } from "../services/transactions/transactionsApi";
 
 // Import all reducers
@@ -40,6 +41,7 @@ const appReducer = combineReducers({
 	[roleApi.reducerPath]: roleApi.reducer,
 	[tablesApi.reducerPath]: tablesApi.reducer,
 	[subscriptionApi.reducerPath]: subscriptionApi.reducer,
+	[subscriptionPlanApi.reducerPath]: subscriptionPlanApi.reducer,
 	[transactionsApi.reducerPath]: transactionsApi.reducer,
 });
 
@@ -72,6 +74,7 @@ export const store = configureStore({
 			roleApi.middleware,
 			tablesApi.middleware,
 			subscriptionApi.middleware,
+			subscriptionPlanApi.middleware,
 			transactionsApi.middleware,
 		),
 });
