@@ -23,6 +23,26 @@ export type UserOutput = {
   } | null;
 };
 
+/** OpenAPI `UserInformationUpdateSchema` (partial update) */
+export type UserInformationUpdateRequest = {
+	first_name?: string | null;
+	last_name?: string | null;
+};
+
+/** OpenAPI `UserUpdateSchema` — `PATCH /api/v1/users/{user_id}` */
+export type UserUpdateRequest = {
+	phone_number?: string | null;
+	username?: string | null;
+	email?: string | null;
+	user_information?: UserInformationUpdateRequest | null;
+};
+
+/** OpenAPI `UserPasswordUpdateSchema` — `PATCH /api/v1/users/me/password` */
+export type UserPasswordUpdateRequest = {
+	old_password: string;
+	new_password: string;
+};
+
 /** OpenAPI `UserAuthResponse` — `token_type` defaults to `"bearer"` on the server */
 export type UserAuthResponse = {
   access_token: string;
@@ -216,6 +236,7 @@ export type BankAccountCreateRequest = {
 
 /** OpenAPI `BankAccountResponseSchema` */
 export type BankAccountResponse = {
+	id: string;
 	business_id: string;
 	bank_name: BankNameEnum;
 	account_name: string;

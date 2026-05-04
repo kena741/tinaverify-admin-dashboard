@@ -4,7 +4,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { LucideIcon } from "lucide-react";
 import {
-	BarChart3,
+	Wallet,
+	CircleDollarSign,
 	BadgeCheck,
 	Bell,
 	Building2,
@@ -13,7 +14,6 @@ import {
 	LayoutDashboard,
 	Landmark,
 	MapPin,
-	Settings,
 	TableProperties,
 	UtensilsCrossed,
 	Users,
@@ -45,7 +45,7 @@ const systemAdminNavigation: {
 	href: string;
 	icon: LucideIcon;
 }[] = [
-	{ name: "Dashboard", href: "/admin", icon: LayoutDashboard },
+	// { name: "Dashboard", href: "/admin", icon: LayoutDashboard },
 	// { name: "Orders", href: "/admin/orders", icon: ClipboardList },
 	{ name: "Business", href: "/admin/business", icon: Building2 },
 	// { name: "Branch", href: "/admin/branches/", icon: MapPin },
@@ -54,10 +54,11 @@ const systemAdminNavigation: {
 	// { name: "Tables", href: "/admin/tables", icon: TableProperties },
 	// { name: "Bank Accounts", href: "/admin/bank-accounts", icon: Landmark },
 	{ name: "Transactions", href: "/admin/transactions", icon: CreditCard },
-	{ name: "Subscription", href: "/admin/subscription", icon: BadgeCheck },
+	{ name: "Subscription", href: "/admin/subscription", icon: 	Wallet },
+	{name: "Plans", href: "/admin/plans", icon: CircleDollarSign},
 	// { name: "Notifications", href: "/admin/notifications", icon: Bell },
-	{ name: "Reports", href: "/admin/reports", icon: BarChart3 },
-	{ name: "Settings", href: "/admin/settings", icon: Settings },
+	// { name: "Reports", href: "/admin/reports", icon: BarChart3 },
+	// { name: "Settings", href: "/admin/settings", icon: Settings },
 ];
 
 const branchAdminNavigation: {

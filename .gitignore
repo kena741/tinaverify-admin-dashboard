@@ -21,6 +21,8 @@
 /build
 
 # misc
+fetch-openai-json.sh
+todo.txt
 .DS_Store
 *.pem
 

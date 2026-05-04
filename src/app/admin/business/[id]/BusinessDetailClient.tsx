@@ -3,11 +3,18 @@
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { ArrowLeft, MoreHorizontal, Power, Trash2 } from "lucide-react";
+import { format } from "date-fns";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+	Card,
+	CardContent,
+	CardDescription,
+	CardHeader,
+	CardTitle,
+} from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -46,17 +53,63 @@ import {
 	useUpdateEmployeeRoleMutation,
 } from "../../../../services/branch-management/branchManagementApi";
 import { useListBankAccountsQuery } from "../../../../services/bank-accounts/bankAccountsApi";
+import {
+	useGetActiveSubscriptionQuery,
+	useGetSubscriptionUsageQuery,
+	useListSubscriptionHistoryQuery,
+	useListSubscriptionPlansQuery,
+} from "../../../../services/subscription/subscriptionApi";
 import type {
 	BankAccountResponse,
 	BranchOutput,
 	EmployeeOutput,
 	RoleOutput,
+	SubscriptionOutput,
 } from "../../../../services/types";
 import { useListRolesQuery } from "../../../../services/role/roleApi";
+import { useGetUserByIdQuery } from "../../../../services/auth/authApi";
 import { cn } from "@/lib/utils";
+import { formatUserDisplayName } from "@/lib/userDisplay";
+
 
 function roleLabel(role?: RoleOutput | null) {
 	return role?.name ?? "—";
+}
+
+function formatDateTime(iso: string | null | undefined): string {
+	if (!iso) return "—";
+	try {
+		return format(new Date(iso), "MMM d, yyyy HH:mm");
+	} catch {
+		return iso;
+	}
+}
+
+function getErrorMessage(error: unknown, fallback: string): string {
+	if (
+		typeof error === "object" &&
+		error !== null &&
+		"data" in error &&
+		(error as { data?: { detail?: unknown } }).data?.detail
+	) {
+		const detail = (error as { data: { detail: unknown } }).data.detail;
+		if (typeof detail === "string") return detail;
+		if (Array.isArray(detail)) {
+			const messages = detail
+				.map((item) =>
+					typeof item === "object" &&
+					item !== null &&
+					"msg" in item &&
+					typeof item.msg === "string"
+						? item.msg
+						: null,
+				)
+				.filter(Boolean);
+			if (messages.length > 0) return messages.join(", ");
+		}
+	}
+	if (error instanceof Error) return error.message;
+	return fallback;
 }
 
 export default function BusinessDetailClient({
@@ -81,6 +134,8 @@ export default function BusinessDetailClient({
 		},
 	);
 
+	const { data: user } = useGetUserByIdQuery({ userId: business?.owner_id ?? "" }, { skip: businessLoading || businessFetching || missingBusinessId });
+
 	const {
 		data: employees,
 		isLoading: employeesLoading,
@@ -96,8 +151,6 @@ export default function BusinessDetailClient({
 	const {
 		data: branches,
 		isLoading: branchesLoading,
-		error: branchesError,
-		refetch: refetchBranches,
 	} = useListBusinessBranchesQuery(
 		{ businessId },
 		{
@@ -115,6 +168,39 @@ export default function BusinessDetailClient({
 		{
 			skip: missingBusinessId,
 		},
+	);
+
+	const {
+		data: subscriptionPlans,
+		isLoading: subscriptionPlansLoading,
+		isFetching: subscriptionPlansFetching,
+		error: subscriptionPlansError,
+		refetch: refetchSubscriptionPlans,
+	} = useListSubscriptionPlansQuery(undefined, { skip: missingBusinessId });
+
+	const {
+		data: activeSubscription,
+		isLoading: activeSubscriptionLoading,
+		isFetching: activeSubscriptionFetching,
+		error: activeSubscriptionError,
+		refetch: refetchActiveSubscription,
+	} = useGetActiveSubscriptionQuery({ businessId }, { skip: missingBusinessId });
+
+	const {
+		data: subscriptionUsage,
+		error: subscriptionUsageError,
+		refetch: refetchSubscriptionUsage,
+	} = useGetSubscriptionUsageQuery({ businessId }, { skip: missingBusinessId });
+
+	const {
+		data: subscriptionHistory,
+		isLoading: subscriptionHistoryLoading,
+		isFetching: subscriptionHistoryFetching,
+		error: subscriptionHistoryError,
+		refetch: refetchSubscriptionHistory,
+	} = useListSubscriptionHistoryQuery(
+		{ businessId },
+		{ skip: missingBusinessId },
 	);
 
 	const { data: roles } = useListRolesQuery(undefined, {
@@ -135,6 +221,11 @@ export default function BusinessDetailClient({
 		const items = roles ?? [];
 		return new Map(items.map((r) => [r.id, r] as const));
 	}, [roles]);
+
+	const subscriptionPlanById = useMemo(() => {
+		const items = subscriptionPlans ?? [];
+		return new Map(items.map((p) => [p.id, p] as const));
+	}, [subscriptionPlans]);
 
 	const employeeRows = employees ?? [];
 
@@ -349,6 +440,7 @@ export default function BusinessDetailClient({
 					<TabsTrigger value="employees">Employees</TabsTrigger>
 					<TabsTrigger value="branches">Branches</TabsTrigger>
 					<TabsTrigger value="bank-accounts">Bank Accounts</TabsTrigger>
+					<TabsTrigger value="subscription">Subscription</TabsTrigger>
 				</TabsList>
 
 				<TabsContent value="overview">
@@ -366,7 +458,7 @@ export default function BusinessDetailClient({
 								<div className="flex flex-col gap-1 min-w-0">
 									<span className="text-sm text-muted-foreground">Owner</span>
 									<span className="font-medium truncate">
-										{business.owner_id}
+										{user ? formatUserDisplayName(user) : "No owner found"}
 									</span>
 								</div>
 								<div className="flex flex-col gap-1">
@@ -636,6 +728,251 @@ export default function BusinessDetailClient({
 							)}
 						</CardContent>
 					</Card>
+				</TabsContent>
+
+				<TabsContent value="subscription">
+					<div className="flex flex-col gap-4">
+						<Card>
+							<CardHeader>
+								<CardTitle>Current subscription</CardTitle>
+								<CardDescription>
+									Active subscription, usage, and history for this business.
+								</CardDescription>
+							</CardHeader>
+							<CardContent className="flex flex-col gap-4">
+								{activeSubscriptionError ? (
+									<Alert variant="destructive">
+										<AlertTitle>Failed to load current subscription</AlertTitle>
+										<AlertDescription className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+											<span className="wrap-break-word">
+												{getErrorMessage(
+													activeSubscriptionError,
+													"Request failed.",
+												)}
+											</span>
+											<button
+												type="button"
+												className={cn(
+													buttonVariants({ variant: "outline", size: "sm" }),
+												)}
+												onClick={() => refetchActiveSubscription()}
+											>
+												Try again
+											</button>
+										</AlertDescription>
+									</Alert>
+								) : null}
+
+								<div className="flex min-h-10 items-center gap-2 rounded-md border px-3">
+									{activeSubscriptionLoading || activeSubscriptionFetching ? (
+										<span className="text-muted-foreground">Loading…</span>
+									) : activeSubscription ? (
+										<div className="flex flex-wrap items-center gap-2">
+											<Badge variant="secondary">
+												{subscriptionPlanById.get(activeSubscription.plan_id)
+													?.name ?? "Subscribed"}
+											</Badge>
+											<span className="text-sm text-muted-foreground">
+												Status: {activeSubscription.status}
+											</span>
+										</div>
+									) : (
+										<Alert variant="destructive" className="border-none px-0">
+											<AlertTitle>No active subscription found</AlertTitle>
+										</Alert>
+									)}
+								</div>
+
+								{subscriptionPlansError ? (
+									<Alert variant="destructive">
+										<AlertTitle>Failed to load plans</AlertTitle>
+										<AlertDescription className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+											<span className="wrap-break-word">
+												{getErrorMessage(
+													subscriptionPlansError,
+													"Request failed.",
+												)}
+											</span>
+											<button
+												type="button"
+												className={cn(
+													buttonVariants({ variant: "outline", size: "sm" }),
+												)}
+												onClick={() => refetchSubscriptionPlans()}
+											>
+												Try again
+											</button>
+										</AlertDescription>
+									</Alert>
+								) : null}
+								{subscriptionPlansLoading || subscriptionPlansFetching ? (
+									<div className="flex flex-col gap-2">
+										{Array.from({ length: 3 }).map((_, i) => (
+											<Skeleton key={i} className="h-10 w-full" />
+										))}
+									</div>
+								) : null}
+							</CardContent>
+						</Card>
+
+						<Card>
+							<CardHeader className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+								<div className="flex flex-col gap-1">
+									<CardTitle>Usage</CardTitle>
+									<CardDescription>
+										Credits used and remaining for the current billing period.
+									</CardDescription>
+								</div>
+								{subscriptionUsageError ? (
+									<button
+										type="button"
+										className={cn(
+											buttonVariants({ variant: "outline", size: "sm" }),
+										)}
+										onClick={() => refetchSubscriptionUsage()}
+									>
+										Retry
+									</button>
+								) : null}
+							</CardHeader>
+							<CardContent className="flex flex-col gap-4">
+								{subscriptionUsageError ? (
+									<Alert variant="destructive">
+										<AlertTitle>No usage data found</AlertTitle>
+									</Alert>
+								) : subscriptionUsage ? (
+									<div className="grid gap-4 sm:grid-cols-3">
+										<div className="flex flex-col gap-1 rounded-lg border bg-muted/40 px-4 py-3">
+											<span className="text-xs font-medium text-muted-foreground">
+												Credits used
+											</span>
+											<span className="text-2xl font-semibold tabular-nums">
+												{subscriptionUsage.credits_used}
+											</span>
+										</div>
+										<div className="flex flex-col gap-1 rounded-lg border bg-muted/40 px-4 py-3">
+											<span className="text-xs font-medium text-muted-foreground">
+												Credits remaining
+											</span>
+											<span className="text-2xl font-semibold tabular-nums">
+												{subscriptionUsage.remaining_credits}
+											</span>
+										</div>
+										<div className="flex flex-col gap-1 rounded-lg border bg-muted/40 px-4 py-3">
+											<span className="text-xs font-medium text-muted-foreground">
+												Credits limit
+											</span>
+											<span className="text-2xl font-semibold tabular-nums">
+												{subscriptionUsage.credits_limit}
+											</span>
+										</div>
+										<p className="text-xs text-muted-foreground sm:col-span-3">
+											Subscription ID:{" "}
+											<code className="rounded bg-muted px-1 py-0.5 font-mono text-[0.8rem]">
+												{subscriptionUsage.subscription_id}
+											</code>
+										</p>
+									</div>
+								) : (
+									<p className="text-sm text-muted-foreground">No usage data.</p>
+								)}
+							</CardContent>
+						</Card>
+
+						<Card>
+							<CardHeader className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+								<div className="flex flex-col gap-1">
+									<CardTitle>History</CardTitle>
+									<CardDescription>
+										Past and current subscription records for this business.
+									</CardDescription>
+								</div>
+								{subscriptionHistoryError ? (
+									<button
+										type="button"
+										className={cn(
+											buttonVariants({ variant: "outline", size: "sm" }),
+										)}
+										onClick={() => refetchSubscriptionHistory()}
+									>
+										Retry
+									</button>
+								) : null}
+							</CardHeader>
+							<CardContent>
+								{subscriptionHistoryError ? (
+									<Alert variant="destructive">
+										<AlertTitle>Couldn’t load history</AlertTitle>
+										<AlertDescription className="wrap-break-word">
+											{getErrorMessage(
+												subscriptionHistoryError,
+												"Request failed.",
+											)}
+										</AlertDescription>
+									</Alert>
+								) : subscriptionHistoryLoading || subscriptionHistoryFetching ? (
+									<div className="flex flex-col gap-2">
+										{Array.from({ length: 5 }).map((_, i) => (
+											<Skeleton key={i} className="h-10 w-full" />
+										))}
+									</div>
+								) : (
+									<div className="overflow-x-auto rounded-md border">
+										<Table aria-label="Subscription history">
+											<TableHeader>
+												<TableRow>
+													<TableHead>Plan</TableHead>
+													<TableHead>Status</TableHead>
+													<TableHead>Started</TableHead>
+													<TableHead>Ended</TableHead>
+													<TableHead className="hidden lg:table-cell">
+														Chapa reference
+													</TableHead>
+												</TableRow>
+											</TableHeader>
+											<TableBody>
+												{(subscriptionHistory ?? []).length === 0 ? (
+													<TableRow>
+														<TableCell
+															colSpan={5}
+															className="py-10 text-center text-muted-foreground"
+														>
+															<Alert variant="destructive" className="border-none px-0 text-center">
+																<AlertTitle>No subscription history found</AlertTitle>
+															</Alert>
+														</TableCell>
+													</TableRow>
+												) : (
+													(subscriptionHistory ?? []).map(
+														(row: SubscriptionOutput) => (
+															<TableRow key={row.id}>
+																<TableCell className="font-medium">
+																	{subscriptionPlanById.get(row.plan_id)?.name ??
+																		row.plan_id}
+																</TableCell>
+																<TableCell>
+																	<Badge variant="outline">{row.status}</Badge>
+																</TableCell>
+																<TableCell className="text-sm whitespace-nowrap">
+																	{formatDateTime(row.started_at)}
+																</TableCell>
+																<TableCell className="text-sm whitespace-nowrap">
+																	{formatDateTime(row.ended_at)}
+																</TableCell>
+																<TableCell className="hidden max-w-48 truncate font-mono text-xs lg:table-cell">
+																	{row.chapa_transaction_reference ?? "—"}
+																</TableCell>
+															</TableRow>
+														),
+													)
+												)}
+											</TableBody>
+										</Table>
+									</div>
+								)}
+							</CardContent>
+						</Card>
+					</div>
 				</TabsContent>
 			</Tabs>
 		</div>

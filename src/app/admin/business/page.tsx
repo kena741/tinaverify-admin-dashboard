@@ -24,7 +24,9 @@ import {
 	SelectValue,
 } from "@/components/ui/select";
 import { useListAllBusinessesQuery } from "../../../services/branch-management/branchManagementApi";
+import { useGetUserByIdQuery } from "../../../services/auth/authApi";
 import type { BusinessOutput } from "../../../services/types";
+import { formatUserDisplayName } from "@/lib/userDisplay";
 
 type BusinessStatusFilter = "all" | "active" | "inactive" | "archived";
 
@@ -38,6 +40,7 @@ function businessMatchesFilter(business: BusinessOutput, filter: BusinessStatusF
 export default function BusinessesPage() {
 	const { data, isLoading, isFetching, error, refetch } =
 		useListAllBusinessesQuery();
+
 
 	const [searchTerm, setSearchTerm] = useState("");
 	const [statusFilter, setStatusFilter] = useState<BusinessStatusFilter>("all");
@@ -179,7 +182,7 @@ export default function BusinessesPage() {
 														className="block"
 													>
 														<span className="max-w-[18rem] truncate">
-															{b.owner_id}
+															<OwnerName ownerId={b.owner_id} />
 														</span>
 													</Link>
 												</TableCell>
@@ -222,3 +225,8 @@ export default function BusinessesPage() {
 	);
 }
 
+
+function OwnerName({ ownerId }: { ownerId: string }) {
+	const { data: user } = useGetUserByIdQuery({ userId: ownerId });
+	return <span>{user ? formatUserDisplayName(user) : "—"}</span>;
+}
