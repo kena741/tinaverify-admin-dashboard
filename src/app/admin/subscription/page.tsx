@@ -1,19 +1,21 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { ChevronsUpDownIcon } from "lucide-react";
+import { ChevronsUpDownIcon, Loader2Icon } from "lucide-react";
 
 import { useListAllBusinessesQuery } from "../../../services/branch-management/branchManagementApi";
-import { useCheckoutSubscriptionMutation } from "../../../services/subscription/subscriptionApi";
+import {
+	useCheckoutSubscriptionCustomMutation,
+	useCheckoutSubscriptionMutation,
+	useGetSubscriptionUsageQuery,
+	useGrantSubscriptionCreditsMutation,
+} from "../../../services/subscription/subscriptionApi";
 import { useListSubscriptionPlansQuery } from "../../../services/subscription-plan/subscriptionPlanApi";
-import type { BusinessOutput } from "../../../services/types";
+import type { BusinessOutput, UsageOutput } from "../../../services/types";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import {
-	Card,
-	CardContent,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
 	Command,
 	CommandEmpty,
@@ -24,9 +26,11 @@ import {
 } from "@/components/ui/command";
 import {
 	Field,
+	FieldGroup,
 	FieldLabel,
 	FieldDescription,
 } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
 import {
 	Popover,
 	PopoverContent,
@@ -40,6 +44,7 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 function moneyLabel(price: string) {
 	const n = Number(price);
@@ -74,11 +79,29 @@ function getErrorMessage(error: unknown, fallback: string): string {
 	return fallback;
 }
 
+/** Parses a positive amount; strips spaces and common currency noise (e.g. "$", "ETB"). */
+function parseAmount(raw: string): number | null {
+	const s = String(raw).trim();
+	if (!s) return null;
+	const normalized = s.replace(/[^\d.,\-]/g, "").replace(/,/g, "");
+	if (!normalized || normalized === "-") return null;
+	const n = Number(normalized);
+	if (!Number.isFinite(n) || n <= 0) return null;
+	return n;
+}
+
+type ActionTab = "standard" | "custom" | "grant";
+
 export default function SubscriptionPage() {
 	const [businessPopoverOpen, setBusinessPopoverOpen] = useState(false);
 	const [businessId, setBusinessId] = useState("");
-	const [selectedPlanId, setSelectedPlanId] = useState("");
+	/** List-price checkout (`POST …/checkout`) — plan only */
+	const [standardPlanId, setStandardPlanId] = useState("");
+	const [actionTab, setActionTab] = useState<ActionTab>("standard");
+	const [customAmount, setCustomAmount] = useState("");
+	const [grantCreditsInput, setGrantCreditsInput] = useState("");
 	const [actionError, setActionError] = useState<string | null>(null);
+	const [grantSuccess, setGrantSuccess] = useState<UsageOutput | null>(null);
 
 	const {
 		data: businesses = [],
@@ -94,6 +117,12 @@ export default function SubscriptionPage() {
 		error: plansError,
 	} = useListSubscriptionPlansQuery();
 
+	const {
+		data: usage,
+		isFetching: usageFetching,
+		isError: usageError,
+	} = useGetSubscriptionUsageQuery({ businessId }, { skip: !businessId });
+
 	const selectedBusiness = useMemo(
 		() => businesses.find((b) => b.id === businessId) ?? null,
 		[businessId, businesses],
@@ -107,16 +136,41 @@ export default function SubscriptionPage() {
 
 	const [checkoutSubscription, { isLoading: paying }] =
 		useCheckoutSubscriptionMutation();
+	const [checkoutSubscriptionCustom, { isLoading: customPaying }] =
+		useCheckoutSubscriptionCustomMutation();
+	const [grantSubscriptionCredits, { isLoading: granting }] =
+		useGrantSubscriptionCreditsMutation();
 
-	const canSubscribe = Boolean(businessId && selectedPlanId) && !paying;
+	const amountParsed = parseAmount(customAmount);
+	const canStandardCheckout =
+		Boolean(businessId && standardPlanId) &&
+		!paying &&
+		!customPaying &&
+		!granting;
 
-	const onSubscribe = async () => {
+	const canCustomCheckout =
+		Boolean(businessId && amountParsed !== null) &&
+		!paying &&
+		!customPaying &&
+		!granting;
+
+	const creditsParsed = Number.parseInt(grantCreditsInput.trim(), 10);
+	const canGrantCredits =
+		Boolean(businessId) &&
+		Number.isFinite(creditsParsed) &&
+		creditsParsed >= 1 &&
+		!paying &&
+		!customPaying &&
+		!granting;
+
+	const onStandardCheckout = async () => {
 		setActionError(null);
+		setGrantSuccess(null);
 		if (!businessId) {
 			setActionError("Select a business first.");
 			return;
 		}
-		if (!selectedPlanId) {
+		if (!standardPlanId) {
 			setActionError("Select a subscription plan.");
 			return;
 		}
@@ -124,23 +178,68 @@ export default function SubscriptionPage() {
 		try {
 			const res = await checkoutSubscription({
 				businessId,
-				planId: selectedPlanId,
+				planId: standardPlanId,
 			}).unwrap();
 
 			if (typeof window !== "undefined") {
 				window.location.assign(res.checkout_url);
 			}
 		} catch (e: unknown) {
-			const err = e as {
-				data?: { detail?: string; message?: string };
-				message?: string;
-			};
-			setActionError(
-				err.data?.detail ||
-					err.data?.message ||
-					err.message ||
-					"Payment failed",
-			);
+			setActionError(getErrorMessage(e, "Checkout failed."));
+		}
+	};
+
+	const onCustomCheckout = async () => {
+		setActionError(null);
+		setGrantSuccess(null);
+		if (!businessId) {
+			setActionError("Select a business first.");
+			return;
+		}
+		const amt = parseAmount(customAmount);
+		if (amt === null) {
+			setActionError("Enter a valid amount greater than zero.");
+			return;
+		}
+
+		try {
+			const res = await checkoutSubscriptionCustom({
+				businessId,
+				body: {
+					amount: amt,
+				},
+			}).unwrap();
+
+			if (typeof window !== "undefined") {
+				window.location.assign(res.checkout_url);
+			}
+		} catch (e: unknown) {
+			setActionError(getErrorMessage(e, "Custom checkout failed."));
+		}
+	};
+
+	const onGrantCredits = async () => {
+		setActionError(null);
+		setGrantSuccess(null);
+		if (!businessId) {
+			setActionError("Select a business first.");
+			return;
+		}
+		const n = Number.parseInt(grantCreditsInput.trim(), 10);
+		if (!Number.isFinite(n) || n < 1) {
+			setActionError("Enter a whole number of credits (at least 1).");
+			return;
+		}
+
+		try {
+			const out = await grantSubscriptionCredits({
+				businessId,
+				body: { credits: n },
+			}).unwrap();
+			setGrantSuccess(out);
+			setGrantCreditsInput("");
+		} catch (e: unknown) {
+			setActionError(getErrorMessage(e, "Could not grant credits."));
 		}
 	};
 
@@ -149,8 +248,9 @@ export default function SubscriptionPage() {
 			<div>
 				<h1 className="text-2xl font-semibold tracking-tight">Subscription</h1>
 				<p className="text-muted-foreground">
-					Choose a business to view usage and history, pick a plan, then proceed to
-					checkout.
+					Choose a business, then subscribe at a plan&apos;s list price, open
+					checkout for a payment amount (no plan required), or grant credits
+					directly.
 				</p>
 			</div>
 
@@ -174,10 +274,13 @@ export default function SubscriptionPage() {
 			) : null}
 
 			<Card>
-				<CardContent>
+				<CardContent className="pt-6">
 					<Field>
 						<FieldLabel id="subscription-business-label">Business</FieldLabel>
-						<Popover open={businessPopoverOpen} onOpenChange={setBusinessPopoverOpen}>
+						<Popover
+							open={businessPopoverOpen}
+							onOpenChange={setBusinessPopoverOpen}
+						>
 							<PopoverTrigger
 								render={
 									<Button
@@ -195,12 +298,17 @@ export default function SubscriptionPage() {
 									) : selectedBusiness ? (
 										selectedBusiness.name
 									) : (
-										<span className="text-muted-foreground">Select a business…</span>
+										<span className="text-muted-foreground">
+											Select a business…
+										</span>
 									)}
 								</span>
 								<ChevronsUpDownIcon data-icon="inline-end" aria-hidden />
 							</PopoverTrigger>
-							<PopoverContent className="w-(--anchor-width) min-w-72 p-0" align="start">
+							<PopoverContent
+								className="w-(--anchor-width) min-w-72 p-0"
+								align="start"
+							>
 								<Command>
 									<CommandInput
 										placeholder="Search by name or TIN…"
@@ -215,14 +323,19 @@ export default function SubscriptionPage() {
 													value={`${b.name} ${b.tin_number} ${b.id}`}
 													onSelect={() => {
 														setBusinessId(b.id);
-														setSelectedPlanId("");
+														setStandardPlanId("");
+														setCustomAmount("");
+														setGrantCreditsInput("");
 														setActionError(null);
+														setGrantSuccess(null);
 														setBusinessPopoverOpen(false);
 													}}
 													className="[&>svg:last-child]:hidden"
 												>
 													<span className="flex min-w-0 flex-1 flex-col gap-0.5 text-left">
-														<span className="truncate font-medium">{b.name}</span>
+														<span className="truncate font-medium">
+															{b.name}
+														</span>
 														<span className="truncate text-xs text-muted-foreground">
 															TIN {b.tin_number}
 														</span>
@@ -235,66 +348,277 @@ export default function SubscriptionPage() {
 							</PopoverContent>
 						</Popover>
 						<FieldDescription>
-							Choose the business you want to activate a subscription for.
+							Choose the business you want to manage billing or credits for.
 						</FieldDescription>
 					</Field>
 				</CardContent>
 			</Card>
 
+			{businessId ? (
+				<Card>
+					<CardHeader className="pb-2">
+						<CardTitle className="text-base">Current usage</CardTitle>
+					</CardHeader>
+					<CardContent className="text-sm">
+						{usageFetching && !usage ? (
+							<p className="text-muted-foreground">Loading usage…</p>
+						) : usageError ? (
+							<p className="text-muted-foreground">
+								Usage data isn’t available for this business (they may have no
+								active subscription yet).
+							</p>
+						) : usage ? (
+							<dl className="grid gap-2 sm:grid-cols-3">
+								<div>
+									<dt className="text-muted-foreground">Limit</dt>
+									<dd className="tabular-nums font-medium">
+										{usage.credits_limit.toLocaleString()}
+									</dd>
+								</div>
+								<div>
+									<dt className="text-muted-foreground">Used</dt>
+									<dd className="tabular-nums font-medium">
+										{usage.credits_used.toLocaleString()}
+									</dd>
+								</div>
+								<div>
+									<dt className="text-muted-foreground">Remaining</dt>
+									<dd className="tabular-nums font-medium">
+										{usage.remaining_credits.toLocaleString()}
+									</dd>
+								</div>
+							</dl>
+						) : (
+							<p className="text-muted-foreground">No usage data.</p>
+						)}
+					</CardContent>
+				</Card>
+			) : null}
+
 			<Card>
+				<CardHeader className="pb-0">
+					<CardTitle className="text-base">Actions</CardTitle>
+				</CardHeader>
 				<CardContent className="flex flex-col gap-4">
-					{plansError ? (
-						<Alert variant="destructive">
-							<AlertTitle>Couldn’t load plans</AlertTitle>
-							<AlertDescription>Please try again later.</AlertDescription>
-						</Alert>
-					) : null}
+					<Tabs
+						value={actionTab}
+						onValueChange={(v) => {
+							const next = v as ActionTab;
+							setActionTab(next);
+							setActionError(null);
+							if (next !== "grant") setGrantSuccess(null);
+						}}
+						className="flex w-full flex-col gap-4"
+					>
+						<TabsList className="grid h-auto w-full grid-cols-1 gap-1 sm:grid-cols-3">
+							<TabsTrigger value="standard">Plan price</TabsTrigger>
+							<TabsTrigger value="custom">Custom amount</TabsTrigger>
+							<TabsTrigger value="grant">Grant credits</TabsTrigger>
+						</TabsList>
 
-					<Field>
-						<FieldLabel htmlFor="subscription-plan">Plan</FieldLabel>
-						<Select
-							value={selectedPlanId}
-							onValueChange={(value) => {
-								setSelectedPlanId(value ?? "");
-								setActionError(null);
-							}}
-							disabled={plansLoading || plansFetching}
+						<TabsContent
+							value="standard"
+							className="flex flex-col gap-4 outline-none"
 						>
-							<SelectTrigger id="subscription-plan" className="w-full">
-								<SelectValue placeholder="Select a plan">
-									{selectedPlanId ? plansById.get(selectedPlanId)?.name : undefined}
-								</SelectValue>
-							</SelectTrigger>
-							<SelectContent>
-								<SelectGroup>
-									{plans
-										.filter((p) => !p.is_archived)
-										.map((p) => (
-											<SelectItem key={p.id} value={p.id}>
-												{p.name} • {moneyLabel(p.price)} • {p.duration_days} days
-											</SelectItem>
-										))}
-								</SelectGroup>
-							</SelectContent>
-						</Select>
-						<FieldDescription>
-							{selectedPlanId
-								? `Monthly transaction limit: ${
-										plansById.get(selectedPlanId)?.monthly_transaction_limit ?? "—"
-									}`
-								: "Pick a plan to see details."}
-						</FieldDescription>
-					</Field>
+							<p className="text-sm text-muted-foreground">
+								Check out through Chapa at the plan&apos;s configured list price.
+								No manual amount — pick a plan and continue.
+							</p>
+							{plansError ? (
+								<Alert variant="destructive">
+									<AlertTitle>Couldn’t load plans</AlertTitle>
+									<AlertDescription>Please try again later.</AlertDescription>
+								</Alert>
+							) : null}
+							<FieldGroup>
+								<Field>
+									<FieldLabel htmlFor="subscription-plan-standard">Plan</FieldLabel>
+									<Select
+										value={standardPlanId}
+										onValueChange={(value) => {
+											setStandardPlanId(value ?? "");
+											setActionError(null);
+											setGrantSuccess(null);
+										}}
+										disabled={!businessId || plansLoading || plansFetching}
+									>
+										<SelectTrigger id="subscription-plan-standard" className="w-full">
+											<SelectValue placeholder="Select a plan…">
+												{standardPlanId
+													? plansById.get(standardPlanId)?.name
+													: undefined}
+											</SelectValue>
+										</SelectTrigger>
+										<SelectContent>
+											<SelectGroup>
+												{plans
+													.filter((p) => !p.is_archived)
+													.map((p) => (
+														<SelectItem key={p.id} value={p.id}>
+															{p.name} • {moneyLabel(p.price)} • {p.duration_days}{" "}
+															days
+														</SelectItem>
+													))}
+											</SelectGroup>
+										</SelectContent>
+									</Select>
+									<FieldDescription>
+										{standardPlanId
+											? `You will pay ${moneyLabel(plansById.get(standardPlanId)?.price ?? "0")} at checkout. Monthly transaction limit: ${
+													plansById.get(standardPlanId)
+														?.monthly_transaction_limit ?? "—"
+												}`
+											: "Pick the tier to bill at its catalog price."}
+									</FieldDescription>
+								</Field>
+							</FieldGroup>
+							{actionError && actionTab === "standard" ? (
+								<p className="text-sm text-destructive">{actionError}</p>
+							) : null}
+							<div className="flex justify-end">
+								<Button
+									onClick={onStandardCheckout}
+									disabled={!canStandardCheckout}
+									title={
+										!businessId
+											? "Select a business first"
+											: !standardPlanId
+												? "Select a plan"
+												: undefined
+									}
+								>
+									{paying ? (
+										<Loader2Icon className="animate-spin" aria-hidden="true" />
+									) : null}
+									{paying ? "Redirecting…" : "Subscribe at plan price"}
+								</Button>
+							</div>
+						</TabsContent>
 
-					{actionError ? (
-						<p className="text-sm text-destructive">{actionError}</p>
-					) : null}
+						<TabsContent
+							value="custom"
+							className="flex flex-col gap-4 outline-none"
+						>
+							<p className="text-sm text-muted-foreground">
+								Enter the payment amount only — no plan is required. The API opens
+								checkout for this business at your chosen amount.
+							</p>
+							<FieldGroup>
+								<Field>
+									<FieldLabel htmlFor="custom-amount">Payment amount</FieldLabel>
+									<Input
+										id="custom-amount"
+										name="amount"
+										type="text"
+										inputMode="decimal"
+										autoComplete="off"
+										placeholder="e.g. 1499.99…"
+										value={customAmount}
+										onChange={(e) => {
+											setCustomAmount(e.target.value);
+											setActionError(null);
+										}}
+										disabled={!businessId}
+									/>
+									<FieldDescription>
+										Must be greater than zero. Currency symbols are stripped before
+										sending.
+									</FieldDescription>
+								</Field>
+							</FieldGroup>
+							{!canCustomCheckout &&
+							businessId &&
+							amountParsed === null &&
+							customAmount.trim() !== "" ? (
+								<p className="text-sm text-destructive">
+									Enter a valid positive number for the amount.
+								</p>
+							) : null}
+							{actionError && actionTab === "custom" ? (
+								<p className="text-sm text-destructive">{actionError}</p>
+							) : null}
+							<div className="flex justify-end">
+								<Button
+									onClick={onCustomCheckout}
+									disabled={!canCustomCheckout}
+									title={
+										!businessId
+											? "Select a business first"
+											: amountParsed === null
+												? "Enter a valid amount"
+												: undefined
+									}
+								>
+									{customPaying ? (
+										<Loader2Icon className="animate-spin" aria-hidden="true" />
+									) : null}
+									{customPaying
+										? "Redirecting…"
+										: "Checkout with custom amount"}
+								</Button>
+							</div>
+						</TabsContent>
 
-					<div className="flex items-center justify-end gap-2">
-						<Button onClick={onSubscribe} disabled={!canSubscribe}>
-							{paying ? "Redirecting…" : "Subscribe"}
-						</Button>
-					</div>
+						<TabsContent
+							value="grant"
+							className="flex flex-col gap-4 outline-none"
+						>
+							<p className="text-sm text-muted-foreground">
+								Add credits to the selected business&apos;s subscription usage
+								without going through checkout.
+							</p>
+							<FieldGroup>
+								<Field>
+									<FieldLabel htmlFor="grant-credits">
+										Credits to grant
+									</FieldLabel>
+									<Input
+										id="grant-credits"
+										name="credits"
+										type="text"
+										inputMode="numeric"
+										autoComplete="off"
+										placeholder="e.g. 500…"
+										value={grantCreditsInput}
+										onChange={(e) => {
+											setGrantCreditsInput(e.target.value);
+											setActionError(null);
+											setGrantSuccess(null);
+										}}
+										disabled={!businessId}
+									/>
+									<FieldDescription>
+										Whole number, minimum 1. Requires an authenticated admin
+										context on the API.
+									</FieldDescription>
+								</Field>
+							</FieldGroup>
+							{grantSuccess ? (
+								<Alert>
+									<AlertTitle>Credits updated</AlertTitle>
+									<AlertDescription className="tabular-nums">
+										Remaining credits:{" "}
+										<strong>
+											{grantSuccess.remaining_credits.toLocaleString()}
+										</strong>{" "}
+										(limit {grantSuccess.credits_limit.toLocaleString()}, used{" "}
+										{grantSuccess.credits_used.toLocaleString()}).
+									</AlertDescription>
+								</Alert>
+							) : null}
+							{actionError && actionTab === "grant" ? (
+								<p className="text-sm text-destructive">{actionError}</p>
+							) : null}
+							<div className="flex justify-end">
+								<Button onClick={onGrantCredits} disabled={!canGrantCredits}>
+									{granting ? (
+										<Loader2Icon className="animate-spin" aria-hidden="true" />
+									) : null}
+									{granting ? "Granting…" : "Grant credits"}
+								</Button>
+							</div>
+						</TabsContent>
+					</Tabs>
 				</CardContent>
 			</Card>
 		</div>

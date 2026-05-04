@@ -101,7 +101,7 @@ export const subscriptionApi = createApi({
 
 		/**
 		 * `POST /api/v1/subscriptions/checkout/custom`
-		 * Body: `SubscriptionCheckoutCustomRequest` per `SubscriptionCheckoutCustomSchema`.
+		 * Body: `{ amount }` required; `plan_id` optional per `SubscriptionCheckoutCustomSchema`.
 		 */
 		checkoutSubscriptionCustom: builder.mutation<
 			SubscriptionCheckoutResponse,

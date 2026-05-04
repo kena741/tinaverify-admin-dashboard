@@ -1,26 +1,26 @@
 export type RegisterUserRequest = {
-  phone_number: string;
-  password: string;
-  user_information: {
-    first_name: string;
-    last_name: string;
-  };
-  email?: string | null;
-  username?: string | null;
+	phone_number: string;
+	password: string;
+	user_information: {
+		first_name: string;
+		last_name: string;
+	};
+	email?: string | null;
+	username?: string | null;
 };
 
 export type UserOutput = {
-  id: string;
-  phone_number: string;
-  username: string | null;
-  email: string | null;
-  is_superuser: boolean;
-  is_active: boolean;
+	id: string;
+	phone_number: string;
+	username: string | null;
+	email: string | null;
+	is_superuser: boolean;
+	is_active: boolean;
 	role: string | null;
-  user_information?: {
-    first_name: string;
-    last_name: string;
-  } | null;
+	user_information?: {
+		first_name: string;
+		last_name: string;
+	} | null;
 };
 
 /** OpenAPI `UserInformationUpdateSchema` (partial update) */
@@ -45,62 +45,62 @@ export type UserPasswordUpdateRequest = {
 
 /** OpenAPI `UserAuthResponse` — `token_type` defaults to `"bearer"` on the server */
 export type UserAuthResponse = {
-  access_token: string;
-  refresh_token: string;
-  token_type?: string;
-  user: UserOutput;
+	access_token: string;
+	refresh_token: string;
+	token_type?: string;
+	user: UserOutput;
 };
 
 export type LoginRequest = {
-  username: string;
-  password: string;
+	username: string;
+	password: string;
 };
 
 export type BusinessCreateRequest = {
-  name: string;
-  tin_number: string;
+	name: string;
+	tin_number: string;
 };
 
 export type BusinessOutput = {
-  id: string;
-  name: string;
-  tin_number: string;
-  owner_id: string;
-  is_active: boolean;
-  is_archived: boolean;
+	id: string;
+	name: string;
+	tin_number: string;
+	owner_id: string;
+	is_active: boolean;
+	is_archived: boolean;
 };
 
 export type BranchCreateRequest = {
-  business_id: string;
-  name: string;
-  address?: string | null;
-  is_head_quarter?: boolean;
+	business_id: string;
+	name: string;
+	address?: string | null;
+	is_head_quarter?: boolean;
 };
 
 /** OpenAPI `BranchUpdateSchema` — body for `PUT /api/v1/branches/{branch_id}` */
 export type BranchUpdateRequest = {
-  name?: string | null;
-  address?: string | null;
-  is_head_quarter?: boolean | null;
-  is_archived?: boolean | null;
+	name?: string | null;
+	address?: string | null;
+	is_head_quarter?: boolean | null;
+	is_archived?: boolean | null;
 };
 
 /** OpenAPI `BranchResponseSchema` */
 export type BranchOutput = {
-  id: string;
-  name: string;
-  business_id: string;
-  is_head_quarter: boolean;
-  address: string | null;
-  is_archived: boolean;
-  created_at: string;
-  updated_at: string;
+	id: string;
+	name: string;
+	business_id: string;
+	is_head_quarter: boolean;
+	address: string | null;
+	is_archived: boolean;
+	created_at: string;
+	updated_at: string;
 };
 
 /** OpenAPI `RoleOutputSchema` */
 export type RoleOutput = {
-  id: string;
-  name: string;
+	id: string;
+	name: string;
 };
 
 /** OpenAPI `RoleCreateSchema` — `POST /api/v1/roles` */
@@ -121,33 +121,32 @@ export type AssignPermissionRequest = {
 
 /** OpenAPI `EmployeeOutputSchema` */
 export type EmployeeOutput = {
-  id: string;
-  user_id: string;
+	id: string;
+	user_id: string;
 	employee_id: string;
-  branch_id: string;
-  role_id: string;
-  is_active: boolean;
-  user?: UserOutput | null;
-  branch?: BranchOutput | null;
+	branch_id: string;
+	role_id: string;
+	is_active: boolean;
+	user?: UserOutput | null;
+	branch?: BranchOutput | null;
 };
 
 /** OpenAPI `CreateEmployeeUserRequest` */
 export type CreateEmployeeUserRequest = {
-  phone_number: string;
-  role_id: string;
-  branch_id: string;
-  username?: string | null;
-  email?: string | null;
+	phone_number: string;
+	role_id: string;
+	branch_id: string;
+	username?: string | null;
+	email?: string | null;
 };
 
 /** OpenAPI `CreateEmployeeUserResponse` */
 export type CreateEmployeeUserResponse = {
-  phone_number: string;
-  temporary_password: string;
-  role_id: string;
-  branch_id: string;
+	phone_number: string;
+	temporary_password: string;
+	role_id: string;
+	branch_id: string;
 };
-
 
 /** UI branch model; `restaurant_id` matches OpenAPI `business_id` for tenant scoping. */
 export interface Branch {
@@ -370,8 +369,8 @@ export type SubscriptionCheckoutResponse = {
 
 /** OpenAPI `SubscriptionCheckoutCustomSchema` — `POST /api/v1/subscriptions/checkout/custom` */
 export type SubscriptionCheckoutCustomRequest = {
-	credits: number | string;
 	amount: number | string;
+	plan_id?: string;
 };
 
 /** OpenAPI `SubscriptionGrantCreditsSchema` — `POST /api/v1/subscriptions/grant-credits` */
