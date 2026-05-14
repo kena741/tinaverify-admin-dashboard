@@ -1,26 +1,19 @@
-export type RegisterUserRequest = {
-	phone_number: string;
-	password: string;
-	user_information: {
-		first_name: string;
-		last_name: string;
-	};
-	email?: string | null;
-	username?: string | null;
+type UUID = string;
+
+// -----------------------------
+// Users
+// -----------------------------
+
+/** OpenAPI `UserInformationInputSchema` */
+export type UserInformationInput = {
+	first_name: string;
+	last_name: string;
 };
 
-export type UserOutput = {
-	id: string;
-	phone_number: string;
-	username: string | null;
-	email: string | null;
-	is_superuser: boolean;
-	is_active: boolean;
-	role: string | null;
-	user_information?: {
-		first_name: string;
-		last_name: string;
-	} | null;
+/** OpenAPI `UserInformationOutputSchema` */
+export type UserInformationOutput = {
+	first_name: string;
+	last_name: string;
 };
 
 /** OpenAPI `UserInformationUpdateSchema` (partial update) */
@@ -29,7 +22,17 @@ export type UserInformationUpdateRequest = {
 	last_name?: string | null;
 };
 
-/** OpenAPI `UserUpdateSchema` — `PATCH /api/v1/users/{user_id}` */
+/** OpenAPI `UserInputSchema` — body for `POST /api/v1/users` */
+export type RegisterUserRequest = {
+	phone_number: string;
+	password: string;
+	username?: string | null;
+	email?: string | null;
+	user_information?: UserInformationInput | null;
+	referral_code?: string | null;
+};
+
+/** OpenAPI `UserUpdateSchema` — body for `PATCH /api/v1/users/{user_id}` */
 export type UserUpdateRequest = {
 	phone_number?: string | null;
 	username?: string | null;
@@ -37,10 +40,27 @@ export type UserUpdateRequest = {
 	user_information?: UserInformationUpdateRequest | null;
 };
 
-/** OpenAPI `UserPasswordUpdateSchema` — `PATCH /api/v1/users/me/password` */
+/** OpenAPI `UserPasswordUpdateSchema` — body for `PATCH /api/v1/users/me/password` */
 export type UserPasswordUpdateRequest = {
 	old_password: string;
 	new_password: string;
+};
+
+/** OpenAPI `ForgotPasswordRequest` — body for `POST /api/v1/users/forgot-password` */
+export type ForgotPasswordRequest = {
+	phone_number: string;
+};
+
+/** OpenAPI `UserOutputSchema` */
+export type UserOutput = {
+	id: UUID;
+	phone_number: string;
+	username: string | null;
+	email: string | null;
+	is_superuser: boolean;
+	is_active: boolean;
+	role: string | null;
+	user_information?: UserInformationOutput | null;
 };
 
 /** OpenAPI `UserAuthResponse` — `token_type` defaults to `"bearer"` on the server */
@@ -51,27 +71,39 @@ export type UserAuthResponse = {
 	user: UserOutput;
 };
 
+/** OpenAPI `Body_login_api_v1_users_login_post` (x-www-form-urlencoded) */
 export type LoginRequest = {
 	username: string;
 	password: string;
+	grant_type?: "password" | null;
+	scope?: string;
+	client_id?: string | null;
+	client_secret?: string | null;
 };
 
+// -----------------------------
+// Business / branches
+// -----------------------------
+
+/** OpenAPI `BusinessCreateSchema` — body for `POST /api/v1/business` */
 export type BusinessCreateRequest = {
 	name: string;
 	tin_number: string;
 };
 
+/** OpenAPI `BusinessOutputSchema` */
 export type BusinessOutput = {
-	id: string;
+	id: UUID;
 	name: string;
 	tin_number: string;
-	owner_id: string;
+	owner_id: UUID;
 	is_active: boolean;
 	is_archived: boolean;
 };
 
+/** OpenAPI `BranchCreateSchema` — body for `POST /api/v1/branches` */
 export type BranchCreateRequest = {
-	business_id: string;
+	business_id: UUID;
 	name: string;
 	address?: string | null;
 	is_head_quarter?: boolean;
@@ -87,65 +119,14 @@ export type BranchUpdateRequest = {
 
 /** OpenAPI `BranchResponseSchema` */
 export type BranchOutput = {
-	id: string;
+	id: UUID;
 	name: string;
-	business_id: string;
+	business_id: UUID;
 	is_head_quarter: boolean;
 	address: string | null;
 	is_archived: boolean;
 	created_at: string;
 	updated_at: string;
-};
-
-/** OpenAPI `RoleOutputSchema` */
-export type RoleOutput = {
-	id: string;
-	name: string;
-};
-
-/** OpenAPI `RoleCreateSchema` — `POST /api/v1/roles` */
-export type RoleCreateRequest = {
-	name: string;
-};
-
-/** OpenAPI `PermissionResponseSchema` */
-export type PermissionOutput = {
-	id: string;
-	action: string;
-};
-
-/** OpenAPI `AssignPermissionSchema` — `POST /api/v1/roles/{role_id}/permissions` */
-export type AssignPermissionRequest = {
-	permission_ids: string[];
-};
-
-/** OpenAPI `EmployeeOutputSchema` */
-export type EmployeeOutput = {
-	id: string;
-	user_id: string;
-	employee_id: string;
-	branch_id: string;
-	role_id: string;
-	is_active: boolean;
-	user?: UserOutput | null;
-	branch?: BranchOutput | null;
-};
-
-/** OpenAPI `CreateEmployeeUserRequest` */
-export type CreateEmployeeUserRequest = {
-	phone_number: string;
-	role_id: string;
-	branch_id: string;
-	username?: string | null;
-	email?: string | null;
-};
-
-/** OpenAPI `CreateEmployeeUserResponse` */
-export type CreateEmployeeUserResponse = {
-	phone_number: string;
-	temporary_password: string;
-	role_id: string;
-	branch_id: string;
 };
 
 /** UI branch model; `restaurant_id` matches OpenAPI `business_id` for tenant scoping. */
@@ -179,42 +160,9 @@ export function branchFromOutput(b: BranchOutput): Branch {
 	};
 }
 
-/** OpenAPI `MenuCategory` enum */
-export type MenuCategoryEnum = "Food" | "Drink";
-
-/** OpenAPI `MenuInputSchema` — `POST /api/v1/menus` */
-export type MenuInputRequest = {
-	branch_id: string;
-	name: string;
-	description?: string | null;
-	price: number;
-	currency: string;
-	category: MenuCategoryEnum;
-};
-
-/** OpenAPI `MenuResponseSchema` */
-export type MenuResponse = {
-	id: string;
-	name: string;
-	description: string | null;
-	price: number;
-	currency: string;
-	category: MenuCategoryEnum;
-	branch_id: string;
-	is_archived: boolean;
-	created_at: string;
-	updated_at: string;
-};
-
-/** OpenAPI `MenuUpdateSchema` — `PUT /api/v1/menus/{menu_id}` */
-export type MenuUpdateRequest = {
-	name?: string | null;
-	description?: string | null;
-	price?: number | null;
-	currency?: string | null;
-	category?: MenuCategoryEnum | null;
-	is_archived?: boolean | null;
-};
+// -----------------------------
+// Bank accounts
+// -----------------------------
 
 /** OpenAPI `BankNameEnum` */
 export type BankNameEnum =
@@ -227,30 +175,197 @@ export type BankNameEnum =
 
 /** OpenAPI `BankAccountCreateSchema` */
 export type BankAccountCreateRequest = {
-	business_id: string;
+	business_id: UUID;
 	bank_name: BankNameEnum;
 	account_name: string;
 	account_number: string;
 };
 
+/** OpenAPI `BankAccountUpdateSchema` */
+export type BankAccountUpdateRequest = {
+	bank_name?: BankNameEnum | null;
+	account_name?: string | null;
+	account_number?: string | null;
+};
+
 /** OpenAPI `BankAccountResponseSchema` */
 export type BankAccountResponse = {
-	id: string;
-	business_id: string;
+	id: UUID;
+	business_id: UUID;
 	bank_name: BankNameEnum;
 	account_name: string;
 	account_number: string;
 	is_archived: boolean;
 };
 
+// -----------------------------
+// Employees
+// -----------------------------
+
+/** OpenAPI `CreateEmployeeUserRequest` */
+export type CreateEmployeeUserRequest = {
+	business_id: UUID;
+	phone_number: string;
+	role_id: UUID;
+	branch_id: UUID;
+	username?: string | null;
+	email?: string | null;
+};
+
+/** OpenAPI `CreateEmployeeUserResponse` */
+export type CreateEmployeeUserResponse = {
+	phone_number: string;
+	temporary_password: string;
+	role_id: string;
+	branch_id: string;
+};
+
+/** OpenAPI `UpdateEmployeeRequest` — body for `PUT /api/v1/business/{business_id}/employees/{employee_id}` */
+export type UpdateEmployeeRequest = {
+	role_id?: UUID | null;
+	branch_id?: UUID | null;
+	phone_number?: string | null;
+	email?: string | null;
+	username?: string | null;
+};
+
+/** OpenAPI `EmployeeOutputSchema` */
+export type EmployeeOutput = {
+	id: UUID;
+	user_id: UUID;
+	employee_id: UUID;
+	business_id: UUID;
+	branch_id?: UUID | null;
+	role_id: UUID;
+	is_active: boolean;
+	user?: UserOutput | null;
+	branch?: BranchOutput | null;
+};
+
+// -----------------------------
+// Roles / permissions
+// -----------------------------
+
+/** OpenAPI `RoleCreateSchema` — body for `POST /api/v1/roles` */
+export type RoleCreateRequest = {
+	name: string;
+};
+
+/** OpenAPI `RoleResponseSchema` */
+export type RoleOutput = {
+	id: UUID;
+	name: string;
+};
+
+/** OpenAPI `PermissionCreateSchema` — body for `POST /api/v1/permissions` */
+export type PermissionCreateRequest = {
+	action: string;
+};
+
+/** OpenAPI `PermissionResponseSchema` */
+export type PermissionOutput = {
+	id: UUID;
+	action: string;
+};
+
+/** OpenAPI `AssignPermissionSchema` — body for `POST /api/v1/roles/{role_id}/permissions` */
+export type AssignPermissionRequest = {
+	permission_ids: UUID[];
+};
+
+// -----------------------------
+// Subscriptions
+// -----------------------------
+
+/** OpenAPI `SubscriptionPlanOutputSchema` */
+export type SubscriptionPlanOutput = {
+	id: UUID;
+	name: string;
+	monthly_transaction_limit: number;
+	price: string;
+	duration_days: number;
+	is_archived: boolean;
+};
+
+/** OpenAPI `SubscriptionPlanCreateSchema` — body for `POST /api/v1/subscription-plan` */
+export type SubscriptionPlanCreate = {
+	name: string;
+	monthly_transaction_limit: number;
+	price: number | string;
+	duration_days?: number;
+};
+
+/** OpenAPI `SubscriptionPlanUpdateSchema` — body for `PATCH /api/v1/subscription-plan/{subscription_plan_id}` */
+export type SubscriptionPlanUpdate = {
+	name?: string | null;
+	monthly_transaction_limit?: number | null;
+	price?: number | string | null;
+	duration_days?: number | null;
+};
+
+/** OpenAPI `SubscriptionCheckoutSchema` — body for `POST /api/v1/subscriptions/checkout` */
+export type SubscriptionCheckoutRequest = {
+	plan_id: UUID;
+};
+
+/** OpenAPI `CustomCheckoutSchema` — body for `POST /api/v1/subscriptions/checkout/custom` */
+export type CustomCheckoutRequest = {
+	amount?: number | null;
+	credits?: number | null;
+};
+
+/** OpenAPI `SubscriptionCheckoutOutputSchema` */
+export type SubscriptionCheckoutResponse = {
+	checkout_url: string;
+	tx_ref: string;
+};
+
+/** OpenAPI `AdminGrantCreditsSchema` — body for `POST /api/v1/subscriptions/grant-credits` */
+export type AdminGrantCreditsRequest = {
+	credits: number;
+};
+
+/** OpenAPI `SubscriptionOutputSchema` */
+export type SubscriptionOutput = {
+	id: UUID;
+	business_id: UUID;
+	plan_id?: UUID | null;
+	status: string;
+	started_at?: string | null;
+	ended_at?: string | null;
+	chapa_transaction_reference?: string | null;
+};
+
+/** OpenAPI `UsageOutputSchema` */
+export type UsageOutput = {
+	subscription_id: UUID;
+	credits_limit: number;
+	credits_used: number;
+	remaining_credits: number;
+};
+
+/** OpenAPI `ExchangeRateOutputSchema` */
+export type ExchangeRateOutput = {
+	credits_per_etb: number;
+};
+
+/** OpenAPI `ExchangeRateUpdateSchema` */
+export type ExchangeRateUpdateRequest = {
+	credits_per_etb: number;
+};
+
+// -----------------------------
+// Transactions / verification
+// -----------------------------
+
 /** OpenAPI `VerifiedTransactionOutputSchema` */
 export type VerifiedTransactionOutput = {
-	id: string;
+	id: UUID;
 	reference_number: string;
-	business_id: string;
+	business_id: UUID;
 	amount: string;
 	currency: string;
-	bank_account_id?: string | null;
+	bank_account_id?: UUID | null;
 	sender_name?: string | null;
 	sender_account?: string | null;
 	receiver_name?: string | null;
@@ -260,133 +375,56 @@ export type VerifiedTransactionOutput = {
 	receipt_url?: string | null;
 };
 
-/** OpenAPI body for `PATCH /api/v1/transactions/{transaction_id}/status` */
+/** OpenAPI `Body_update_transaction_status_api_v1_transactions__transaction_id__status_patch` */
 export type UpdateTransactionStatusRequest = {
 	status: "verified" | "failed";
 };
 
-/** OpenAPI `TableInputSchema` — `POST /api/v1/tables` */
-export type TableInputRequest = {
-	branch_id: string;
-	name: string;
+// Note: verify endpoints accept multipart/form-data; actual HTTP usage should send FormData.
+/** OpenAPI `Body_verify_cbe_endpoint_api_v1_verify_cbe_post` */
+export type VerifyCbeRequest = {
+	business_id: UUID;
+	file: File;
+	sender_account_number: string;
 };
 
-/** OpenAPI `TableResponseSchema` */
-export type TableResponse = {
-	id: string;
-	name: string;
-	branch_id: string;
-	is_archived: boolean;
-	created_at: string;
-	updated_at: string;
+/** OpenAPI `Body_verify_cbebirr_endpoint_api_v1_verify_cbebirr_post` */
+export type VerifyCbebirrRequest = {
+	business_id: UUID;
+	file: File;
 };
 
-/** OpenAPI `TableUpdateSchema` — `PUT /api/v1/tables/{table_id}` */
-export type TableUpdateRequest = {
-	name?: string | null;
-	is_archived?: boolean | null;
+/** OpenAPI `Body_verify_awash_endpoint_api_v1_verify_awash_post` */
+export type VerifyAwashRequest = {
+	business_id: UUID;
+	file: File;
+	account_number: string;
 };
 
-/** OpenAPI `OrderStatus` enum */
-export type OrderStatus = "pending" | "in_progress" | "completed" | "cancelled";
-
-/** OpenAPI `OrderItemResponseSchema` */
-export type OrderItemResponse = {
-	id: string;
-	order_id: string;
-	menu_id: string;
-	quantity: number;
-	unit_price: number;
+/** OpenAPI `Body_verify_dashen_endpoint_api_v1_verify_dashen_post` */
+export type VerifyDashenRequest = {
+	business_id: UUID;
+	file: File;
 };
 
-/** OpenAPI `OrderResponseSchema` */
-export type OrderResponse = {
-	id: string;
-	table_id: string | null;
-	transaction_id: string | null;
-	created_by: string | null;
-	status: OrderStatus;
-	is_archived: boolean;
-	items: OrderItemResponse[];
-	created_at: string;
-	updated_at: string;
+/** OpenAPI `Body_verify_abysinya_endpoint_api_v1_verify_abysinya_post` */
+export type VerifyAbysinyaRequest = {
+	business_id: UUID;
+	file: File;
+	sender_account_number: string;
 };
 
-/** OpenAPI `OrderTransactionSummaryResponse` */
-export type OrderTransactionSummaryResponse = {
-	order_id: string;
-	transaction_id: string;
-	amount: number;
+/** OpenAPI `Body_verify_telebirr_endpoint_api_v1_verify_telebirr_post` */
+export type VerifyTelebirrRequest = {
+	business_id: UUID;
+	file: File;
 };
 
-/** OpenAPI `SubscriptionPlanOutputSchema` */
-export type SubscriptionPlanOutput = {
-	id: string;
-	name: string;
-	monthly_transaction_limit: number;
-	price: string;
-	duration_days: number;
-	is_archived: boolean;
-};
+// -----------------------------
+// Referrals
+// -----------------------------
 
-/** OpenAPI `SubscriptionPlanCreateSchema` — `POST /api/v1/subscription-plan` */
-export type SubscriptionPlanCreate = {
-	name: string;
-	monthly_transaction_limit: number;
-	price: number | string;
-	duration_days?: number;
-};
-
-/** OpenAPI `SubscriptionPlanUpdateSchema` — `PATCH /api/v1/subscription-plan/{subscription_plan_id}` */
-export type SubscriptionPlanUpdate = {
-	name?: string | null;
-	monthly_transaction_limit?: number | null;
-	price?: number | string | null;
-	duration_days?: number | null;
-};
-
-/** OpenAPI `SubscriptionOutputSchema` */
-export type SubscriptionOutput = {
-	id: string;
-	business_id: string;
-	plan_id: string;
-	status: string;
-	started_at?: string | null;
-	ended_at?: string | null;
-	chapa_transaction_reference?: string | null;
-};
-
-/** OpenAPI `SubscriptionCheckoutSchema` — `POST /api/v1/subscriptions/checkout` */
-export type SubscriptionCheckoutRequest = {
-	plan_id: string;
-};
-
-/** OpenAPI `SubscriptionCheckoutOutputSchema` */
-export type SubscriptionCheckoutResponse = {
-	checkout_url: string;
-	tx_ref: string;
-};
-
-/** OpenAPI `SubscriptionCheckoutCustomSchema` — `POST /api/v1/subscriptions/checkout/custom` */
-export type SubscriptionCheckoutCustomRequest = {
-	amount: number | string;
-	plan_id?: string;
-};
-
-/** OpenAPI `SubscriptionGrantCreditsSchema` — `POST /api/v1/subscriptions/grant-credits` */
-export type SubscriptionGrantCreditsRequest = {
-	credits: number;
-};
-
-/** OpenAPI `UsageOutputSchema` — `GET /api/v1/subscriptions/usage` */
-export type UsageOutput = {
-	subscription_id: string;
-	credits_limit: number;
-	credits_used: number;
-	remaining_credits: number;
-};
-
-/** OpenAPI `CampaignCreateSchema` — `POST /api/v1/admin/referrals/campaigns` */
+/** OpenAPI `CampaignCreateSchema` — body for `POST /api/v1/admin/referrals/campaigns` */
 export type CampaignCreateRequest = {
 	code: string;
 	description: string;
@@ -399,7 +437,7 @@ export type CampaignOutput = {
 	is_active: boolean;
 };
 
-/** OpenAPI `ReferralPerformanceSchema` — `GET /api/v1/admin/referrals/performance` */
+/** OpenAPI `ReferralPerformanceSchema` */
 export type ReferralPerformance = {
 	code: string;
 	description: string;
@@ -408,17 +446,25 @@ export type ReferralPerformance = {
 	active_subscriptions: number;
 };
 
-/** OpenAPI `DeactivateBusinessRequest` — `POST /api/v1/business/{business_id}/deactivate` */
+// -----------------------------
+// Misc
+// -----------------------------
+
+/** OpenAPI `DeactivateBusinessRequest` — body for `PATCH /api/v1/business/{business_id}/deactivate` */
 export type DeactivateBusinessRequest = {
 	is_active: boolean;
 };
 
-/** OpenAPI `UpdateEmployeeRoleRequest` — `PUT /api/v1/business/{business_id}/employees/{employee_id}` */
-export type UpdateEmployeeRoleRequest = {
-	role_id: string;
+/** OpenAPI `ValidationError` */
+export type ValidationError = {
+	loc: Array<string | number>;
+	msg: string;
+	type: string;
+	input?: unknown;
+	ctx?: Record<string, unknown>;
 };
 
-/** OpenAPI `PermissionCreateSchema` — `POST /api/v1/permissions/{permission_id}` */
-export type PermissionCreateRequest = {
-	action: string;
+/** OpenAPI `HTTPValidationError` */
+export type HTTPValidationError = {
+	detail?: ValidationError[];
 };

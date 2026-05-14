@@ -3,43 +3,18 @@ import { resetStore } from "./resetActions";
 import { authApi } from "../services/auth/authApi";
 import { bankAccountsApi } from "../services/bank-accounts/bankAccountsApi";
 import { branchManagementApi } from "../services/branch-management/branchManagementApi";
-import { menuApi } from "../services/menu/menuApi";
-import { ordersApi } from "../services/orders/ordersApi";
 import { roleApi } from "../services/role/roleApi";
-import { tablesApi } from "../services/tables/tablesApi";
 import { subscriptionApi } from "../services/subscription/subscriptionApi";
 import { subscriptionPlanApi } from "../services/subscription-plan/subscriptionPlanApi";
 import { transactionsApi } from "../services/transactions/transactionsApi";
 
-// Import all reducers
-import authReducer from "../features/auth/authSlice";
-import signupReducer from "../features/auth/signupSlice";
-import restaurantsReducer from "../features/restaurants/restaurantsSlice";
-import staffReducer from "../features/staff/staffSlice";
-import tablesReducer from "../features/tables/tablesSlice";
-import ordersReducer from "../features/orders/ordersSlice";
-import paymentsReducer from "../features/payments/paymentsSlice";
-import customersReducer from "../features/customers/customersSlice";
-import menuReducer from "../features/menu/menuSlice";
 
 // Combine all reducers
 const appReducer = combineReducers({
-	auth: authReducer,
-	signup: signupReducer,
-	restaurants: restaurantsReducer,
-	staff: staffReducer,
-	tables: tablesReducer,
-	orders: ordersReducer,
-	payments: paymentsReducer,
-	customers: customersReducer,
-	menu: menuReducer,
 	[authApi.reducerPath]: authApi.reducer,
 	[bankAccountsApi.reducerPath]: bankAccountsApi.reducer,
 	[branchManagementApi.reducerPath]: branchManagementApi.reducer,
-	[menuApi.reducerPath]: menuApi.reducer,
-	[ordersApi.reducerPath]: ordersApi.reducer,
 	[roleApi.reducerPath]: roleApi.reducer,
-	[tablesApi.reducerPath]: tablesApi.reducer,
 	[subscriptionApi.reducerPath]: subscriptionApi.reducer,
 	[subscriptionPlanApi.reducerPath]: subscriptionPlanApi.reducer,
 	[transactionsApi.reducerPath]: transactionsApi.reducer,
@@ -69,10 +44,7 @@ export const store = configureStore({
 			authApi.middleware,
 			bankAccountsApi.middleware,
 			branchManagementApi.middleware,
-			menuApi.middleware,
-			ordersApi.middleware,
 			roleApi.middleware,
-			tablesApi.middleware,
 			subscriptionApi.middleware,
 			subscriptionPlanApi.middleware,
 			transactionsApi.middleware,

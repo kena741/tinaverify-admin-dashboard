@@ -9,9 +9,8 @@ Use this skill when the backend API changes or when initializing new API feature
 
 ### 1. Fetching the Specification
 Whenever I ask to "sync the API" or "update types," perform the following:
-* **Source URL:** `https://zuludine-backend-596135030502.europe-west3.run.app/openapi.json`
-* **Action:** Use `curl` or `fetch` to retrieve the latest JSON definition.
-* **Storage:** Overwrite the local `@/src/services/openapi.json` file.
+* **Action:** Run the `fetch-openai-json.sh` script.
+* **Output:** The script will update the `@/src/services/openapi.json` file.
 
 ### 2. Type Generation
 After fetching the JSON, generate or update the TypeScript interfaces:
