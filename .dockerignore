@@ -1,0 +1,21 @@
+# dependencies
+node_modules
+
+# next.js
+.next
+out
+
+# git / ide
+.git
+.gitignore
+.cursor
+.agents
+
+# env (never bake local secrets into images)
+.env
+.env.*
+
+# misc
+coverage
+.turbo
+pnpm-debug.log*

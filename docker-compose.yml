@@ -1,0 +1,12 @@
+# Local: use an env file with NEXT_PUBLIC_BACKEND_BASE_URL (and optional CLOUD_RUN_IMAGE for registry push).
+# CI sets CLOUD_RUN_IMAGE and NEXT_PUBLIC_BACKEND_BASE_URL in GitHub Actions before docker compose build/push.
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_BACKEND_BASE_URL: ${NEXT_PUBLIC_BACKEND_BASE_URL:?NEXT_PUBLIC_BACKEND_BASE_URL is required at image build time}
+    image: ${CLOUD_RUN_IMAGE:-tinaverify-fe:local}
+    ports:
+      - "${HOST_PORT:-3000}:8080"

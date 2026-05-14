@@ -1,0 +1,68 @@
+name: Deploy to Google Cloud Run
+
+on:
+  push:
+    branches:
+      - staging
+      - production
+
+concurrency:
+  group: cloud-run-${{ github.ref_name }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  deploy:
+    name: Deploy (${{ github.ref_name }})
+    runs-on: ubuntu-latest
+    environment: ${{ github.ref_name }}
+    env:
+      SERVICE_NAME: ${{ github.ref_name == 'production' && 'tinaverify-fe-production' || 'tinaverify-fe-staging' }}
+      GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+      GCP_REGION: ${{ vars.GCP_REGION }}
+      ARTIFACT_REGISTRY_REPO: ${{ vars.ARTIFACT_REGISTRY_REPO }}
+      IMAGE_NAME: tinaverify-fe
+      NEXT_PUBLIC_BACKEND_BASE_URL: ${{ secrets.NEXT_PUBLIC_BACKEND_BASE_URL }}
+      DOCKER_DEFAULT_PLATFORM: linux/amd64
+    steps:
+      - name: Validate configuration
+        run: |
+          test -n "${GCP_PROJECT_ID}" || (echo "Missing secret GCP_PROJECT_ID" && exit 1)
+          test -n "${GCP_REGION}" || (echo "Missing repo variable GCP_REGION" && exit 1)
+          test -n "${ARTIFACT_REGISTRY_REPO}" || (echo "Missing repo variable ARTIFACT_REGISTRY_REPO" && exit 1)
+          test -n "${NEXT_PUBLIC_BACKEND_BASE_URL}" || (echo "Missing environment secret NEXT_PUBLIC_BACKEND_BASE_URL (per staging/production)" && exit 1)
+
+      - uses: actions/checkout@v4
+
+      - id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
+          project_id: ${{ secrets.GCP_PROJECT_ID }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker "${GCP_REGION}-docker.pkg.dev" --quiet
+
+      - name: Set image reference
+        run: |
+          echo "CLOUD_RUN_IMAGE=${GCP_REGION}-docker.pkg.dev/${GCP_PROJECT_ID}/${ARTIFACT_REGISTRY_REPO}/${IMAGE_NAME}:${GITHUB_SHA}" >> "$GITHUB_ENV"
+
+      - name: Build and push (Docker Compose)
+        run: |
+          docker compose build --pull
+          docker compose push
+
+      - name: Deploy to Cloud Run
+        run: |
+          gcloud run deploy "${SERVICE_NAME}" \
+            --image "${CLOUD_RUN_IMAGE}" \
+            --region "${GCP_REGION}" \
+            --platform managed \
+            --allow-unauthenticated \
+            --quiet
