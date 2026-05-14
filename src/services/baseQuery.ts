@@ -7,7 +7,7 @@ import type { FetchBaseQueryError } from "@reduxjs/toolkit/query";
 import { getStoredRefreshToken, refreshAccessToken } from "./authTokens";
 
 /** API surface is defined in `src/services/openapi.json` (synced from the backend). */
-const BACKEND_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_BASE_URL! || "https://zuludine-backend-596135030502.europe-west3.run.app";
+const BACKEND_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_BASE_URL!;
 
 export const backendBaseUrl = BACKEND_BASE_URL.replace(/\/$/, "");
 
