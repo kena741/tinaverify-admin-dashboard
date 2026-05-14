@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { Providers } from "../../components/providers";
-import { AuthProvider } from "./contexts/AuthContext";
 import { ReduxProvider } from "../store/ReduxProvider";
 
 const geistSans = Geist({
@@ -33,9 +32,7 @@ export default function RootLayout({
     >
       <body className="min-h-svh bg-background font-sans text-foreground antialiased">
         <ReduxProvider>
-          <AuthProvider>
-            <Providers>{children}</Providers>
-          </AuthProvider>
+          <Providers>{children}</Providers>
         </ReduxProvider>
       </body>
     </html>

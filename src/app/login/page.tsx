@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Loader2Icon, LogInIcon } from "lucide-react";
 
-import { useAuth } from "../contexts/AuthContext";
+import { useAuth } from "../../store/useAuth";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {

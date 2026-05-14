@@ -13,7 +13,9 @@ import {
 	SidebarProvider,
 	SidebarTrigger,
 } from "@/components/ui/sidebar";
-import { useAuth } from "../contexts/AuthContext";
+import { useAuth } from "../../store/useAuth";
+import { useAppSelector } from "../../store/hooks";
+import { selectAuthSessionPending } from "../../store/authSlice";
 
 export default function AdminLayout({
 	children,
@@ -22,15 +24,17 @@ export default function AdminLayout({
 }) {
 	const router = useRouter();
 	const { user, logout, isSystemAdmin } = useAuth();
+	const sessionPending = useAppSelector(selectAuthSessionPending);
 	const [notificationsOpen, setNotificationsOpen] = useState(false);
 
 	useEffect(() => {
+		if (sessionPending) return;
 		if (!user) {
 			router.push("/login");
 		}
-	}, [user, router]);
+	}, [user, router, sessionPending]);
 
-	if (!user) {
+	if (sessionPending || !user) {
 		return null;
 	}
 
