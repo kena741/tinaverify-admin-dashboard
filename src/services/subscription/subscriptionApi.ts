@@ -3,9 +3,9 @@ import { createApi } from "@reduxjs/toolkit/query/react";
 import { getStoredAccessToken } from "../authTokens";
 import { backendBaseQuery } from "../baseQuery";
 import type {
-	SubscriptionCheckoutCustomRequest,
+	AdminGrantCreditsRequest,
+	CustomCheckoutRequest,
 	SubscriptionCheckoutResponse,
-	SubscriptionGrantCreditsRequest,
 	SubscriptionOutput,
 	UsageOutput,
 } from "../types";
@@ -101,11 +101,11 @@ export const subscriptionApi = createApi({
 
 		/**
 		 * `POST /api/v1/subscriptions/checkout/custom`
-		 * Body: `{ amount }` required; `plan_id` optional per `SubscriptionCheckoutCustomSchema`.
+		 * Body: `{ amount?, credits? }` per `CustomCheckoutSchema`.
 		 */
 		checkoutSubscriptionCustom: builder.mutation<
 			SubscriptionCheckoutResponse,
-			{ businessId: string; body: SubscriptionCheckoutCustomRequest }
+			{ businessId: string; body: CustomCheckoutRequest }
 		>({
 			query: ({ businessId, body }) => ({
 				url: "/api/v1/subscriptions/checkout/custom",
@@ -126,11 +126,11 @@ export const subscriptionApi = createApi({
 
 		/**
 		 * `POST /api/v1/subscriptions/grant-credits`
-		 * Body: `SubscriptionGrantCreditsRequest` per `SubscriptionGrantCreditsSchema`.
+		 * Body: `AdminGrantCreditsRequest` per `AdminGrantCreditsSchema`.
 		 */
 		grantSubscriptionCredits: builder.mutation<
-			UsageOutput,
-			{ businessId: string; body: SubscriptionGrantCreditsRequest }
+			SubscriptionOutput,
+			{ businessId: string; body: AdminGrantCreditsRequest }
 		>({
 			query: ({ businessId, body }) => ({
 				url: "/api/v1/subscriptions/grant-credits",

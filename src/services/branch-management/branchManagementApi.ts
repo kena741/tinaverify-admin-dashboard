@@ -11,7 +11,7 @@ import type {
 	DeactivateBusinessRequest,
 	EmployeeOutput,
 	RoleOutput,
-	UpdateEmployeeRoleRequest,
+	UpdateEmployeeRequest,
 } from "../types";
 
 function bearerHeaders(accessToken?: string | null) {
@@ -193,7 +193,7 @@ export const branchManagementApi = createApi({
 		/** `PUT /api/v1/business/{business_id}/employees/{employee_id}` */
 		updateEmployeeRole: builder.mutation<
 			EmployeeOutput,
-			{ businessId: string; employeeId: string; body: UpdateEmployeeRoleRequest }
+			{ businessId: string; employeeId: string; body: UpdateEmployeeRequest }
 		>({
 			query: ({ businessId, employeeId, body }) => ({
 				url: `/api/v1/business/${businessId}/employees/${employeeId}`,

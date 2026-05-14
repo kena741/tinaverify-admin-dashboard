@@ -769,8 +769,11 @@ export default function BusinessDetailClient({
 									) : activeSubscription ? (
 										<div className="flex flex-wrap items-center gap-2">
 											<Badge variant="secondary">
-												{subscriptionPlanById.get(activeSubscription.plan_id)
-													?.name ?? "Subscribed"}
+												{activeSubscription.plan_id != null &&
+												activeSubscription.plan_id !== ""
+													? (subscriptionPlanById.get(activeSubscription.plan_id)
+															?.name ?? "Subscribed")
+													: "Subscribed"}
 											</Badge>
 											<span className="text-sm text-muted-foreground">
 												Status: {activeSubscription.status}
@@ -947,8 +950,10 @@ export default function BusinessDetailClient({
 														(row: SubscriptionOutput) => (
 															<TableRow key={row.id}>
 																<TableCell className="font-medium">
-																	{subscriptionPlanById.get(row.plan_id)?.name ??
-																		row.plan_id}
+																	{row.plan_id != null && row.plan_id !== ""
+																		? (subscriptionPlanById.get(row.plan_id)?.name ??
+																			row.plan_id)
+																		: "—"}
 																</TableCell>
 																<TableCell>
 																	<Badge variant="outline">{row.status}</Badge>

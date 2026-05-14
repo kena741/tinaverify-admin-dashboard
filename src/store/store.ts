@@ -7,10 +7,13 @@ import { roleApi } from "../services/role/roleApi";
 import { subscriptionApi } from "../services/subscription/subscriptionApi";
 import { subscriptionPlanApi } from "../services/subscription-plan/subscriptionPlanApi";
 import { transactionsApi } from "../services/transactions/transactionsApi";
-
+import restaurantsReducer from "../features/restaurants/restaurantsSlice";
+import staffReducer from "../features/staff/staffSlice";
 
 // Combine all reducers
 const appReducer = combineReducers({
+	restaurants: restaurantsReducer,
+	staff: staffReducer,
 	[authApi.reducerPath]: authApi.reducer,
 	[bankAccountsApi.reducerPath]: bankAccountsApi.reducer,
 	[branchManagementApi.reducerPath]: branchManagementApi.reducer,

@@ -8,7 +8,6 @@ import {
 	Building2Icon,
 	Loader2Icon,
 	MapPinIcon,
-	PlusIcon,
 	TablePropertiesIcon,
 	UsersIcon,
 } from "lucide-react";
@@ -20,10 +19,6 @@ import {
 	useListMyBusinessesQuery,
 	useUpdateBranchMutation,
 } from "../../../../services/branch-management/branchManagementApi";
-import {
-	useCreateTableMutation,
-	useListBranchTablesQuery,
-} from "../../../../services/tables/tablesApi";
 import type { BranchOutput } from "../../../../services/types";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -35,13 +30,6 @@ import {
 	CardHeader,
 	CardTitle,
 } from "@/components/ui/card";
-import {
-	Dialog,
-	DialogContent,
-	DialogFooter,
-	DialogHeader,
-	DialogTitle,
-} from "@/components/ui/dialog";
 import {
 	Field,
 	FieldContent,
@@ -138,12 +126,6 @@ export default function BranchDetailPage({
 	}, [branch, businesses]);
 
 	const {
-		data: tables = [],
-		isLoading: tablesLoading,
-		error: tablesError,
-	} = useListBranchTablesQuery({ branchId: id }, { skip: !id || !branch });
-
-	const {
 		data: businessEmployees = [],
 		isLoading: employeesLoading,
 		error: employeesError,
@@ -157,12 +139,15 @@ export default function BranchDetailPage({
 		[businessEmployees, id],
 	);
 
-	const activeTables = tables.filter((t) => !t.is_archived).length;
-
-	const [createOpen, setCreateOpen] = useState(false);
-	const [newTableName, setNewTableName] = useState("");
-	const [createError, setCreateError] = useState<string | null>(null);
-	const [createTable, { isLoading: creatingTable }] = useCreateTableMutation();
+	// Branch “tables” API is not in the current OpenAPI; UI shows placeholders.
+	const tables: {
+		id: string;
+		name: string;
+		is_archived: boolean;
+		updated_at: string;
+	}[] = [];
+	const tablesLoading = false;
+	const activeTables = 0;
 
 	const baseSettings = useMemo(
 		() => (branch ? branchToSettingsForm(branch) : null),
@@ -187,23 +172,6 @@ export default function BranchDetailPage({
 	const loadError = branchError
 		? getErrorMessage(branchQueryError, "Could not load this branch.")
 		: null;
-
-	const handleCreateTable = async (event: React.FormEvent) => {
-		event.preventDefault();
-		setCreateError(null);
-		const name = newTableName.trim();
-		if (!name) {
-			setCreateError("Enter a table name.");
-			return;
-		}
-		try {
-			await createTable({ branch_id: id, name }).unwrap();
-			setNewTableName("");
-			setCreateOpen(false);
-		} catch (err) {
-			setCreateError(getErrorMessage(err, "Could not create the table."));
-		}
-	};
 
 	const handleSaveSettings = async (event: React.FormEvent) => {
 		event.preventDefault();
@@ -424,62 +392,13 @@ export default function BranchDetailPage({
 				</TabsContent>
 
 				<TabsContent value="tables" className="flex flex-col gap-4">
-					<div className="flex flex-wrap items-center justify-between gap-3">
-						<Button type="button" onClick={() => setCreateOpen(true)}>
-							<PlusIcon data-icon="inline-start" aria-hidden="true" />
-							Add Table
-						</Button>
-					</div>
-					{tablesError ? (
-						<Alert variant="destructive">
-							<AlertTitle>Could not load tables</AlertTitle>
-							<AlertDescription>
-								{getErrorMessage(tablesError, "Request failed.")}
-							</AlertDescription>
-						</Alert>
-					) : null}
-					{tablesLoading ? (
-						<div className="flex items-center gap-2 text-sm text-muted-foreground">
-							<Loader2Icon className="animate-spin" aria-hidden="true" />
-							Loading tables…
-						</div>
-					) : tables.length === 0 ? (
-						<Alert className="border-none">
-							<AlertTitle>No tables yet</AlertTitle>
-							<AlertDescription>
-								Create a table for this branch to use it in service.
-							</AlertDescription>
-						</Alert>
-					) : (
-						<div className="overflow-x-auto rounded-lg border border-border">
-							<Table>
-								<TableHeader>
-									<TableRow>
-										<TableHead>Name</TableHead>
-										<TableHead>Status</TableHead>
-										<TableHead className="hidden md:table-cell">
-											Updated
-										</TableHead>
-									</TableRow>
-								</TableHeader>
-								<TableBody>
-									{tables.map((t) => (
-										<TableRow key={t.id}>
-											<TableCell className="font-medium">{t.name}</TableCell>
-											<TableCell>
-												<Badge variant={t.is_archived ? "outline" : "default"}>
-													{t.is_archived ? "Archived" : "Active"}
-												</Badge>
-											</TableCell>
-											<TableCell className="hidden text-muted-foreground md:table-cell">
-												{formatDateTime(t.updated_at)}
-											</TableCell>
-										</TableRow>
-									))}
-								</TableBody>
-							</Table>
-						</div>
-					)}
+					<Alert>
+						<AlertTitle>Tables</AlertTitle>
+						<AlertDescription>
+							Table listing and creation are not exposed in the current API
+							specification, so this screen cannot load or create tables here.
+						</AlertDescription>
+					</Alert>
 				</TabsContent>
 
 				<TabsContent value="team" className="flex flex-col gap-4">
@@ -652,56 +571,6 @@ export default function BranchDetailPage({
 					</Card>
 				</TabsContent>
 			</Tabs>
-
-			<Dialog open={createOpen} onOpenChange={setCreateOpen}>
-				<DialogContent className="sm:max-w-md">
-					<form onSubmit={handleCreateTable}>
-						<DialogHeader>
-							<DialogTitle>Add table</DialogTitle>
-						</DialogHeader>
-						<FieldGroup className="py-4">
-							<Field>
-								<FieldLabel htmlFor="new-table-name">Table name</FieldLabel>
-								<Input
-									id="new-table-name"
-									value={newTableName}
-									onChange={(e) => setNewTableName(e.target.value)}
-									placeholder="e.g. Terrace 1…"
-									autoComplete="off"
-								/>
-							</Field>
-							{createError ? (
-								<Alert variant="destructive">
-									<AlertDescription>{createError}</AlertDescription>
-								</Alert>
-							) : null}
-						</FieldGroup>
-						<DialogFooter className="gap-2">
-							<Button
-								type="button"
-								variant="outline"
-								onClick={() => setCreateOpen(false)}
-							>
-								Cancel
-							</Button>
-							<Button type="submit" disabled={creatingTable}>
-								{creatingTable ? (
-									<>
-										<Loader2Icon
-											className="animate-spin"
-											data-icon="inline-start"
-											aria-hidden="true"
-										/>
-										Creating…
-									</>
-								) : (
-									"Create Table"
-								)}
-							</Button>
-						</DialogFooter>
-					</form>
-				</DialogContent>
-			</Dialog>
 		</main>
 	);
 }

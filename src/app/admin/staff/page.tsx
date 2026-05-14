@@ -84,10 +84,7 @@ export default function StaffPage() {
 		() => branchesData?.myBusinesses ?? [],
 		[branchesData?.myBusinesses],
 	);
-	const { restaurants } = useAppSelector(
-		(state: { restaurants: { restaurants: { id: string; name: string }[] } }) =>
-			state.restaurants,
-	);
+	const { restaurants } = useAppSelector((state) => state.restaurants);
 	const {
 		businessRoles,
 		rolesLoading,
@@ -95,18 +92,7 @@ export default function StaffPage() {
 		employeesLoading,
 		employeesBusinessId,
 		error: staffError,
-	} = useAppSelector(
-		(state: {
-			staff: {
-				businessRoles: { id: string; name: string }[];
-				rolesLoading: boolean;
-				apiEmployees: unknown[];
-				employeesLoading: boolean;
-				employeesBusinessId: string | null;
-				error: string | null;
-			};
-		}) => state.staff,
-	);
+	} = useAppSelector((state) => state.staff);
 
 	const [selectedBranchId, setSelectedBranchId] = useState("");
 
@@ -219,7 +205,9 @@ export default function StaffPage() {
 	const filteredEmployees = useMemo(() => {
 		return employeesForBranch.filter((emp) => {
 			const roleName = (roleNameById[emp.role_id] || "").toLowerCase();
-			const branchName = (branchNameById[emp.branch_id] || "").toLowerCase();
+			const branchName = (
+				emp.branch_id != null ? branchNameById[emp.branch_id] ?? "" : ""
+			).toLowerCase();
 			const userName = employeeUserDisplayName(emp).toLowerCase();
 			const q = searchTerm.toLowerCase();
 			const matchesSearch =
@@ -505,7 +493,9 @@ export default function StaffPage() {
 														{roleNameById[emp.role_id] ?? emp.role_id}
 													</TableCell>
 													<TableCell>
-														{branchNameById[emp.branch_id] ?? emp.branch_id}
+														{emp.branch_id != null
+															? (branchNameById[emp.branch_id] ?? emp.branch_id)
+															: "—"}
 													</TableCell>
 													<TableCell>
 														<Badge
@@ -561,14 +551,16 @@ export default function StaffPage() {
 							if (
 								!formData.phone_number ||
 								!formData.role_id ||
-								!formData.branch_id
+								!formData.branch_id ||
+								!selectedBusinessId
 							) {
-								setFormError("Phone, role, and branch are required.");
+								setFormError("Phone, role, branch, and business are required.");
 								return;
 							}
 							setSubmitting(true);
 							try {
 								const body = {
+									business_id: selectedBusinessId,
 									phone_number: formData.phone_number.trim(),
 									role_id: formData.role_id,
 									branch_id: formData.branch_id,

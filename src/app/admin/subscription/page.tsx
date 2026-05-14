@@ -11,7 +11,7 @@ import {
 	useGrantSubscriptionCreditsMutation,
 } from "../../../services/subscription/subscriptionApi";
 import { useListSubscriptionPlansQuery } from "../../../services/subscription-plan/subscriptionPlanApi";
-import type { BusinessOutput, UsageOutput } from "../../../services/types";
+import type { BusinessOutput, SubscriptionOutput } from "../../../services/types";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -115,7 +115,7 @@ export default function SubscriptionPage() {
 	const [customAmount, setCustomAmount] = useState("");
 	const [grantCreditsInput, setGrantCreditsInput] = useState("");
 	const [actionError, setActionError] = useState<string | null>(null);
-	const [grantSuccess, setGrantSuccess] = useState<UsageOutput | null>(null);
+	const [grantSuccess, setGrantSuccess] = useState<SubscriptionOutput | null>(null);
 
 	const {
 		data: businesses = [],
@@ -609,14 +609,14 @@ export default function SubscriptionPage() {
 							</FieldGroup>
 							{grantSuccess ? (
 								<Alert>
-									<AlertTitle>Credits updated</AlertTitle>
-									<AlertDescription className="tabular-nums">
-										Remaining credits:{" "}
-										<strong>
-											{usageMetricLabel(grantSuccess.remaining_credits)}
-										</strong>{" "}
-										(limit {usageMetricLabel(grantSuccess.credits_limit)}, used{" "}
-										{usageMetricLabel(grantSuccess.credits_used)}).
+									<AlertTitle>Subscription updated</AlertTitle>
+									<AlertDescription className="space-y-1">
+										<p>
+											Status: <strong>{grantSuccess.status}</strong>
+										</p>
+										<p className="font-mono text-xs text-muted-foreground">
+											Subscription ID: {grantSuccess.id}
+										</p>
 									</AlertDescription>
 								</Alert>
 							) : null}
