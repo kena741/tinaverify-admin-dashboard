@@ -5,7 +5,11 @@ import {
 } from "@reduxjs/toolkit/query/react";
 import type { FetchBaseQueryError } from "@reduxjs/toolkit/query";
 import { getStoredRefreshToken, refreshAccessToken } from "./authTokens";
-import { backendBaseUrl } from "./backendUrl";
+import {
+	backendBaseUrl,
+	BACKEND_NOT_CONFIGURED_MESSAGE,
+	isBackendConfigured,
+} from "./backendUrl";
 
 /** API surface is defined in `src/services/openapi.json` (synced from the backend). */
 
@@ -39,6 +43,16 @@ export const backendBaseQuery: BaseQueryFn<
 	unknown,
 	FetchBaseQueryError
 > = async (args, api, extraOptions) => {
+	if (!isBackendConfigured) {
+		return {
+			error: {
+				status: "CUSTOM_ERROR",
+				error: "Backend not configured",
+				data: BACKEND_NOT_CONFIGURED_MESSAGE,
+			} as FetchBaseQueryError,
+		};
+	}
+
 	let result = await rawBaseQuery(args, api, extraOptions);
 
 	if (

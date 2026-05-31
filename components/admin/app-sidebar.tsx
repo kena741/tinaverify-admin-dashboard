@@ -46,6 +46,7 @@ const systemAdminNavigation: {
 	href: string;
 	icon: LucideIcon;
 }[] = [
+	{ name: "Dashboard", href: "/admin/dashboard", icon: LayoutDashboard },
 	{ name: "Business", href: "/admin/business", icon: Building2 },
 	{ name: "Transactions", href: "/admin/transactions", icon: CreditCard },
 	{ name: "Subscription", href: "/admin/subscription", icon: Wallet },
@@ -58,7 +59,7 @@ const branchAdminNavigation: {
 	href: string;
 	icon: LucideIcon;
 }[] = [
-	{ name: "Dashboard", href: "/admin", icon: LayoutDashboard },
+	{ name: "Dashboard", href: "/admin/dashboard", icon: LayoutDashboard },
 	{ name: "Branch", href: "/admin/branches/", icon: MapPin },
 	{ name: "Orders", href: "/admin/orders", icon: ClipboardList },
 	{ name: "Menu", href: "/admin/menu", icon: UtensilsCrossed },

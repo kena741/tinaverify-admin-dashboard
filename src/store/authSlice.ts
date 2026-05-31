@@ -12,6 +12,7 @@ import {
 	setStoredTokens,
 	refreshAccessToken,
 } from "../services/authTokens";
+import { BACKEND_HTML_RESPONSE_MESSAGE } from "../services/backendUrl";
 
 /** UI user shape (matches former `AuthContext` model). */
 export interface AuthUser {
@@ -53,22 +54,34 @@ export function backendUserToUser(u: UserOutput): AuthUser {
 }
 
 function messageFromLoginError(error: unknown): string {
-	if (
-		typeof error === "object" &&
-		error !== null &&
-		"data" in error &&
-		(error as { data?: { detail?: unknown; message?: unknown } }).data
-	) {
-		const data = (error as { data: { detail?: unknown; message?: unknown } })
-			.data;
-		if (typeof data.detail === "string") return data.detail;
-		if (typeof data.message === "string") return data.message;
-	}
 	if (typeof error === "object" && error !== null) {
 		const e = error as Record<string, unknown>;
-		if (typeof e.error === "string") return e.error;
-		if (typeof e.message === "string") return e.message;
+
+		if (e.status === "PARSING_ERROR") {
+			return BACKEND_HTML_RESPONSE_MESSAGE;
+		}
+
+		if (typeof e.data === "string" && e.data.length > 0) {
+			return e.data;
+		}
+
+		if ("data" in e && e.data && typeof e.data === "object") {
+			const data = e.data as { detail?: unknown; message?: unknown };
+			if (typeof data.detail === "string") return data.detail;
+			if (typeof data.message === "string") return data.message;
+		}
+
+		if (typeof e.error === "string" && e.error.length > 0) return e.error;
+		if (typeof e.message === "string" && e.message.length > 0) return e.message;
 	}
+
+	if (error instanceof Error) {
+		if (error.message.includes("<!DOCTYPE")) {
+			return BACKEND_HTML_RESPONSE_MESSAGE;
+		}
+		return error.message;
+	}
+
 	return "Login failed";
 }
 
