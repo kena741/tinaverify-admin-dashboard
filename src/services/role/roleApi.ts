@@ -5,6 +5,7 @@ import { getStoredAccessToken } from "../authTokens";
 import { backendBaseQuery } from "../baseQuery";
 import type {
 	AssignPermissionRequest,
+	PermissionCreateRequest,
 	PermissionOutput,
 	RoleCreateRequest,
 	RoleOutput,
@@ -23,8 +24,40 @@ function bearerHeaders(accessToken?: string | null) {
 export const roleApi = createApi({
 	reducerPath: "roleApi",
 	baseQuery: backendBaseQuery,
-	tagTypes: ["Role", "RolePermissions"],
+	tagTypes: ["Role", "RolePermissions", "Permission"],
 	endpoints: (builder) => ({
+		/** `GET /api/v1/permissions` */
+		listPermissions: builder.query<PermissionOutput[], void>({
+			query: () => ({
+				url: "/api/v1/permissions",
+				headers: bearerHeaders(),
+			}),
+			providesTags: (result) =>
+				result
+					? [
+							{ type: "Permission" as const, id: "LIST" },
+							...result.map((p) => ({
+								type: "Permission" as const,
+								id: p.id,
+							})),
+						]
+					: [{ type: "Permission" as const, id: "LIST" }],
+		}),
+
+		/** `POST /api/v1/permissions` */
+		createPermission: builder.mutation<
+			PermissionOutput,
+			{ body: PermissionCreateRequest }
+		>({
+			query: ({ body }) => ({
+				url: "/api/v1/permissions",
+				method: "POST",
+				body,
+				headers: bearerHeaders(),
+			}),
+			invalidatesTags: [{ type: "Permission", id: "LIST" }],
+		}),
+
 		/** `GET /api/v1/roles/admin` */
 		listRoles: builder.query<RoleOutput[], void>({
 			query: () => ({
@@ -137,6 +170,8 @@ export const roleApi = createApi({
 });
 
 export const {
+	useListPermissionsQuery,
+	useCreatePermissionMutation,
 	useListRolesQuery,
 	useListRolesByBusinessQuery,
 	useCreateRoleMutation,

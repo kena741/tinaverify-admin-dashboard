@@ -21,11 +21,12 @@ import {
 	SelectContent,
 	SelectItem,
 	SelectTrigger,
-	SelectValue,
 } from "@/components/ui/select";
 import { useListAllBusinessesQuery } from "../../../services/branch-management/branchManagementApi";
 import { useGetUserByIdQuery } from "../../../services/auth/authApi";
 import type { BusinessOutput } from "../../../services/types";
+import { PageHeader } from "@/components/admin/page-header";
+import { getBusinessStatusLabel } from "@/lib/filter-labels";
 import { formatUserDisplayName } from "@/lib/userDisplay";
 
 type BusinessStatusFilter = "all" | "active" | "inactive" | "archived";
@@ -57,12 +58,10 @@ export default function BusinessesPage() {
 
 	return (
 		<div className="flex flex-col gap-6">
-			<div className="flex flex-col gap-1">
-				<h1 className="text-2xl font-semibold tracking-tight">Businesses</h1>
-				<p className="text-sm text-muted-foreground">
-					List all businesses registered in the platform.
-				</p>
-			</div>
+			<PageHeader
+				title="Businesses"
+				description="List all businesses registered in the platform."
+			/>
 
 			<Card>
 				<CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -82,7 +81,9 @@ export default function BusinessesPage() {
 							}
 						>
 							<SelectTrigger aria-label="Filter businesses by status" className="sm:w-48">
-								<SelectValue placeholder="Filter status" />
+								<span className="flex flex-1 truncate text-left">
+									{getBusinessStatusLabel(statusFilter)}
+								</span>
 							</SelectTrigger>
 							<SelectContent>
 								<SelectItem value="all">All</SelectItem>

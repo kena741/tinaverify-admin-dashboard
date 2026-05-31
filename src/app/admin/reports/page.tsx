@@ -11,7 +11,7 @@ export default function ReportsPage() {
     { restaurant: "Addis Café", branch: "Bole Branch", revenue: 1250000, transactions: 2847, successRate: 98.5 },
     { restaurant: "Blue Nile Hotel", branch: "Main Branch", revenue: 980000, transactions: 2156, successRate: 97.2 },
     { restaurant: "Kaldi's Coffee", branch: "Meskel Square", revenue: 750000, transactions: 1892, successRate: 96.8 },
-    { restaurant: "Habesha Restaurant", branch: "Main Branch", revenue: 620000, transactions: 1456, successRate: 95.4 },
+    { restaurant: "Habesha Group", branch: "Main Branch", revenue: 620000, transactions: 1456, successRate: 95.4 },
     { restaurant: "Tomoca", branch: "Piazza Branch", revenue: 450000, transactions: 1234, successRate: 94.1 },
   ];
 
@@ -42,7 +42,7 @@ export default function ReportsPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Reports & Analytics</h1>
-          <p className="mt-1 text-sm text-gray-500">View detailed reports and analytics for your restaurants</p>
+          <p className="mt-1 text-sm text-gray-500">View detailed reports and analytics for payment receipt verification</p>
         </div>
         <div className="flex items-center space-x-2">
           <button
@@ -85,11 +85,11 @@ export default function ReportsPage() {
             onChange={(e) => setRestaurantFilter(e.target.value)}
             className="px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
-            <option value="all">All Restaurants</option>
+            <option value="all">All businesses</option>
             <option value="addis">Addis Café</option>
             <option value="bluenile">Blue Nile Hotel</option>
             <option value="kaldi">Kaldi's Coffee</option>
-            <option value="habesha">Habesha Restaurant</option>
+            <option value="habesha">Habesha Group</option>
             <option value="tomoca">Tomoca</option>
           </select>
           <select
@@ -153,7 +153,7 @@ export default function ReportsPage() {
 
       {/* Revenue by Restaurant/Branch */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-6">Revenue by Restaurant/Branch</h2>
+        <h2 className="text-lg font-semibold text-gray-900 mb-6">Revenue by business/branch</h2>
         <div className="space-y-4">
           {revenueData.map((item, index) => (
             <div key={index}>

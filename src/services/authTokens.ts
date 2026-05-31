@@ -1,10 +1,7 @@
-const BACKEND_ORIGIN = process.env.NEXT_PUBLIC_BACKEND_BASE_URL!.replace(
-	/\/$/,
-	"",
-);
+import { backendBaseUrl } from "./backendUrl";
 
-export const AUTH_ACCESS_TOKEN_KEY = "zuludine_access_token";
-export const AUTH_REFRESH_TOKEN_KEY = "zuludine_refresh_token";
+export const AUTH_ACCESS_TOKEN_KEY = "zuluverify_access_token";
+export const AUTH_REFRESH_TOKEN_KEY = "zuluverify_refresh_token";
 
 export function getStoredAccessToken(): string | null {
 	if (typeof window === "undefined") return null;
@@ -44,7 +41,7 @@ export async function refreshAccessToken(): Promise<boolean> {
 			return false;
 		}
 		try {
-			const url = `${BACKEND_ORIGIN}/api/v1/users/refresh-token?refresh_token=${encodeURIComponent(refresh)}`;
+			const url = `${backendBaseUrl}/api/v1/users/refresh-token?refresh_token=${encodeURIComponent(refresh)}`;
 			const res = await fetch(url, {
 				method: "POST",
 				headers: { Accept: "application/json" },

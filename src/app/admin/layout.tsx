@@ -3,7 +3,13 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import {
+	BellIcon,
+	LogOutIcon,
+	SearchIcon,
+} from "lucide-react";
 
+import { AdminShellLoading } from "@/components/admin/admin-shell-loading";
 import { AppSidebar } from "@/components/admin/app-sidebar";
 import { ModeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
@@ -35,34 +41,30 @@ export default function AdminLayout({
 	}, [user, router, sessionPending]);
 
 	if (sessionPending || !user) {
-		return null;
+		return <AdminShellLoading />;
 	}
-
-	const handleLogout = () => {
-		logout();
-	};
 
 	const notifications = [
 		{
 			id: 1,
-			message: "Payment failed at Addis Café - Table 5",
+			message: "Payment failed at Addis Café — Table 5",
 			time: "2 min ago",
 			read: false,
-			type: "error",
+			type: "error" as const,
 		},
 		{
 			id: 2,
-			message: "New restaurant registered: Habesha Restaurant",
+			message: "New business registered: Habesha Group",
 			time: "15 min ago",
 			read: false,
-			type: "info",
+			type: "info" as const,
 		},
 		{
 			id: 3,
 			message: "Telebirr connection restored at Blue Nile Hotel",
 			time: "1 hour ago",
 			read: true,
-			type: "success",
+			type: "success" as const,
 		},
 	];
 
@@ -82,34 +84,22 @@ export default function AdminLayout({
 				userEmail={userEmail}
 				roleLabel={roleLabel}
 			/>
-			<SidebarInset>
-				<header className="sticky top-0 z-10 flex h-16 shrink-0 items-center gap-4 border-b bg-background px-4">
-					<SidebarTrigger />
-					<div className="flex flex-1 items-center gap-4">
-						<div className="relative max-w-lg flex-1">
-							<Input
-								type="search"
-								placeholder="Search..."
-								className="bg-background pl-9"
-								aria-label="Search"
-							/>
-							<svg
-								className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
-								fill="none"
-								stroke="currentColor"
-								viewBox="0 0 24 24"
-								aria-hidden
-							>
-								<path
-									strokeLinecap="round"
-									strokeLinejoin="round"
-									strokeWidth={2}
-									d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-								/>
-							</svg>
-						</div>
+			<SidebarInset className="bg-muted/30">
+				<header className="sticky top-0 z-10 flex h-14 shrink-0 items-center gap-3 border-b border-border/80 bg-background/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+					<SidebarTrigger className="-ml-1" />
+					<div className="relative max-w-md flex-1">
+						<SearchIcon
+							className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
+							aria-hidden
+						/>
+						<Input
+							type="search"
+							placeholder="Search…"
+							className="h-9 bg-muted/50 pl-9"
+							aria-label="Search"
+						/>
 					</div>
-					<div className="flex items-center gap-4">
+					<div className="flex items-center gap-1">
 						<ModeToggle />
 						<div className="relative">
 							<Button
@@ -121,68 +111,51 @@ export default function AdminLayout({
 								aria-expanded={notificationsOpen}
 								aria-label="Notifications"
 							>
-								<svg
-									className="size-6"
-									fill="none"
-									stroke="currentColor"
-									viewBox="0 0 24 24"
-								>
-									<path
-										strokeLinecap="round"
-										strokeLinejoin="round"
-										strokeWidth={2}
-										d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
-									/>
-								</svg>
+								<BellIcon />
 								{unreadCount > 0 && (
-									<span className="absolute top-1 right-1 size-2 rounded-full bg-destructive ring-2 ring-background" />
+									<span className="absolute top-1.5 right-1.5 size-2 rounded-full bg-destructive ring-2 ring-background" />
 								)}
 							</Button>
 
 							{notificationsOpen && (
-								<div className="absolute right-0 z-50 mt-2 w-80 rounded-lg border bg-popover text-popover-foreground shadow-lg">
-									<div className="border-b p-4">
-										<div className="flex items-center justify-between gap-2">
-											<h3 className="text-lg font-semibold">Notifications</h3>
-											<Button variant="link" className="h-auto p-0 text-sm">
-												Mark all read
-											</Button>
-										</div>
+								<div className="absolute right-0 z-50 mt-2 w-80 overflow-hidden rounded-xl border bg-popover text-popover-foreground shadow-lg">
+									<div className="flex items-center justify-between gap-2 border-b px-4 py-3">
+										<h3 className="font-semibold">Notifications</h3>
+										<Button variant="link" className="h-auto p-0 text-xs">
+											Mark all read
+										</Button>
 									</div>
 									<div className="max-h-96 overflow-y-auto">
 										{notifications.map((notification) => (
 											<div
 												key={notification.id}
-												className={`cursor-pointer border-b p-4 last:border-b-0 hover:bg-muted/50 ${
-													!notification.read ? "bg-accent/30" : ""
+												className={`cursor-pointer border-b px-4 py-3 last:border-b-0 hover:bg-muted/50 ${
+													!notification.read ? "bg-accent/40" : ""
 												}`}
 											>
 												<div className="flex gap-3">
 													<div
-														className={`mt-2 size-2 shrink-0 rounded-full ${
+														className={`mt-1.5 size-2 shrink-0 rounded-full ${
 															notification.type === "error"
 																? "bg-destructive"
 																: notification.type === "success"
-																	? "bg-green-500"
-																	: "bg-primary"
+																	? "bg-primary"
+																	: "bg-chart-3"
 														}`}
 													/>
 													<div className="min-w-0 flex-1">
-														<p className="text-sm">{notification.message}</p>
+														<p className="text-sm leading-snug">
+															{notification.message}
+														</p>
 														<p className="mt-1 text-xs text-muted-foreground">
 															{notification.time}
 														</p>
 													</div>
-													{!notification.read && (
-														<div className="shrink-0">
-															<div className="size-2 rounded-full bg-primary" />
-														</div>
-													)}
 												</div>
 											</div>
 										))}
 									</div>
-									<div className="border-t p-4 text-center">
+									<div className="border-t px-4 py-3 text-center">
 										<Link
 											href="/admin/notifications"
 											className="text-sm font-medium text-primary hover:underline"
@@ -194,16 +167,12 @@ export default function AdminLayout({
 							)}
 						</div>
 
-						<div className="hidden items-center gap-3 sm:flex">
+						<div className="ml-1 hidden items-center gap-2.5 rounded-full border bg-muted/40 py-1 pr-1 pl-3 sm:flex">
 							<div className="text-right">
-								<p className="text-sm font-medium">{userName}</p>
-								<p className="text-xs text-muted-foreground">
-									{isSystemAdmin()
-										? "System Administrator"
-										: user?.branchName || "Branch Staff"}
-								</p>
+								<p className="text-sm font-medium leading-none">{userName}</p>
+								<p className="mt-0.5 text-xs text-muted-foreground">{roleLabel}</p>
 							</div>
-							<div className="flex size-10 items-center justify-center rounded-full bg-primary text-sm font-semibold text-primary-foreground">
+							<div className="flex size-8 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">
 								{userName
 									.split(" ")
 									.map((n) => n[0])
@@ -212,33 +181,24 @@ export default function AdminLayout({
 									.toUpperCase() || "U"}
 							</div>
 						</div>
+
 						<Button
 							type="button"
 							variant="ghost"
 							size="icon"
 							className="text-muted-foreground"
-							onClick={handleLogout}
-							title="Logout"
-							aria-label="Logout"
+							onClick={() => logout()}
+							title="Sign out"
+							aria-label="Sign out"
 						>
-							<svg
-								className="size-5"
-								fill="none"
-								stroke="currentColor"
-								viewBox="0 0 24 24"
-							>
-								<path
-									strokeLinecap="round"
-									strokeLinejoin="round"
-									strokeWidth={2}
-									d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
-								/>
-							</svg>
+							<LogOutIcon />
 						</Button>
 					</div>
 				</header>
 
-				<div className="flex flex-1 flex-col gap-4 p-4 sm:p-6 lg:p-8">{children}</div>
+				<main className="flex flex-1 flex-col gap-6 p-4 sm:p-6 lg:p-8">
+					{children}
+				</main>
 			</SidebarInset>
 		</SidebarProvider>
 	);

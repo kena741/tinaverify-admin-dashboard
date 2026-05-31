@@ -1,4 +1,4 @@
-const STORAGE_KEY = "zuludine_business_ids";
+const STORAGE_KEY = "zuluverify_business_ids";
 
 export function getStoredBusinessIds(): string[] {
 	if (typeof window === "undefined") return [];

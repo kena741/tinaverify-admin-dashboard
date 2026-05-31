@@ -4,21 +4,23 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { LucideIcon } from "lucide-react";
 import {
-	Wallet,
-	CircleDollarSign,
 	BadgeCheck,
 	Bell,
 	Building2,
+	CircleDollarSign,
 	ClipboardList,
 	CreditCard,
-	LayoutDashboard,
+	ShieldCheck,
 	Landmark,
+	LayoutDashboard,
 	MapPin,
 	TableProperties,
 	UtensilsCrossed,
 	Users,
+	Wallet,
 } from "lucide-react";
 
+import { BrandLogo } from "@/components/brand-logo";
 import {
 	Sidebar,
 	SidebarContent,
@@ -34,7 +36,6 @@ import {
 } from "@/components/ui/sidebar";
 import { cn } from "@/lib/utils";
 
-/** Normalize for comparing app paths (trailing slashes). */
 function normalizePath(p: string) {
 	if (p === "/") return p;
 	return p.replace(/\/$/, "") || "/";
@@ -45,20 +46,11 @@ const systemAdminNavigation: {
 	href: string;
 	icon: LucideIcon;
 }[] = [
-	// { name: "Dashboard", href: "/admin", icon: LayoutDashboard },
-	// { name: "Orders", href: "/admin/orders", icon: ClipboardList },
 	{ name: "Business", href: "/admin/business", icon: Building2 },
-	// { name: "Branch", href: "/admin/branches/", icon: MapPin },
-	// { name: "Staff", href: "/admin/staff", icon: Users },
-	// { name: "Menu", href: "/admin/menu", icon: UtensilsCrossed },
-	// { name: "Tables", href: "/admin/tables", icon: TableProperties },
-	// { name: "Bank Accounts", href: "/admin/bank-accounts", icon: Landmark },
 	{ name: "Transactions", href: "/admin/transactions", icon: CreditCard },
-	{ name: "Subscription", href: "/admin/subscription", icon: 	Wallet },
-	{name: "Plans", href: "/admin/plans", icon: CircleDollarSign},
-	// { name: "Notifications", href: "/admin/notifications", icon: Bell },
-	// { name: "Reports", href: "/admin/reports", icon: BarChart3 },
-	// { name: "Settings", href: "/admin/settings", icon: Settings },
+	{ name: "Subscription", href: "/admin/subscription", icon: Wallet },
+	{ name: "Plans", href: "/admin/plans", icon: CircleDollarSign },
+	{ name: "Roles", href: "/admin/roles", icon: ShieldCheck },
 ];
 
 const branchAdminNavigation: {
@@ -104,16 +96,14 @@ export function AppSidebar({
 			.toUpperCase() || "U";
 
 	return (
-		<Sidebar collapsible="offcanvas">
-			<SidebarHeader className="border-b border-sidebar-border px-4 py-4">
-				<span className="text-xl font-semibold tracking-tight text-sidebar-foreground">
-					Zuludine
-				</span>
+		<Sidebar collapsible="offcanvas" className="border-r-0">
+			<SidebarHeader className="border-b border-sidebar-border px-4 py-5">
+				<BrandLogo />
 			</SidebarHeader>
-			<SidebarContent>
-				<SidebarGroup className="px-1">
+			<SidebarContent className="px-2 py-3">
+				<SidebarGroup>
 					<SidebarGroupContent>
-						<SidebarMenu className="gap-1">
+						<SidebarMenu className="gap-0.5">
 							{navigation.map((item) => {
 								const path = pathname ?? "";
 								const itemBase = normalizePath(item.href);
@@ -128,13 +118,12 @@ export function AppSidebar({
 									<SidebarMenuItem key={item.name}>
 										<SidebarMenuButton
 											isActive={isActive}
-											size="lg"
+											size="default"
 											tooltip={item.name}
 											className={cn(
-												"h-11 min-h-11 gap-3 text-base leading-snug transition-colors duration-150 [&_svg]:size-5",
-												isActive
-													? "hover:bg-sidebar-primary hover:text-sidebar-primary-foreground font-semibold shadow-sm data-active:bg-sidebar-primary data-active:text-sidebar-primary-foreground"
-													: "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+												"h-10 gap-3 transition-colors duration-150",
+												isActive &&
+													"bg-sidebar-primary font-medium text-sidebar-primary-foreground shadow-sm hover:bg-sidebar-primary hover:text-sidebar-primary-foreground data-active:bg-sidebar-primary data-active:text-sidebar-primary-foreground",
 											)}
 											render={
 												<Link
@@ -155,17 +144,18 @@ export function AppSidebar({
 					</SidebarGroupContent>
 				</SidebarGroup>
 			</SidebarContent>
-			<SidebarFooter className="border-t border-sidebar-border">
-				<div className="flex items-center gap-3 px-2 py-2">
-					<div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-sidebar-primary text-sidebar-primary-foreground text-sm font-semibold">
+			<SidebarFooter className="border-t border-sidebar-border p-3">
+				<div className="flex items-center gap-3 rounded-lg bg-sidebar-accent/60 p-2.5">
+					<div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-sidebar-primary text-xs font-semibold text-sidebar-primary-foreground">
 						{initials}
 					</div>
 					<div className="min-w-0 flex-1">
-						<p className="truncate text-base font-medium text-sidebar-foreground">
+						<p className="truncate text-sm font-medium text-sidebar-foreground">
 							{userName}
 						</p>
-						<p className="truncate text-sm text-muted-foreground">{userEmail}</p>
-						<p className="truncate text-sm text-muted-foreground">{roleLabel}</p>
+						<p className="truncate text-xs text-sidebar-foreground/65">
+							{userEmail || roleLabel}
+						</p>
 					</div>
 				</div>
 			</SidebarFooter>

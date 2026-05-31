@@ -1,10 +1,11 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { Loader2Icon, LogInIcon } from "lucide-react";
+import { Loader2Icon } from "lucide-react";
 
+import { BrandLogo } from "@/components/brand-logo";
+import { BRAND_DESCRIPTION, BRAND_TAGLINE } from "@/lib/brand";
 import { useAuth } from "../../store/useAuth";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -17,6 +18,7 @@ import {
 } from "@/components/ui/card";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { InputGroup, InputGroupInput } from "@/components/ui/input-group";
+import { Separator } from "@/components/ui/separator";
 
 export default function LoginPage() {
 	const router = useRouter();
@@ -29,7 +31,7 @@ export default function LoginPage() {
 
 	const handleLogin = async (e: React.FormEvent) => {
 		e.preventDefault();
-		setError(authError || "");
+		setError("");
 
 		const success = await login(emailOrPhone, password);
 
@@ -44,103 +46,100 @@ export default function LoginPage() {
 	};
 
 	return (
-		<div className="grid min-h-svh grid-cols-1 bg-background lg:grid-cols-2">
-			<div className="hidden bg-muted lg:block" aria-hidden="true" />
-
-			<div className="flex items-center justify-center px-4 py-10">
-				<div className="w-full max-w-md">
-					<div className="mb-6 text-center">
-						<Link href="/" className="inline-flex items-center justify-center">
-							<span className="text-pretty text-2xl font-semibold">
-								Zuludine
-							</span>
-						</Link>
-						<p className="mt-2 text-sm text-muted-foreground">
-							Sign in to access your dashboard.
-						</p>
-					</div>
-
-					<Card>
-						<CardHeader className="flex flex-col items-center gap-2">
-							<CardTitle className="flex items-center gap-2">
-								Welcome to Zuludine
-							</CardTitle>
-							<CardDescription>
-								Your all in one solution for your business.
-							</CardDescription>
-						</CardHeader>
-						<CardContent className="flex flex-col gap-5">
-							{uiError && (
-								<Alert variant="destructive" aria-live="polite">
-									<AlertTitle>Login Failed</AlertTitle>
-									<AlertDescription>
-										<div className="flex flex-col gap-2">
-											<div>{uiError}</div>
-											{uiError.includes("confirm") && (
-												<div className="text-sm">
-													Check your email inbox (and spam folder) for the
-													confirmation link.
-												</div>
-											)}
-										</div>
-									</AlertDescription>
-								</Alert>
-							)}
-
-							<form onSubmit={handleLogin} className="flex flex-col gap-5">
-								<FieldGroup>
-									<Field>
-										<FieldLabel htmlFor="emailOrPhone">
-											Email or Phone
-										</FieldLabel>
-										<InputGroup>
-											<InputGroupInput
-												id="emailOrPhone"
-												name="username"
-												type="text"
-												inputMode="email"
-												autoComplete="username"
-												spellCheck={false}
-												required
-												placeholder="name@company.com or +251911234567…"
-												value={emailOrPhone}
-												onChange={(e) => setEmailOrPhone(e.target.value)}
-											/>
-										</InputGroup>
-									</Field>
-
-									<Field>
-										<FieldLabel htmlFor="password">Password</FieldLabel>
-										<InputGroup>
-											<InputGroupInput
-												id="password"
-												name="password"
-												type="password"
-												autoComplete="current-password"
-												required
-												placeholder="Enter your password…"
-												value={password}
-												onChange={(e) => setPassword(e.target.value)}
-											/>
-										</InputGroup>
-									</Field>
-								</FieldGroup>
-
-								<Button type="submit" disabled={authLoading}>
-									{authLoading && (
-										<Loader2Icon
-											data-icon="inline-start"
-											className="animate-spin"
-											aria-hidden="true"
-										/>
-									)}
-									{authLoading ? "Signing in…" : "Sign In"}
-								</Button>
-							</form>
-						</CardContent>
-					</Card>
-				</div>
+		<div className="flex min-h-svh flex-col items-center justify-center bg-background px-4 py-10 sm:px-8">
+			<div className="mb-8 flex max-w-md flex-col items-center gap-3 text-center">
+				<BrandLogo showTagline />
+				<p className="text-pretty text-sm leading-relaxed text-muted-foreground">
+					{BRAND_DESCRIPTION}
+				</p>
 			</div>
+
+			<Card className="w-full max-w-md border-border/80 shadow-lg">
+				<CardHeader className="flex flex-col gap-1.5 pb-2">
+					<p className="text-xs font-medium tracking-wide text-primary uppercase">
+						{BRAND_TAGLINE}
+					</p>
+					<CardTitle className="text-xl">Sign in</CardTitle>
+					<CardDescription>
+						Access your dashboard to review receipts, verify payments, and
+						manage operations.
+					</CardDescription>
+				</CardHeader>
+				<CardContent className="flex flex-col gap-5">
+					{uiError && (
+						<Alert variant="destructive" aria-live="polite">
+							<AlertTitle>Sign in failed</AlertTitle>
+							<AlertDescription>
+								<div className="flex flex-col gap-2">
+									<div>{uiError}</div>
+									{uiError.includes("confirm") && (
+										<p className="text-sm">
+											Check your email inbox (and spam folder) for the
+											confirmation link.
+										</p>
+									)}
+								</div>
+							</AlertDescription>
+						</Alert>
+					)}
+
+					<form onSubmit={handleLogin} className="flex flex-col gap-5">
+						<FieldGroup>
+							<Field>
+								<FieldLabel htmlFor="emailOrPhone">Email or phone</FieldLabel>
+								<InputGroup>
+									<InputGroupInput
+										id="emailOrPhone"
+										name="username"
+										type="text"
+										inputMode="email"
+										autoComplete="username"
+										spellCheck={false}
+										required
+										placeholder="name@company.com or +251911234567"
+										value={emailOrPhone}
+										onChange={(e) => setEmailOrPhone(e.target.value)}
+									/>
+								</InputGroup>
+							</Field>
+
+							<Field>
+								<FieldLabel htmlFor="password">Password</FieldLabel>
+								<InputGroup>
+									<InputGroupInput
+										id="password"
+										name="password"
+										type="password"
+										autoComplete="current-password"
+										required
+										placeholder="Enter your password"
+										value={password}
+										onChange={(e) => setPassword(e.target.value)}
+									/>
+								</InputGroup>
+							</Field>
+						</FieldGroup>
+
+						<Button type="submit" size="lg" disabled={authLoading}>
+							{authLoading && (
+								<Loader2Icon
+									data-icon="inline-start"
+									className="animate-spin"
+									aria-hidden
+								/>
+							)}
+							{authLoading ? "Signing in…" : "Sign in"}
+						</Button>
+					</form>
+
+					<Separator />
+
+					<p className="text-center text-sm text-muted-foreground">
+						Need access to {BRAND_TAGLINE.toLowerCase()}? Contact your
+						administrator.
+					</p>
+				</CardContent>
+			</Card>
 		</div>
 	);
 }

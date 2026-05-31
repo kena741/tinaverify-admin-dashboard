@@ -595,7 +595,7 @@ export default function BankAccountsPage() {
 											account_name: undefined,
 										}));
 									}}
-									placeholder="Zuludine Operations"
+									placeholder="Zulu Verify Operations"
 									autoComplete="off"
 									aria-invalid={Boolean(createValidation.account_name)}
 								/>

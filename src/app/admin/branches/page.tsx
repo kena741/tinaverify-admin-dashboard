@@ -17,6 +17,7 @@ import {
 } from "../../../services/branch-management/branchManagementApi";
 import { getStoredAccessToken } from "../../../services/authTokens";
 import { branchFromOutput, type Branch } from "../../../services/types";
+import { getBusinessFilterLabel } from "@/lib/filter-labels";
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -213,6 +214,11 @@ export default function BranchesPage() {
 	const activeCount = branches.filter((b) => b.active).length;
 	const businessCount = myBusinesses.length;
 
+	const businessFilterLabel = useMemo(
+		() => getBusinessFilterLabel(restaurantFilter, myBusinesses),
+		[restaurantFilter, myBusinesses],
+	);
+
 	const loadError = queryError
 		? getErrorMessage(queryError, "Failed to load branches.")
 		: null;
@@ -390,7 +396,9 @@ export default function BranchesPage() {
 									id="branches-business-filter"
 									className="h-10 w-full min-h-10 data-[size=default]:h-10"
 								>
-									<SelectValue placeholder="All businesses" />
+									<span className="flex flex-1 truncate text-left">
+										{businessFilterLabel}
+									</span>
 								</SelectTrigger>
 								<SelectContent>
 									<SelectGroup>

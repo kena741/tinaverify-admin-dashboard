@@ -1,4 +1,4 @@
-import { backendBaseUrl } from "./baseQuery";
+import { backendBaseUrl } from "./backendUrl";
 import {
 	getStoredAccessToken,
 	getStoredRefreshToken,

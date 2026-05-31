@@ -5,11 +5,9 @@ import {
 } from "@reduxjs/toolkit/query/react";
 import type { FetchBaseQueryError } from "@reduxjs/toolkit/query";
 import { getStoredRefreshToken, refreshAccessToken } from "./authTokens";
+import { backendBaseUrl } from "./backendUrl";
 
 /** API surface is defined in `src/services/openapi.json` (synced from the backend). */
-const BACKEND_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_BASE_URL!;
-
-export const backendBaseUrl = BACKEND_BASE_URL.replace(/\/$/, "");
 
 const rawBaseQuery = fetchBaseQuery({
 	baseUrl: backendBaseUrl,

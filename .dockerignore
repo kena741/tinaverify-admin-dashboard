@@ -18,4 +18,4 @@ out
 # misc
 coverage
 .turbo
-pnpm-debug.log*
+npm-debug.log*

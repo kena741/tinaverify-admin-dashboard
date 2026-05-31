@@ -9,7 +9,7 @@ export default function NotificationsPage() {
     { id: 1, type: "payment_failure", message: "Payment failed at Addis Café - Bole, Table 5. Amount: ETB 450", time: "2 minutes ago", read: false, critical: true },
     { id: 2, type: "telebirr_error", message: "Telebirr connection error at Blue Nile Hotel. Retrying connection...", time: "15 minutes ago", read: false, critical: true },
     { id: 3, type: "staff_login", message: "Waiter John Doe logged in at Addis Café - Bole", time: "1 hour ago", read: true, critical: false },
-    { id: 4, type: "restaurant_added", message: "New restaurant 'Habesha Restaurant' added to the platform", time: "2 hours ago", read: true, critical: false },
+    { id: 4, type: "business_added", message: "New business 'Habesha Group' added to the platform", time: "2 hours ago", read: true, critical: false },
     { id: 5, type: "branch_activated", message: "Branch 'Kaldi's Coffee - Meskel' has been activated", time: "3 hours ago", read: true, critical: false },
     { id: 6, type: "payment_failure", message: "Payment failed at Tomoca - Piazza, Table 2. Amount: ETB 150", time: "4 hours ago", read: true, critical: true },
     { id: 7, type: "telebirr_restored", message: "Telebirr connection restored at Tomoca - Piazza", time: "5 hours ago", read: true, critical: false },

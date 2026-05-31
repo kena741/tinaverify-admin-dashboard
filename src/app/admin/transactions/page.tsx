@@ -23,19 +23,20 @@ import {
 	useUpdateTransactionStatusMutation,
 } from "../../../services/transactions/transactionsApi";
 import type {
+	BranchOutput,
 	BusinessOutput,
 	VerifiedTransactionOutput,
 } from "../../../services/types";
+import {
+	BRANCH_FILTER_ALL,
+	getBranchFilterLabel,
+	getDateRangeLabel,
+	getStatusFilterLabel,
+} from "@/lib/filter-labels";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-	Card,
-	CardContent,
-	CardDescription,
-	CardHeader,
-	CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import {
 	Command,
 	CommandEmpty,
@@ -75,8 +76,6 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/components/ui/table";
-const BRANCH_ALL = "__all__";
-
 type BuiltInDatePreset =
 	| "today"
 	| "last_7_days"
@@ -193,7 +192,7 @@ export default function TransactionsPage() {
 	const [selectedBusinessId, setSelectedBusinessId] = useState<string | null>(
 		null,
 	);
-	const [branchId, setBranchId] = useState<string>(BRANCH_ALL);
+	const [branchId, setBranchId] = useState<string>(BRANCH_FILTER_ALL);
 	const [dateRangePreset, setDateRangePreset] =
 		useState<DateRangePreset>("last_7_days");
 	const [customDateRange, setCustomDateRange] = useState<DateRange | undefined>(
@@ -237,7 +236,7 @@ export default function TransactionsPage() {
 
 	const useBranchEndpoint =
 		selectedBusinessId !== null &&
-		branchId !== BRANCH_ALL &&
+		branchId !== BRANCH_FILTER_ALL &&
 		branchId.length > 0;
 
 	const {
@@ -339,6 +338,11 @@ export default function TransactionsPage() {
 		[businesses, selectedBusinessId],
 	);
 
+	const branchFilterLabel = useMemo(
+		() => getBranchFilterLabel(branchId, branches as BranchOutput[] | undefined),
+		[branchId, branches],
+	);
+
 	const {
 		data: detailTransaction,
 		isLoading: detailLoading,
@@ -387,15 +391,7 @@ export default function TransactionsPage() {
 			) : null}
 
 			<Card>
-				<CardHeader className="flex flex-col gap-1">
-					<CardTitle>Filters</CardTitle>
-					<CardDescription>
-						Choose a business (searchable), then optionally a branch. Use a
-						preset range or open Custom range to pick start and end dates in the
-						calendar.
-					</CardDescription>
-				</CardHeader>
-				<CardContent className="flex flex-col gap-4">
+				<CardContent className="flex flex-col gap-4 pt-6">
 					<div className="flex flex-col gap-4 lg:flex-row lg:flex-wrap lg:items-end">
 						<div className="flex min-w-0 flex-1 flex-col gap-2">
 							<span className="text-sm font-medium" id="business-filter-label">
@@ -447,7 +443,7 @@ export default function TransactionsPage() {
 														value={`${b.name} ${b.tin_number} ${b.id}`}
 														onSelect={() => {
 															setSelectedBusinessId(b.id);
-															setBranchId(BRANCH_ALL);
+															setBranchId(BRANCH_FILTER_ALL);
 															setBusinessPopoverOpen(false);
 														}}
 														className="[&>svg:last-child]:hidden"
@@ -484,10 +480,12 @@ export default function TransactionsPage() {
 									className="h-10 w-full"
 									aria-labelledby="branch-filter-label"
 								>
-									<SelectValue placeholder="All branches" />
+									<span className="flex flex-1 truncate text-left">
+										{branchFilterLabel}
+									</span>
 								</SelectTrigger>
 								<SelectContent>
-									<SelectItem value={BRANCH_ALL}>All branches</SelectItem>
+									<SelectItem value={BRANCH_FILTER_ALL}>All branches</SelectItem>
 									{(branches ?? []).map((br) => (
 										<SelectItem key={br.id} value={br.id}>
 											{br.name}
@@ -540,7 +538,9 @@ export default function TransactionsPage() {
 										className="h-10 w-full sm:min-w-48 sm:flex-1"
 										aria-labelledby="date-filter-label"
 									>
-										<SelectValue />
+										<span className="flex flex-1 truncate text-left">
+											{getDateRangeLabel(dateRangePreset)}
+										</span>
 									</SelectTrigger>
 									<SelectContent>
 										<SelectItem value="today">Today</SelectItem>
@@ -605,7 +605,9 @@ export default function TransactionsPage() {
 									className="h-10 w-full"
 									aria-labelledby="status-filter-label"
 								>
-									<SelectValue placeholder="All statuses" />
+									<span className="flex flex-1 truncate text-left">
+										{getStatusFilterLabel(statusFilter)}
+									</span>
 								</SelectTrigger>
 								<SelectContent>
 									<SelectItem value="all">All statuses</SelectItem>
