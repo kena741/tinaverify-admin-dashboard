@@ -121,27 +121,27 @@ export default function DashboardPage() {
 			{truncatedBusinessFetch ? (
 				<Alert>
 					<AlertDescription>
-						Showing analytics for the first 25 businesses. Narrow scope in
-						Transactions for a specific business if needed.
+						Showing analytics for the first 25 businesses. Use the Transactions
+						page to filter by a specific business.
 					</AlertDescription>
 				</Alert>
 			) : null}
 
 			<div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
 				<StatCard
-					label="Transactions"
+					label="Total verified transactions"
 					value={
-						isLoading ? null : analytics.transactions.length.toLocaleString()
+						isLoading ? null : analytics.successCount.toLocaleString()
 					}
 					icon={CreditCardIcon}
 					loading={isLoading}
 				/>
 				<StatCard
-					label="Total volume"
+					label="Verified amount"
 					value={
 						isLoading
 							? null
-							: formatVolume(analytics.totalVolume, analytics.currency)
+							: formatVolume(analytics.verifiedAmount, analytics.currency)
 					}
 					icon={ReceiptIcon}
 					loading={isLoading}
@@ -285,7 +285,7 @@ export default function DashboardPage() {
 				<CardHeader className="flex flex-row items-center justify-between gap-4">
 					<CardTitle className="text-base">Recent transactions</CardTitle>
 					<Button variant="outline" size="sm" render={<Link href="/admin/transactions" />}>
-						View all
+						View all transactions
 					</Button>
 				</CardHeader>
 				<CardContent>

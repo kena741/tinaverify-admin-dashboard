@@ -42,7 +42,7 @@ export function isSuccessfulStatus(status: string): boolean {
 
 export type DashboardAnalytics = {
 	transactions: VerifiedTransactionOutput[];
-	totalVolume: number;
+	verifiedAmount: number;
 	currency: string | null;
 	successCount: number;
 	failedCount: number;
@@ -66,7 +66,7 @@ export function computeDashboardAnalytics(
 	let successCount = 0;
 	let failedCount = 0;
 	let pendingCount = 0;
-	let totalVolume = 0;
+	let verifiedAmount = 0;
 	let currency: string | null = null;
 
 	const volumeByBusiness = new Map<string, number>();
@@ -77,13 +77,14 @@ export function computeDashboardAnalytics(
 		if (!currency && t.currency) currency = t.currency;
 
 		const amount = parseTransactionAmount(t.amount);
-		totalVolume += amount;
 
 		const statusKey = t.status.toLowerCase();
 		countByStatus.set(statusKey, (countByStatus.get(statusKey) ?? 0) + 1);
 
-		if (isSuccessfulStatus(t.status)) successCount++;
-		else if (statusKey === "failed" || statusKey === "rejected") failedCount++;
+		if (isSuccessfulStatus(t.status)) {
+			successCount++;
+			verifiedAmount += amount;
+		} else if (statusKey === "failed" || statusKey === "rejected") failedCount++;
 		else pendingCount++;
 
 		volumeByBusiness.set(
@@ -114,7 +115,7 @@ export function computeDashboardAnalytics(
 
 	return {
 		transactions,
-		totalVolume,
+		verifiedAmount,
 		currency,
 		successCount,
 		failedCount,
