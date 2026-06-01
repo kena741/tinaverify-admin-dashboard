@@ -4,9 +4,11 @@ import { getStoredAccessToken } from "../authTokens";
 import { backendBaseQuery } from "../baseQuery";
 import type {
 	AdminGrantCreditsRequest,
+	AdminSubscriptionOutput,
 	CustomCheckoutRequest,
 	SubscriptionCheckoutResponse,
 	SubscriptionOutput,
+	SubscriptionStatus,
 	UsageOutput,
 } from "../types";
 
@@ -23,7 +25,12 @@ function bearerHeaders(accessToken?: string | null) {
 export const subscriptionApi = createApi({
 	reducerPath: "subscriptionApi",
 	baseQuery: backendBaseQuery,
-	tagTypes: ["Subscription", "SubscriptionHistory", "SubscriptionUsage"],
+	tagTypes: [
+		"Subscription",
+		"SubscriptionHistory",
+		"SubscriptionUsage",
+		"SubscriptionTransactions",
+	],
 	endpoints: (builder) => ({
 		/** `GET /api/v1/subscriptions/me` */
 		getActiveSubscription: builder.query<
@@ -38,6 +45,29 @@ export const subscriptionApi = createApi({
 			providesTags: (_result, _err, { businessId }) => [
 				{ type: "Subscription" as const, id: businessId },
 			],
+		}),
+
+		/** `GET /api/v1/subscriptions/transactions` — admin subscription history */
+		listAdminSubscriptionTransactions: builder.query<
+			AdminSubscriptionOutput[],
+			{
+				businessId?: string | null;
+				planId?: string | null;
+				status?: SubscriptionStatus | null;
+			} | void
+		>({
+			query: (arg) => {
+				const params: Record<string, string> = {};
+				if (arg?.businessId) params.business_id = arg.businessId;
+				if (arg?.planId) params.plan_id = arg.planId;
+				if (arg?.status) params.status = arg.status;
+				return {
+					url: "/api/v1/subscriptions/transactions",
+					params: Object.keys(params).length > 0 ? params : undefined,
+					headers: bearerHeaders(),
+				};
+			},
+			providesTags: [{ type: "SubscriptionTransactions" as const, id: "LIST" }],
 		}),
 
 		/** `GET /api/v1/subscriptions/history` */
@@ -153,6 +183,7 @@ export const subscriptionApi = createApi({
 export const {
 	useGetActiveSubscriptionQuery,
 	useLazyGetActiveSubscriptionQuery,
+	useListAdminSubscriptionTransactionsQuery,
 	useListSubscriptionHistoryQuery,
 	useGetSubscriptionUsageQuery,
 	useLazyGetSubscriptionUsageQuery,

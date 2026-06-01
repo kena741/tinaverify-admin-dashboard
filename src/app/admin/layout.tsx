@@ -23,6 +23,13 @@ import { useAuth } from "../../store/useAuth";
 import { useAppSelector } from "../../store/hooks";
 import { selectAuthSessionPending } from "../../store/authSlice";
 
+function getUserInitials(name: string): string {
+	const parts = name.trim().split(/\s+/).filter(Boolean);
+	if (parts.length === 0) return "U";
+	if (parts.length === 1) return parts[0].charAt(0).toUpperCase();
+	return `${parts[0].charAt(0)}${parts[parts.length - 1].charAt(0)}`.toUpperCase();
+}
+
 export default function AdminLayout({
 	children,
 }: {
@@ -75,6 +82,7 @@ export default function AdminLayout({
 	const roleLabel = isSystemAdmin()
 		? "System Administrator"
 		: user?.branchName || "Branch Staff";
+	const userInitials = getUserInitials(userName);
 
 	return (
 		<SidebarProvider>
@@ -167,19 +175,12 @@ export default function AdminLayout({
 							)}
 						</div>
 
-						<div className="ml-1 hidden items-center gap-2.5 rounded-full border bg-muted/40 py-1 pr-1 pl-3 sm:flex">
-							<div className="text-right">
-								<p className="text-sm font-medium leading-none">{userName}</p>
-								<p className="mt-0.5 text-xs text-muted-foreground">{roleLabel}</p>
-							</div>
-							<div className="flex size-8 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">
-								{userName
-									.split(" ")
-									.map((n) => n[0])
-									.join("")
-									.substring(0, 2)
-									.toUpperCase() || "U"}
-							</div>
+						<div
+							className="ml-1 flex size-8 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground"
+							title={userName}
+							aria-label={userName}
+						>
+							{userInitials}
 						</div>
 
 						<Button

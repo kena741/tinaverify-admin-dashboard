@@ -336,6 +336,37 @@ export type SubscriptionOutput = {
 	chapa_transaction_reference?: string | null;
 };
 
+/** OpenAPI `SubscriptionStatus` */
+export type SubscriptionStatus =
+	| "pending"
+	| "active"
+	| "expired"
+	| "cancelled"
+	| "insufficient_credits";
+
+/** OpenAPI `SubscriptionBusinessOutputSchema` */
+export type SubscriptionBusinessOutput = {
+	id: UUID;
+	name: string;
+	tin_number: string;
+};
+
+/** OpenAPI `AdminSubscriptionOutputSchema` — `GET /api/v1/subscriptions/transactions` */
+export type AdminSubscriptionOutput = {
+	id: UUID;
+	business_id: UUID;
+	plan_id?: UUID | null;
+	status: string;
+	amount?: number | null;
+	credits_limit: number;
+	started_at?: string | null;
+	ended_at?: string | null;
+	chapa_transaction_reference?: string | null;
+	created_at?: string | null;
+	business?: SubscriptionBusinessOutput | null;
+	plan?: SubscriptionPlanOutput | null;
+};
+
 /** OpenAPI `UsageOutputSchema` */
 export type UsageOutput = {
 	subscription_id: UUID;
