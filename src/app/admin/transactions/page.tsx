@@ -1,9 +1,15 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { format } from "date-fns";
-import { CheckCircle2Icon, XCircleIcon } from "lucide-react";
+import {
+	Building2Icon,
+	CheckCircle2Icon,
+	ClockIcon,
+	MinusCircleIcon,
+	XCircleIcon,
+} from "lucide-react";
 
 import { PageHeader } from "@/components/admin/page-header";
 import { useListAllBusinessesQuery } from "@/services/branch-management/branchManagementApi";
@@ -12,12 +18,14 @@ import { useListSubscriptionPlansQuery } from "@/services/subscription-plan/subs
 import type { AdminSubscriptionOutput } from "@/services/types";
 import {
 	apiStatusForStatusFilter,
+	buildUnsubscribedBusinessRows,
 	BUSINESS_FILTER_ALL,
-	countUniqueBusinesses,
 	getSubscriptionPlanLabel,
 	getSubscriptionStatusFilterLabel,
 	getSubscriptionStatusLabel,
 	PLAN_FILTER_ALL,
+	summarizeBusinessSubscriptionStats,
+	type BusinessSubscriptionStats,
 	type SubscriptionStatusFilter,
 } from "@/lib/subscription-filters";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -87,7 +95,8 @@ function statusBadgeVariant(
 	const s = status.toLowerCase();
 	if (s === "active") return "default";
 	if (s === "pending" || s === "insufficient_credits") return "secondary";
-	if (s === "expired" || s === "cancelled") return "destructive";
+	if (s === "expired" || s === "cancelled" || s === "unsubscribed")
+		return "destructive";
 	return "outline";
 }
 
@@ -99,7 +108,8 @@ export default function TransactionsPage() {
 		useState<SubscriptionStatusFilter>("all");
 	const [searchTerm, setSearchTerm] = useState("");
 
-	const { data: businesses } = useListAllBusinessesQuery();
+	const { data: businesses, isLoading: businessesLoading } =
+		useListAllBusinessesQuery();
 	const { data: plans } = useListSubscriptionPlansQuery();
 
 	const {
@@ -114,10 +124,31 @@ export default function TransactionsPage() {
 		status: apiStatusForStatusFilter(statusFilter),
 	});
 
-	const filteredRows = useMemo(() => {
-		const q = searchTerm.trim().toLowerCase();
-		const rows = transactions ?? [];
+	/** Separate cache from filtered table query so summary cards stay global. */
+	const { data: statsTransactions, isLoading: statsLoading } =
+		useListAdminSubscriptionTransactionsQuery(undefined, {
+			fixedCacheKey: "admin-business-subscription-stats",
+		});
 
+	const filteredRows = useMemo(() => {
+		let rows: AdminSubscriptionOutput[];
+
+		if (statusFilter === "unsubscribed") {
+			rows = buildUnsubscribedBusinessRows(
+				businesses ?? [],
+				statsTransactions ?? [],
+			);
+			if (businessId !== BUSINESS_FILTER_ALL) {
+				rows = rows.filter((r) => r.business_id === businessId);
+			}
+			if (planId !== PLAN_FILTER_ALL) {
+				rows = [];
+			}
+		} else {
+			rows = transactions ?? [];
+		}
+
+		const q = searchTerm.trim().toLowerCase();
 		if (!q) return rows;
 
 		return rows.filter((row) => {
@@ -134,19 +165,34 @@ export default function TransactionsPage() {
 				.toLowerCase();
 			return hay.includes(q);
 		});
-	}, [transactions, searchTerm]);
+	}, [
+		statusFilter,
+		transactions,
+		businesses,
+		statsTransactions,
+		businessId,
+		planId,
+		searchTerm,
+	]);
 
-	const activeRows = useMemo(
-		() => filteredRows.filter((r) => r.status.toLowerCase() === "active"),
-		[filteredRows],
-	);
-	const pendingRows = useMemo(
-		() => filteredRows.filter((r) => r.status.toLowerCase() === "pending"),
-		[filteredRows],
-	);
+	const [summarySnapshot, setSummarySnapshot] = useState<{
+		total: number;
+		stats: BusinessSubscriptionStats;
+	} | null>(null);
 
-	const activeCustomerTotal = countUniqueBusinesses(activeRows);
-	const pendingCustomerTotal = countUniqueBusinesses(pendingRows);
+	useEffect(() => {
+		if (businessesLoading || statsLoading) return;
+		setSummarySnapshot({
+			total: businesses?.length ?? 0,
+			stats: summarizeBusinessSubscriptionStats(
+				statsTransactions ?? [],
+				businesses?.length ?? 0,
+			),
+		});
+	}, [businessesLoading, statsLoading, businesses, statsTransactions]);
+
+	const businessesBusy = businessesLoading && summarySnapshot === null;
+	const statsBusy = statsLoading && summarySnapshot === null;
 
 	const businessLabel =
 		businessId === BUSINESS_FILTER_ALL
@@ -158,14 +204,14 @@ export default function TransactionsPage() {
 			? "All plans"
 			: (plans?.find((p) => p.id === planId)?.name ?? "All plans");
 
-	const listBusy = isLoading || isFetching;
+	const listBusy =
+		statusFilter === "unsubscribed"
+			? businessesLoading || statsLoading
+			: isLoading || isFetching;
 
 	return (
 		<div className="flex flex-col gap-6">
-			<PageHeader
-				title="Business"
-				description="All businesses and subscription status. Click a row to open the full business profile."
-			/>
+			<PageHeader title="Business" />
 
 			{error ? (
 				<Alert variant="destructive">
@@ -179,22 +225,72 @@ export default function TransactionsPage() {
 				</Alert>
 			) : null}
 
-			<div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+			<div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
 				<SummaryCard
-					label="Active customers"
-					value={listBusy ? null : activeCustomerTotal.toLocaleString()}
+					label="Total"
+					value={
+						summarySnapshot
+							? summarySnapshot.total.toLocaleString()
+							: null
+					}
+					icon={Building2Icon}
+					loading={businessesBusy}
+					variant="total"
+				/>
+				<SummaryCard
+					label="Active"
+					value={
+						summarySnapshot
+							? summarySnapshot.stats.active.toLocaleString()
+							: null
+					}
 					icon={CheckCircle2Icon}
-					loading={listBusy}
+					loading={statsBusy}
 					variant="active"
 				/>
 				<SummaryCard
-					label="Pending customers"
-					value={listBusy ? null : pendingCustomerTotal.toLocaleString()}
+					label="Pending"
+					value={
+						summarySnapshot
+							? summarySnapshot.stats.pending.toLocaleString()
+							: null
+					}
 					icon={XCircleIcon}
-					loading={listBusy}
+					loading={statsBusy}
 					variant="pending"
 				/>
+				<SummaryCard
+					label="Expired"
+					value={
+						summarySnapshot
+							? summarySnapshot.stats.expired.toLocaleString()
+							: null
+					}
+					icon={ClockIcon}
+					loading={statsBusy}
+					variant="expired"
+				/>
+				<SummaryCard
+					label="Unsubscribed"
+					value={
+						summarySnapshot
+							? summarySnapshot.stats.noSubscription.toLocaleString()
+							: null
+					}
+					icon={MinusCircleIcon}
+					loading={businessesBusy || statsBusy}
+					variant="none"
+				/>
 			</div>
+
+			{summarySnapshot && summarySnapshot.stats.other > 0 ? (
+				<p className="text-xs text-muted-foreground">
+					{summarySnapshot.stats.other} business
+					{summarySnapshot.stats.other === 1 ? "" : "es"} with another status
+					(e.g. cancelled or insufficient credits) are included in total but
+					not in active, pending, or expired.
+				</p>
+			) : null}
 
 			<Card>
 				<CardContent className="flex flex-col gap-4 pt-6">
@@ -217,7 +313,8 @@ export default function TransactionsPage() {
 										v === "all" ||
 										v === "pending" ||
 										v === "active" ||
-										v === "expired"
+										v === "expired" ||
+										v === "unsubscribed"
 									) {
 										setStatusFilter(v);
 									}
@@ -233,6 +330,7 @@ export default function TransactionsPage() {
 									<SelectItem value="pending">Pending</SelectItem>
 									<SelectItem value="active">Active</SelectItem>
 									<SelectItem value="expired">Expired</SelectItem>
+									<SelectItem value="unsubscribed">Unsubscribed</SelectItem>
 								</SelectContent>
 							</Select>
 						</FilterField>
@@ -421,12 +519,24 @@ function SummaryCard({
 	value: string | null;
 	icon: React.ComponentType<{ className?: string }>;
 	loading: boolean;
-	variant: "active" | "pending";
+	variant: "total" | "active" | "pending" | "expired" | "none";
 }) {
 	const iconClass =
-		variant === "active" ? "text-primary" : "text-muted-foreground";
+		variant === "active"
+			? "text-primary"
+			: variant === "expired"
+				? "text-destructive"
+				: variant === "total"
+					? "text-foreground"
+					: variant === "none"
+						? "text-muted-foreground"
+						: "text-muted-foreground";
 	const bgClass =
-		variant === "active" ? "bg-primary/10" : "bg-muted";
+		variant === "active"
+			? "bg-primary/10"
+			: variant === "expired"
+				? "bg-destructive/10"
+				: "bg-muted";
 
 	return (
 		<Card>

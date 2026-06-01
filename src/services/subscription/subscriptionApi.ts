@@ -67,6 +67,17 @@ export const subscriptionApi = createApi({
 					headers: bearerHeaders(),
 				};
 			},
+			serializeQueryArgs: ({ endpointName, queryArgs }) => {
+				const arg = queryArgs ?? {};
+				const businessId =
+					"businessId" in arg ? arg.businessId : undefined;
+				const planId = "planId" in arg ? arg.planId : undefined;
+				const status = "status" in arg ? arg.status : undefined;
+				const hasFilter =
+					Boolean(businessId) || Boolean(planId) || Boolean(status);
+				if (!hasFilter) return `${endpointName}(global)`;
+				return `${endpointName}(${businessId ?? ""}|${planId ?? ""}|${status ?? ""})`;
+			},
 			providesTags: [{ type: "SubscriptionTransactions" as const, id: "LIST" }],
 		}),
 

@@ -1,9 +1,18 @@
-import type { AdminSubscriptionOutput, SubscriptionStatus } from "@/services/types";
+import type {
+	AdminSubscriptionOutput,
+	BusinessOutput,
+	SubscriptionStatus,
+} from "@/services/types";
 
 export const BUSINESS_FILTER_ALL = "all";
 export const PLAN_FILTER_ALL = "all";
 
-export type SubscriptionStatusFilter = "all" | "pending" | "active" | "expired";
+export type SubscriptionStatusFilter =
+	| "all"
+	| "pending"
+	| "active"
+	| "expired"
+	| "unsubscribed";
 
 export const SUBSCRIPTION_STATUS_FILTER_LABELS: Record<
 	SubscriptionStatusFilter,
@@ -13,6 +22,7 @@ export const SUBSCRIPTION_STATUS_FILTER_LABELS: Record<
 	pending: "Pending",
 	active: "Active",
 	expired: "Expired",
+	unsubscribed: "Unsubscribed",
 };
 
 export function getSubscriptionStatusFilterLabel(
@@ -25,6 +35,7 @@ export const SUBSCRIPTION_STATUS_LABELS: Record<string, string> = {
 	pending: "Pending",
 	active: "Active",
 	expired: "Expired",
+	unsubscribed: "Unsubscribed",
 	cancelled: "Cancelled",
 	insufficient_credits: "Insufficient credits",
 };
@@ -33,15 +44,99 @@ export function getSubscriptionStatusLabel(status: string): string {
 	return SUBSCRIPTION_STATUS_LABELS[status.toLowerCase()] ?? status;
 }
 
+/** API accepts only these status query values (not `unsubscribed`). */
 export function apiStatusForStatusFilter(
 	filter: SubscriptionStatusFilter,
 ): SubscriptionStatus | undefined {
-	if (filter === "all") return undefined;
+	if (filter === "all" || filter === "unsubscribed") return undefined;
 	return filter;
+}
+
+/** Businesses with no subscription transaction (UI label: Unsubscribed). */
+export function buildUnsubscribedBusinessRows(
+	businesses: BusinessOutput[],
+	subscriptionRows: AdminSubscriptionOutput[],
+): AdminSubscriptionOutput[] {
+	const withSubscription = latestSubscriptionByBusiness(subscriptionRows);
+	return businesses
+		.filter((b) => !withSubscription.has(b.id))
+		.map((b) => ({
+			id: b.id,
+			business_id: b.id,
+			status: "unsubscribed",
+			credits_limit: 0,
+			business: {
+				id: b.id,
+				name: b.name,
+				tin_number: b.tin_number,
+			},
+		}));
 }
 
 export function countUniqueBusinesses(rows: AdminSubscriptionOutput[]): number {
 	return new Set(rows.map((r) => r.business_id)).size;
+}
+
+function subscriptionRowTimestamp(row: AdminSubscriptionOutput): number {
+	const raw = row.started_at ?? row.created_at;
+	if (!raw) return 0;
+	const t = new Date(raw).getTime();
+	return Number.isNaN(t) ? 0 : t;
+}
+
+/** Latest subscription row per business (by started_at / created_at). */
+export function latestSubscriptionByBusiness(
+	rows: AdminSubscriptionOutput[],
+): Map<string, AdminSubscriptionOutput> {
+	const byBusiness = new Map<string, AdminSubscriptionOutput>();
+	for (const row of rows) {
+		const existing = byBusiness.get(row.business_id);
+		if (!existing) {
+			byBusiness.set(row.business_id, row);
+			continue;
+		}
+		if (subscriptionRowTimestamp(row) >= subscriptionRowTimestamp(existing)) {
+			byBusiness.set(row.business_id, row);
+		}
+	}
+	return byBusiness;
+}
+
+export type BusinessSubscriptionStats = {
+	active: number;
+	pending: number;
+	expired: number;
+	other: number;
+	noSubscription: number;
+};
+
+/**
+ * Count businesses by latest subscription status. `totalBusinesses` should be
+ * the full business list length; `noSubscription` fills the gap for businesses
+ * with no subscription transaction.
+ */
+export function summarizeBusinessSubscriptionStats(
+	rows: AdminSubscriptionOutput[],
+	totalBusinesses: number,
+): BusinessSubscriptionStats {
+	const latest = latestSubscriptionByBusiness(rows);
+	let active = 0;
+	let pending = 0;
+	let expired = 0;
+	let other = 0;
+
+	for (const row of latest.values()) {
+		const s = row.status.toLowerCase();
+		if (s === "active") active++;
+		else if (s === "pending") pending++;
+		else if (s === "expired") expired++;
+		else other++;
+	}
+
+	const withSubscription = latest.size;
+	const noSubscription = Math.max(0, totalBusinesses - withSubscription);
+
+	return { active, pending, expired, other, noSubscription };
 }
 
 export const CUSTOM_SUBSCRIPTION_PLAN_LABEL = "Custom";
