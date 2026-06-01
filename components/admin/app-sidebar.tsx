@@ -9,7 +9,6 @@ import {
 	Building2,
 	CircleDollarSign,
 	ClipboardList,
-	CreditCard,
 	ShieldCheck,
 	Landmark,
 	LayoutDashboard,
@@ -47,8 +46,7 @@ const systemAdminNavigation: {
 	icon: LucideIcon;
 }[] = [
 	{ name: "Dashboard", href: "/admin/dashboard", icon: LayoutDashboard },
-	{ name: "Business", href: "/admin/business", icon: Building2 },
-	{ name: "Transactions", href: "/admin/transactions", icon: CreditCard },
+	{ name: "Business", href: "/admin/transactions", icon: Building2 },
 	{ name: "Subscription", href: "/admin/subscription", icon: Wallet },
 	{ name: "Plans", href: "/admin/plans", icon: CircleDollarSign },
 	{ name: "Roles", href: "/admin/roles", icon: ShieldCheck },
@@ -65,7 +63,7 @@ const branchAdminNavigation: {
 	{ name: "Menu", href: "/admin/menu", icon: UtensilsCrossed },
 	{ name: "Tables", href: "/admin/tables", icon: TableProperties },
 	{ name: "Bank Accounts", href: "/admin/bank-accounts", icon: Landmark },
-	{ name: "Transactions", href: "/admin/transactions", icon: CreditCard },
+	{ name: "Business", href: "/admin/transactions", icon: Building2 },
 	{ name: "Staff", href: "/admin/staff", icon: Users },
 	{ name: "Subscription", href: "/admin/subscription", icon: BadgeCheck },
 	{ name: "Notifications", href: "/admin/notifications", icon: Bell },
@@ -97,14 +95,18 @@ export function AppSidebar({
 			.toUpperCase() || "U";
 
 	return (
-		<Sidebar collapsible="offcanvas" className="border-r-0">
-			<SidebarHeader className="border-b border-sidebar-border px-4 py-5">
-				<BrandLogo />
+		<Sidebar collapsible="icon" className="border-r-0">
+			<SidebarHeader className="border-b border-sidebar-border px-4 py-5 group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-2 group-data-[collapsible=icon]:py-4 group-data-[collapsible=icon]:pr-3">
+				<BrandLogo
+					className="group-data-[collapsible=icon]:items-center"
+					iconOnlyClassName="group-data-[collapsible=icon]:mx-auto"
+					labelClassName="group-data-[collapsible=icon]:hidden"
+				/>
 			</SidebarHeader>
-			<SidebarContent className="px-2 py-3">
-				<SidebarGroup>
-					<SidebarGroupContent>
-						<SidebarMenu className="gap-0.5">
+			<SidebarContent className="px-2 py-3 group-data-[collapsible=icon]:px-2 group-data-[collapsible=icon]:pr-3">
+				<SidebarGroup className="group-data-[collapsible=icon]:p-0">
+					<SidebarGroupContent className="group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:flex-col group-data-[collapsible=icon]:items-center">
+						<SidebarMenu className="gap-1 group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:gap-1.5">
 							{navigation.map((item) => {
 								const path = pathname ?? "";
 								const itemBase = normalizePath(item.href);
@@ -116,13 +118,17 @@ export function AppSidebar({
 										itemBase !== "/admin");
 								const Icon = item.icon;
 								return (
-									<SidebarMenuItem key={item.name}>
+									<SidebarMenuItem
+										key={item.name}
+										className="group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:w-full group-data-[collapsible=icon]:justify-center"
+									>
 										<SidebarMenuButton
 											isActive={isActive}
 											size="default"
 											tooltip={item.name}
 											className={cn(
 												"h-10 gap-3 transition-colors duration-150",
+												"group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:size-9! group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-0!",
 												isActive &&
 													"bg-sidebar-primary font-medium text-sidebar-primary-foreground shadow-sm hover:bg-sidebar-primary hover:text-sidebar-primary-foreground data-active:bg-sidebar-primary data-active:text-sidebar-primary-foreground",
 											)}
@@ -145,12 +151,15 @@ export function AppSidebar({
 					</SidebarGroupContent>
 				</SidebarGroup>
 			</SidebarContent>
-			<SidebarFooter className="border-t border-sidebar-border p-3">
-				<div className="flex items-center gap-3 rounded-lg bg-sidebar-accent/60 p-2.5">
-					<div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-sidebar-primary text-xs font-semibold text-sidebar-primary-foreground">
+			<SidebarFooter className="border-t border-sidebar-border p-3 group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-2 group-data-[collapsible=icon]:py-3 group-data-[collapsible=icon]:pr-3">
+				<div className="flex items-center gap-3 rounded-lg bg-sidebar-accent/60 p-2.5 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-2">
+					<div
+						className="flex size-9 shrink-0 items-center justify-center rounded-full bg-sidebar-primary text-xs font-semibold text-sidebar-primary-foreground"
+						title={userName}
+					>
 						{initials}
 					</div>
-					<div className="min-w-0 flex-1">
+					<div className="min-w-0 flex-1 group-data-[collapsible=icon]:hidden">
 						<p className="truncate text-sm font-medium text-sidebar-foreground">
 							{userName}
 						</p>

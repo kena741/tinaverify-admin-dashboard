@@ -1,24 +1,24 @@
-import type { AdminSubscriptionOutput } from "@/services/types";
+import type { AdminSubscriptionOutput, SubscriptionStatus } from "@/services/types";
 
 export const BUSINESS_FILTER_ALL = "all";
 export const PLAN_FILTER_ALL = "all";
 
-export type SubscriptionPaymentFilter = "all" | "active" | "paid" | "unpaid";
+export type SubscriptionStatusFilter = "all" | "pending" | "active" | "expired";
 
-export const SUBSCRIPTION_PAYMENT_FILTER_LABELS: Record<
-	SubscriptionPaymentFilter,
+export const SUBSCRIPTION_STATUS_FILTER_LABELS: Record<
+	SubscriptionStatusFilter,
 	string
 > = {
 	all: "All",
+	pending: "Pending",
 	active: "Active",
-	paid: "Paid",
-	unpaid: "Unpaid",
+	expired: "Expired",
 };
 
-export function getSubscriptionPaymentFilterLabel(
-	filter: SubscriptionPaymentFilter,
+export function getSubscriptionStatusFilterLabel(
+	filter: SubscriptionStatusFilter,
 ): string {
-	return SUBSCRIPTION_PAYMENT_FILTER_LABELS[filter];
+	return SUBSCRIPTION_STATUS_FILTER_LABELS[filter];
 }
 
 export const SUBSCRIPTION_STATUS_LABELS: Record<string, string> = {
@@ -33,25 +33,24 @@ export function getSubscriptionStatusLabel(status: string): string {
 	return SUBSCRIPTION_STATUS_LABELS[status.toLowerCase()] ?? status;
 }
 
-export function isPaidSubscriptionStatus(status: string): boolean {
-	return status.toLowerCase() === "active";
-}
-
-export function isUnpaidSubscriptionStatus(status: string): boolean {
-	return !isPaidSubscriptionStatus(status);
-}
-
-export function matchesPaymentFilter(
-	row: AdminSubscriptionOutput,
-	filter: SubscriptionPaymentFilter,
-): boolean {
-	if (filter === "all") return true;
-	if (filter === "active" || filter === "paid") {
-		return isPaidSubscriptionStatus(row.status);
-	}
-	return isUnpaidSubscriptionStatus(row.status);
+export function apiStatusForStatusFilter(
+	filter: SubscriptionStatusFilter,
+): SubscriptionStatus | undefined {
+	if (filter === "all") return undefined;
+	return filter;
 }
 
 export function countUniqueBusinesses(rows: AdminSubscriptionOutput[]): number {
 	return new Set(rows.map((r) => r.business_id)).size;
+}
+
+export const CUSTOM_SUBSCRIPTION_PLAN_LABEL = "Custom";
+
+/** Display name for a subscription plan; empty/null plan is a custom subscription. */
+export function getSubscriptionPlanLabel(
+	plan?: { name?: string } | null,
+	resolvedName?: string | null,
+): string {
+	const name = plan?.name?.trim() || resolvedName?.trim();
+	return name || CUSTOM_SUBSCRIPTION_PLAN_LABEL;
 }

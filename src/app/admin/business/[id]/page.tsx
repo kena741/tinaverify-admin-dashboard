@@ -1,6 +1,7 @@
 "use client";
 
 import { useParams } from "next/navigation";
+
 import BusinessDetailClient from "./BusinessDetailClient";
 
 export default function BusinessDetailPage() {

@@ -1,24 +1,24 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { format } from "date-fns";
 import { CheckCircle2Icon, XCircleIcon } from "lucide-react";
 
-import { BusinessDetailSheet } from "@/components/admin/business-detail-sheet";
 import { PageHeader } from "@/components/admin/page-header";
 import { useListAllBusinessesQuery } from "@/services/branch-management/branchManagementApi";
 import { useListAdminSubscriptionTransactionsQuery } from "@/services/subscription/subscriptionApi";
 import { useListSubscriptionPlansQuery } from "@/services/subscription-plan/subscriptionPlanApi";
 import type { AdminSubscriptionOutput } from "@/services/types";
 import {
+	apiStatusForStatusFilter,
 	BUSINESS_FILTER_ALL,
 	countUniqueBusinesses,
-	getSubscriptionPaymentFilterLabel,
+	getSubscriptionPlanLabel,
+	getSubscriptionStatusFilterLabel,
 	getSubscriptionStatusLabel,
-	isPaidSubscriptionStatus,
-	matchesPaymentFilter,
 	PLAN_FILTER_ALL,
-	type SubscriptionPaymentFilter,
+	type SubscriptionStatusFilter,
 } from "@/lib/subscription-filters";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -91,24 +91,13 @@ function statusBadgeVariant(
 	return "outline";
 }
 
-function apiStatusForFilter(
-	filter: SubscriptionPaymentFilter,
-): "active" | undefined {
-	if (filter === "active" || filter === "paid") return "active";
-	return undefined;
-}
-
 export default function TransactionsPage() {
+	const router = useRouter();
 	const [businessId, setBusinessId] = useState(BUSINESS_FILTER_ALL);
 	const [planId, setPlanId] = useState(PLAN_FILTER_ALL);
-	const [paymentFilter, setPaymentFilter] =
-		useState<SubscriptionPaymentFilter>("all");
+	const [statusFilter, setStatusFilter] =
+		useState<SubscriptionStatusFilter>("all");
 	const [searchTerm, setSearchTerm] = useState("");
-	const [selectedBusinessId, setSelectedBusinessId] = useState<string | null>(
-		null,
-	);
-	const [selectedTransaction, setSelectedTransaction] =
-		useState<AdminSubscriptionOutput | null>(null);
 
 	const { data: businesses } = useListAllBusinessesQuery();
 	const { data: plans } = useListSubscriptionPlansQuery();
@@ -122,16 +111,12 @@ export default function TransactionsPage() {
 	} = useListAdminSubscriptionTransactionsQuery({
 		businessId: businessId === BUSINESS_FILTER_ALL ? null : businessId,
 		planId: planId === PLAN_FILTER_ALL ? null : planId,
-		status: apiStatusForFilter(paymentFilter),
+		status: apiStatusForStatusFilter(statusFilter),
 	});
 
 	const filteredRows = useMemo(() => {
 		const q = searchTerm.trim().toLowerCase();
-		let rows = transactions ?? [];
-
-		if (paymentFilter === "unpaid" || paymentFilter === "all") {
-			rows = rows.filter((row) => matchesPaymentFilter(row, paymentFilter));
-		}
+		const rows = transactions ?? [];
 
 		if (!q) return rows;
 
@@ -149,19 +134,19 @@ export default function TransactionsPage() {
 				.toLowerCase();
 			return hay.includes(q);
 		});
-	}, [transactions, paymentFilter, searchTerm]);
+	}, [transactions, searchTerm]);
 
-	const paidRows = useMemo(
-		() => filteredRows.filter((r) => isPaidSubscriptionStatus(r.status)),
+	const activeRows = useMemo(
+		() => filteredRows.filter((r) => r.status.toLowerCase() === "active"),
 		[filteredRows],
 	);
-	const unpaidRows = useMemo(
-		() => filteredRows.filter((r) => !isPaidSubscriptionStatus(r.status)),
+	const pendingRows = useMemo(
+		() => filteredRows.filter((r) => r.status.toLowerCase() === "pending"),
 		[filteredRows],
 	);
 
-	const paidCustomerTotal = countUniqueBusinesses(paidRows);
-	const unpaidCustomerTotal = countUniqueBusinesses(unpaidRows);
+	const activeCustomerTotal = countUniqueBusinesses(activeRows);
+	const pendingCustomerTotal = countUniqueBusinesses(pendingRows);
 
 	const businessLabel =
 		businessId === BUSINESS_FILTER_ALL
@@ -178,8 +163,8 @@ export default function TransactionsPage() {
 	return (
 		<div className="flex flex-col gap-6">
 			<PageHeader
-				title="Transactions"
-				description="Subscription transactions across all businesses. Filter by status, plan, or business."
+				title="Business"
+				description="All businesses and subscription status. Click a row to open the full business profile."
 			/>
 
 			{error ? (
@@ -196,48 +181,58 @@ export default function TransactionsPage() {
 
 			<div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
 				<SummaryCard
-					label="Paid customers"
-					value={listBusy ? null : paidCustomerTotal.toLocaleString()}
+					label="Active customers"
+					value={listBusy ? null : activeCustomerTotal.toLocaleString()}
 					icon={CheckCircle2Icon}
 					loading={listBusy}
-					variant="paid"
+					variant="active"
 				/>
 				<SummaryCard
-					label="Unpaid customers"
-					value={listBusy ? null : unpaidCustomerTotal.toLocaleString()}
+					label="Pending customers"
+					value={listBusy ? null : pendingCustomerTotal.toLocaleString()}
 					icon={XCircleIcon}
 					loading={listBusy}
-					variant="unpaid"
+					variant="pending"
 				/>
 			</div>
 
 			<Card>
 				<CardContent className="flex flex-col gap-4 pt-6">
 					<div className="flex flex-col gap-4 lg:flex-row lg:flex-wrap lg:items-end">
+						<FilterField label="Search" className="min-w-48 flex-1 lg:min-w-64">
+							<Input
+								type="search"
+								placeholder="Search business, plan, or reference…"
+								value={searchTerm}
+								onChange={(e) => setSearchTerm(e.target.value)}
+								className="h-10"
+							/>
+						</FilterField>
+
 						<FilterField label="Status" className="min-w-40 flex-1">
 							<Select
-								value={paymentFilter}
+								value={statusFilter}
 								onValueChange={(v) => {
 									if (
 										v === "all" ||
+										v === "pending" ||
 										v === "active" ||
-										v === "paid" ||
-										v === "unpaid"
+										v === "expired"
 									) {
-										setPaymentFilter(v);
+										setStatusFilter(v);
 									}
 								}}
 							>
 								<SelectTrigger className="h-10 w-full">
 									<span className="flex flex-1 truncate text-left">
-										{getSubscriptionPaymentFilterLabel(paymentFilter)}
+										{getSubscriptionStatusFilterLabel(statusFilter)}
 									</span>
 								</SelectTrigger>
 								<SelectContent>
 									<SelectItem value="all">All</SelectItem>
+									<SelectItem value="pending">Pending</SelectItem>
 									<SelectItem value="active">Active</SelectItem>
-									<SelectItem value="paid">Paid</SelectItem>
-									<SelectItem value="unpaid">Unpaid</SelectItem>
+									<SelectItem value="expired">Expired</SelectItem>
 								</SelectContent>
 							</Select>
 						</FilterField>
@@ -287,16 +282,6 @@ export default function TransactionsPage() {
 								</SelectContent>
 							</Select>
 						</FilterField>
-
-						<FilterField label="Search" className="min-w-48 flex-[1_1_100%] lg:flex-1">
-							<Input
-								type="search"
-								placeholder="Search business, plan, or reference…"
-								value={searchTerm}
-								onChange={(e) => setSearchTerm(e.target.value)}
-								className="h-10"
-							/>
-						</FilterField>
 					</div>
 
 					{listBusy ? (
@@ -328,10 +313,9 @@ export default function TransactionsPage() {
 										<SubscriptionRow
 											key={row.id}
 											row={row}
-											onSelect={() => {
-												setSelectedBusinessId(row.business_id);
-												setSelectedTransaction(row);
-											}}
+											onSelect={() =>
+												router.push(`/admin/business/${row.business_id}`)
+											}
 										/>
 									))}
 								</TableBody>
@@ -343,24 +327,13 @@ export default function TransactionsPage() {
 						<p className="text-xs text-muted-foreground">
 							Showing {filteredRows.length} transaction
 							{filteredRows.length === 1 ? "" : "s"}
-							{paymentFilter !== "all"
-								? ` · ${getSubscriptionPaymentFilterLabel(paymentFilter)}`
+							{statusFilter !== "all"
+								? ` · ${getSubscriptionStatusFilterLabel(statusFilter)}`
 								: ""}
 						</p>
 					) : null}
 				</CardContent>
 			</Card>
-
-			<BusinessDetailSheet
-				businessId={selectedBusinessId}
-				transaction={selectedTransaction}
-				onOpenChange={(open) => {
-					if (!open) {
-						setSelectedBusinessId(null);
-						setSelectedTransaction(null);
-					}
-				}}
-			/>
 		</div>
 	);
 }
@@ -396,7 +369,9 @@ function SubscriptionRow({
 					) : null}
 				</div>
 			</TableCell>
-			<TableCell>{row.plan?.name ?? "—"}</TableCell>
+			<TableCell>
+				{getSubscriptionPlanLabel(row.plan)}
+			</TableCell>
 			<TableCell>
 				<Badge variant={statusBadgeVariant(row.status)}>
 					{getSubscriptionStatusLabel(row.status)}
@@ -446,12 +421,12 @@ function SummaryCard({
 	value: string | null;
 	icon: React.ComponentType<{ className?: string }>;
 	loading: boolean;
-	variant: "paid" | "unpaid";
+	variant: "active" | "pending";
 }) {
 	const iconClass =
-		variant === "paid" ? "text-primary" : "text-destructive";
+		variant === "active" ? "text-primary" : "text-muted-foreground";
 	const bgClass =
-		variant === "paid" ? "bg-primary/10" : "bg-destructive/10";
+		variant === "active" ? "bg-primary/10" : "bg-muted";
 
 	return (
 		<Card>

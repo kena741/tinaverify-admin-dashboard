@@ -68,7 +68,9 @@ import type {
 } from "../../../../services/types";
 import { useListRolesQuery } from "../../../../services/role/roleApi";
 import { useGetUserByIdQuery } from "../../../../services/auth/authApi";
+import { BusinessPaymentsTab } from "@/components/admin/business-payments-tab";
 import { cn } from "@/lib/utils";
+import { getSubscriptionPlanLabel } from "@/lib/subscription-filters";
 import { formatUserDisplayName } from "@/lib/userDisplay";
 
 
@@ -242,7 +244,7 @@ export default function BusinessDetailClient({
 					<button
 						type="button"
 						className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
-						onClick={() => router.back()}
+						onClick={() => router.push("/admin/transactions")}
 					>
 						Back
 					</button>
@@ -300,7 +302,7 @@ export default function BusinessDetailClient({
 								className={cn(
 									buttonVariants({ variant: "outline", size: "sm" }),
 								)}
-								onClick={() => router.back()}
+								onClick={() => router.push("/admin/transactions")}
 							>
 								Back
 							</button>
@@ -326,7 +328,7 @@ export default function BusinessDetailClient({
 						<button
 							type="button"
 							className={cn(buttonVariants({ variant: "ghost", size: "sm" }))}
-							onClick={() => router.back()}
+							onClick={() => router.push("/admin/transactions")}
 						>
 							<ArrowLeft data-icon="inline-start" />
 							Back
@@ -423,7 +425,7 @@ export default function BusinessDetailClient({
 								<AlertDialogAction
 									onClick={async () => {
 										await deleteBusiness({ businessId }).unwrap();
-										router.push("/admin/business");
+										router.push("/admin/transactions");
 									}}
 								>
 									Delete
@@ -440,6 +442,7 @@ export default function BusinessDetailClient({
 					<TabsTrigger value="employees">Employees</TabsTrigger>
 					<TabsTrigger value="branches">Branches</TabsTrigger>
 					<TabsTrigger value="bank-accounts">Bank Accounts</TabsTrigger>
+					<TabsTrigger value="payments">Payments</TabsTrigger>
 					<TabsTrigger value="subscription">Subscription</TabsTrigger>
 				</TabsList>
 
@@ -730,6 +733,10 @@ export default function BusinessDetailClient({
 					</Card>
 				</TabsContent>
 
+				<TabsContent value="payments">
+					<BusinessPaymentsTab businessId={businessId} />
+				</TabsContent>
+
 				<TabsContent value="subscription">
 					<div className="flex flex-col gap-4">
 						<Card>
@@ -769,11 +776,14 @@ export default function BusinessDetailClient({
 									) : activeSubscription ? (
 										<div className="flex flex-wrap items-center gap-2">
 											<Badge variant="secondary">
-												{activeSubscription.plan_id != null &&
-												activeSubscription.plan_id !== ""
-													? (subscriptionPlanById.get(activeSubscription.plan_id)
-															?.name ?? "Subscribed")
-													: "Subscribed"}
+												{getSubscriptionPlanLabel(
+													null,
+													activeSubscription.plan_id
+														? subscriptionPlanById.get(
+																activeSubscription.plan_id,
+															)?.name
+														: null,
+												)}
 											</Badge>
 											<span className="text-sm text-muted-foreground">
 												Status: {activeSubscription.status}
@@ -950,10 +960,12 @@ export default function BusinessDetailClient({
 														(row: SubscriptionOutput) => (
 															<TableRow key={row.id}>
 																<TableCell className="font-medium">
-																	{row.plan_id != null && row.plan_id !== ""
-																		? (subscriptionPlanById.get(row.plan_id)?.name ??
-																			row.plan_id)
-																		: "—"}
+																	{getSubscriptionPlanLabel(
+																		null,
+																		row.plan_id
+																			? subscriptionPlanById.get(row.plan_id)?.name
+																			: null,
+																	)}
 																</TableCell>
 																<TableCell>
 																	<Badge variant="outline">{row.status}</Badge>

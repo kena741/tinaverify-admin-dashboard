@@ -121,7 +121,7 @@ export default function DashboardPage() {
 			{truncatedBusinessFetch ? (
 				<Alert>
 					<AlertDescription>
-						Showing analytics for the first 25 businesses. Use the Transactions
+						Showing analytics for the first 25 businesses. Use the Business
 						page to filter by a specific business.
 					</AlertDescription>
 				</Alert>
@@ -285,7 +285,7 @@ export default function DashboardPage() {
 				<CardHeader className="flex flex-row items-center justify-between gap-4">
 					<CardTitle className="text-base">Recent transactions</CardTitle>
 					<Button variant="outline" size="sm" render={<Link href="/admin/transactions" />}>
-						View all transactions
+						View all businesses
 					</Button>
 				</CardHeader>
 				<CardContent>

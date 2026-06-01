@@ -5,14 +5,12 @@ import { useState } from "react";
 import { Loader2Icon } from "lucide-react";
 
 import { BrandLogo } from "@/components/brand-logo";
-import { BRAND_DESCRIPTION, BRAND_TAGLINE } from "@/lib/brand";
 import { useAuth } from "../../store/useAuth";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
 	Card,
 	CardContent,
-	CardDescription,
 	CardHeader,
 	CardTitle,
 } from "@/components/ui/card";
@@ -48,22 +46,12 @@ export default function LoginPage() {
 	return (
 		<div className="flex min-h-svh flex-col items-center justify-center bg-background px-4 py-10 sm:px-8">
 			<div className="mb-8 flex max-w-md flex-col items-center gap-3 text-center">
-				<BrandLogo showTagline />
-				<p className="text-pretty text-sm leading-relaxed text-muted-foreground">
-					{BRAND_DESCRIPTION}
-				</p>
+				<BrandLogo />
 			</div>
 
 			<Card className="w-full max-w-md border-border/80 shadow-lg">
-				<CardHeader className="flex flex-col gap-1.5 pb-2">
-					<p className="text-xs font-medium tracking-wide text-primary uppercase">
-						{BRAND_TAGLINE}
-					</p>
+				<CardHeader className="pb-2">
 					<CardTitle className="text-xl">Sign in</CardTitle>
-					<CardDescription>
-						Access your dashboard to review receipts, verify payments, and
-						manage operations.
-					</CardDescription>
 				</CardHeader>
 				<CardContent className="flex flex-col gap-5">
 					{uiError && (
@@ -135,8 +123,7 @@ export default function LoginPage() {
 					<Separator />
 
 					<p className="text-center text-sm text-muted-foreground">
-						Need access to {BRAND_TAGLINE.toLowerCase()}? Contact your
-						administrator.
+						Need access? Contact your administrator.
 					</p>
 				</CardContent>
 			</Card>
