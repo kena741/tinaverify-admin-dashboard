@@ -46,7 +46,13 @@ export default function LoginPage() {
 	return (
 		<div className="flex min-h-svh flex-col items-center justify-center bg-background px-4 py-10 sm:px-8">
 			<div className="mb-8 flex max-w-md flex-col items-center gap-3 text-center">
-				<BrandLogo />
+				<BrandLogo
+					size="lg"
+					priority
+					className="items-center"
+					imageClassName="object-center"
+					labelClassName="text-center"
+				/>
 			</div>
 
 			<Card className="w-full max-w-md border-border/80 shadow-lg">

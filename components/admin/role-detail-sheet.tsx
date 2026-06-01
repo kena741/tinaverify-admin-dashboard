@@ -5,11 +5,22 @@ import { Loader2Icon, Trash2Icon } from "lucide-react";
 
 import {
 	useAssignPermissionsToRoleMutation,
+	useDeleteRoleMutation,
 	useGetRolePermissionsQuery,
 	useGetRoleQuery,
 	useListPermissionsQuery,
 	useRemovePermissionFromRoleMutation,
 } from "@/services/role/roleApi";
+import {
+	AlertDialog,
+	AlertDialogAction,
+	AlertDialogCancel,
+	AlertDialogContent,
+	AlertDialogDescription,
+	AlertDialogFooter,
+	AlertDialogHeader,
+	AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Field, FieldLabel } from "@/components/ui/field";
@@ -84,9 +95,12 @@ export function RoleDetailSheet({ roleId, onOpenChange }: RoleDetailSheetProps) 
 
 	const [assignPermissions, assignState] = useAssignPermissionsToRoleMutation();
 	const [removePermission, removeState] = useRemovePermissionFromRoleMutation();
+	const [deleteRole, deleteRoleState] = useDeleteRoleMutation();
 
 	const [permissionToAdd, setPermissionToAdd] = useState("");
 	const [assignError, setAssignError] = useState("");
+	const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+	const [deleteError, setDeleteError] = useState("");
 	const [removingPermissionId, setRemovingPermissionId] = useState<string | null>(
 		null,
 	);
@@ -130,6 +144,18 @@ export function RoleDetailSheet({ roleId, onOpenChange }: RoleDetailSheetProps) 
 		}
 	};
 
+	const handleDeleteRole = async () => {
+		if (!roleId) return;
+		setDeleteError("");
+		try {
+			await deleteRole({ roleId }).unwrap();
+			setDeleteDialogOpen(false);
+			onOpenChange(false);
+		} catch (err) {
+			setDeleteError(getErrorMessage(err, "Failed to delete role."));
+		}
+	};
+
 	return (
 		<Sheet
 			open={open}
@@ -137,6 +163,8 @@ export function RoleDetailSheet({ roleId, onOpenChange }: RoleDetailSheetProps) 
 				if (!next) {
 					setPermissionToAdd("");
 					setAssignError("");
+					setDeleteDialogOpen(false);
+					setDeleteError("");
 					onOpenChange(false);
 				}
 			}}
@@ -304,8 +332,88 @@ export function RoleDetailSheet({ roleId, onOpenChange }: RoleDetailSheetProps) 
 							</Button>
 						</div>
 					</div>
+
+					{role ? (
+						<>
+							<Separator />
+							<div className="flex flex-col gap-3">
+								<div className="flex flex-col gap-1">
+									<h3 className="text-sm font-medium text-destructive">
+										Danger zone
+									</h3>
+									<p className="text-sm text-muted-foreground">
+										Deleting this role removes it permanently. Staff assigned to
+										this role may lose access until they are given another role.
+									</p>
+								</div>
+								<Button
+									type="button"
+									variant="destructive"
+									size="sm"
+									className="w-fit"
+									onClick={() => {
+										setDeleteError("");
+										setDeleteDialogOpen(true);
+									}}
+								>
+									<Trash2Icon data-icon="inline-start" aria-hidden />
+									Delete role
+								</Button>
+							</div>
+						</>
+					) : null}
 				</div>
 			</SheetContent>
+
+			<AlertDialog
+				open={deleteDialogOpen}
+				onOpenChange={(open) => {
+					setDeleteDialogOpen(open);
+					if (!open) setDeleteError("");
+				}}
+			>
+				<AlertDialogContent>
+					<AlertDialogHeader>
+						<AlertDialogTitle>Delete role?</AlertDialogTitle>
+						<AlertDialogDescription>
+							You are about to permanently delete{" "}
+							<strong>{role?.name ?? "this role"}</strong>. Users with this role
+							may lose permissions immediately. This action cannot be undone.
+						</AlertDialogDescription>
+					</AlertDialogHeader>
+					{deleteError ? (
+						<Alert variant="destructive">
+							<AlertDescription>{deleteError}</AlertDescription>
+						</Alert>
+					) : null}
+					<AlertDialogFooter>
+						<AlertDialogCancel disabled={deleteRoleState.isLoading}>
+							Cancel
+						</AlertDialogCancel>
+						<AlertDialogAction
+							className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+							disabled={deleteRoleState.isLoading}
+							onClick={(e) => {
+								e.preventDefault();
+								void handleDeleteRole();
+							}}
+						>
+							{deleteRoleState.isLoading ? (
+								<>
+									<Loader2Icon
+										data-icon="inline-start"
+										className="animate-spin"
+										aria-hidden
+									/>
+									Deleting…
+								</>
+							) : (
+								"Delete role"
+							)}
+						</AlertDialogAction>
+					</AlertDialogFooter>
+				</AlertDialogContent>
+			</AlertDialog>
 		</Sheet>
 	);
 }

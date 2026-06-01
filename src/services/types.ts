@@ -478,6 +478,23 @@ export type ReferralPerformance = {
 };
 
 // -----------------------------
+// SMS (GeezSMS)
+// -----------------------------
+
+/** Body for `POST /api/v1/sms/geezsms/send` */
+export type SendCustomSmsRequest = {
+	phone: string;
+	message: string;
+};
+
+/** Response from custom SMS send */
+export type SendCustomSmsResponse = {
+	status?: string;
+	message?: string;
+	api_log_id?: string;
+};
+
+// -----------------------------
 // Misc
 // -----------------------------
 

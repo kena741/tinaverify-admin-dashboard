@@ -175,13 +175,14 @@ export default function AdminLayout({
 							)}
 						</div>
 
-						<div
-							className="ml-1 flex size-8 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground"
-							title={userName}
-							aria-label={userName}
+						<Link
+							href="/admin/profile"
+							className="ml-1 flex size-8 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground transition-opacity hover:opacity-90"
+							title={`${userName} — view profile`}
+							aria-label={`${userName} — view profile`}
 						>
 							{userInitials}
-						</div>
+						</Link>
 
 						<Button
 							type="button"

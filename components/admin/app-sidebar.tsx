@@ -7,25 +7,25 @@ import {
 	BadgeCheck,
 	Bell,
 	Building2,
-	CircleDollarSign,
 	ClipboardList,
-	ShieldCheck,
 	Landmark,
 	LayoutDashboard,
 	MapPin,
 	TableProperties,
 	UtensilsCrossed,
 	Users,
-	Wallet,
 } from "lucide-react";
 
 import { BrandLogo } from "@/components/brand-logo";
+import { ServiceManagementNav } from "@/components/admin/service-management-nav";
+import { SystemManagementNav } from "@/components/admin/system-management-nav";
 import {
 	Sidebar,
 	SidebarContent,
 	SidebarFooter,
 	SidebarGroup,
 	SidebarGroupContent,
+	SidebarGroupLabel,
 	SidebarHeader,
 	SidebarMenu,
 	SidebarMenuButton,
@@ -40,29 +40,30 @@ function normalizePath(p: string) {
 	return p.replace(/\/$/, "") || "/";
 }
 
-const systemAdminNavigation: {
+type NavItem = {
 	name: string;
 	href: string;
 	icon: LucideIcon;
-}[] = [
+};
+
+const systemAdminMainNav: NavItem[] = [
 	{ name: "Dashboard", href: "/admin/dashboard", icon: LayoutDashboard },
-	{ name: "Business", href: "/admin/transactions", icon: Building2 },
-	{ name: "Subscription", href: "/admin/subscription", icon: Wallet },
-	{ name: "Plans", href: "/admin/plans", icon: CircleDollarSign },
-	{ name: "Roles", href: "/admin/roles", icon: ShieldCheck },
 ];
 
-const branchAdminNavigation: {
-	name: string;
-	href: string;
-	icon: LucideIcon;
-}[] = [
+const systemAdminUsersNav: NavItem[] = [
+	{ name: "Business", href: "/admin/transactions", icon: Building2 },
+];
+
+const branchAdminMainNav: NavItem[] = [
 	{ name: "Dashboard", href: "/admin/dashboard", icon: LayoutDashboard },
 	{ name: "Branch", href: "/admin/branches/", icon: MapPin },
 	{ name: "Orders", href: "/admin/orders", icon: ClipboardList },
 	{ name: "Menu", href: "/admin/menu", icon: UtensilsCrossed },
 	{ name: "Tables", href: "/admin/tables", icon: TableProperties },
 	{ name: "Bank Accounts", href: "/admin/bank-accounts", icon: Landmark },
+];
+
+const branchAdminUsersNav: NavItem[] = [
 	{ name: "Business", href: "/admin/transactions", icon: Building2 },
 	{ name: "Staff", href: "/admin/staff", icon: Users },
 	{ name: "Subscription", href: "/admin/subscription", icon: BadgeCheck },
@@ -84,7 +85,51 @@ export function AppSidebar({
 }: AppSidebarProps) {
 	const pathname = usePathname();
 	const { isMobile, setOpenMobile } = useSidebar();
-	const navigation = isSystemAdmin ? systemAdminNavigation : branchAdminNavigation;
+	const mainNav = isSystemAdmin ? systemAdminMainNav : branchAdminMainNav;
+	const usersNav = isSystemAdmin ? systemAdminUsersNav : branchAdminUsersNav;
+
+	function renderNavItems(items: NavItem[]) {
+		return items.map((item) => {
+			const path = pathname ?? "";
+			const itemBase = normalizePath(item.href);
+			const isActive =
+				normalizePath(path) === itemBase ||
+				(item.href !== "/admin" &&
+					item.href !== "/admin/" &&
+					path.startsWith(itemBase) &&
+					itemBase !== "/admin");
+			const Icon = item.icon;
+			return (
+				<SidebarMenuItem
+					key={item.name}
+					className="group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:w-full group-data-[collapsible=icon]:justify-center"
+				>
+					<SidebarMenuButton
+						isActive={isActive}
+						size="default"
+						tooltip={item.name}
+						className={cn(
+							"h-10 gap-3 transition-colors duration-150",
+							"group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:size-9! group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-0!",
+							isActive &&
+								"bg-sidebar-primary font-medium text-sidebar-primary-foreground shadow-sm hover:bg-sidebar-primary hover:text-sidebar-primary-foreground data-active:bg-sidebar-primary data-active:text-sidebar-primary-foreground",
+						)}
+						render={
+							<Link
+								href={item.href}
+								onClick={() => {
+									if (isMobile) setOpenMobile(false);
+								}}
+							/>
+						}
+					>
+						<Icon />
+						<span>{item.name}</span>
+					</SidebarMenuButton>
+				</SidebarMenuItem>
+			);
+		});
+	}
 
 	const initials =
 		userName
@@ -98,8 +143,9 @@ export function AppSidebar({
 		<Sidebar collapsible="icon" className="border-r-0">
 			<SidebarHeader className="border-b border-sidebar-border px-4 py-5 group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-2 group-data-[collapsible=icon]:py-4 group-data-[collapsible=icon]:pr-3">
 				<BrandLogo
+					size="sm"
 					className="group-data-[collapsible=icon]:items-center"
-					iconOnlyClassName="group-data-[collapsible=icon]:mx-auto"
+					imageClassName="group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:!h-10 group-data-[collapsible=icon]:!w-auto"
 					labelClassName="group-data-[collapsible=icon]:hidden"
 				/>
 			</SidebarHeader>
@@ -107,55 +153,39 @@ export function AppSidebar({
 				<SidebarGroup className="group-data-[collapsible=icon]:p-0">
 					<SidebarGroupContent className="group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:flex-col group-data-[collapsible=icon]:items-center">
 						<SidebarMenu className="gap-1 group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:gap-1.5">
-							{navigation.map((item) => {
-								const path = pathname ?? "";
-								const itemBase = normalizePath(item.href);
-								const isActive =
-									normalizePath(path) === itemBase ||
-									(item.href !== "/admin" &&
-										item.href !== "/admin/" &&
-										path.startsWith(itemBase) &&
-										itemBase !== "/admin");
-								const Icon = item.icon;
-								return (
-									<SidebarMenuItem
-										key={item.name}
-										className="group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:w-full group-data-[collapsible=icon]:justify-center"
-									>
-										<SidebarMenuButton
-											isActive={isActive}
-											size="default"
-											tooltip={item.name}
-											className={cn(
-												"h-10 gap-3 transition-colors duration-150",
-												"group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:size-9! group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-0!",
-												isActive &&
-													"bg-sidebar-primary font-medium text-sidebar-primary-foreground shadow-sm hover:bg-sidebar-primary hover:text-sidebar-primary-foreground data-active:bg-sidebar-primary data-active:text-sidebar-primary-foreground",
-											)}
-											render={
-												<Link
-													href={item.href}
-													onClick={() => {
-														if (isMobile) setOpenMobile(false);
-													}}
-												/>
-											}
-										>
-											<Icon />
-											<span>{item.name}</span>
-										</SidebarMenuButton>
-									</SidebarMenuItem>
-								);
-							})}
+							{renderNavItems(mainNav)}
 						</SidebarMenu>
 					</SidebarGroupContent>
 				</SidebarGroup>
+				<SidebarGroup className="group-data-[collapsible=icon]:p-0">
+					<SidebarGroupLabel className="text-xs font-semibold tracking-wider text-primary uppercase">
+						Users
+					</SidebarGroupLabel>
+					<SidebarGroupContent className="group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:flex-col group-data-[collapsible=icon]:items-center">
+						<SidebarMenu className="gap-1 group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:gap-1.5">
+							{renderNavItems(usersNav)}
+						</SidebarMenu>
+					</SidebarGroupContent>
+				</SidebarGroup>
+				{isSystemAdmin ? (
+					<>
+						<ServiceManagementNav pathname={pathname ?? ""} />
+						<SystemManagementNav pathname={pathname ?? ""} />
+					</>
+				) : null}
 			</SidebarContent>
 			<SidebarFooter className="border-t border-sidebar-border p-3 group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-2 group-data-[collapsible=icon]:py-3 group-data-[collapsible=icon]:pr-3">
-				<div className="flex items-center gap-3 rounded-lg bg-sidebar-accent/60 p-2.5 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-2">
+				<Link
+					href="/admin/profile"
+					onClick={() => {
+						if (isMobile) setOpenMobile(false);
+					}}
+					className="flex items-center gap-3 rounded-lg bg-sidebar-accent/60 p-2.5 transition-colors hover:bg-sidebar-accent group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-2"
+					title="View profile"
+				>
 					<div
 						className="flex size-9 shrink-0 items-center justify-center rounded-full bg-sidebar-primary text-xs font-semibold text-sidebar-primary-foreground"
-						title={userName}
+						aria-hidden
 					>
 						{initials}
 					</div>
@@ -167,7 +197,7 @@ export function AppSidebar({
 							{userEmail || roleLabel}
 						</p>
 					</div>
-				</div>
+				</Link>
 			</SidebarFooter>
 			<SidebarRail />
 		</Sidebar>

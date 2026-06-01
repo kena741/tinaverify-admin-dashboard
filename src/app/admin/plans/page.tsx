@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
 	EyeIcon,
 	Loader2Icon,
@@ -117,7 +118,7 @@ function parsePriceInput(raw: string): number | string {
 
 type Banner = { variant: "default" | "destructive"; title: string; message: string };
 
-export default function PlansPage() {
+export function PlansAdminPanel({ embedded = false }: { embedded?: boolean }) {
 	const [includeArchived, setIncludeArchived] = useState(false);
 	const [detailPlanId, setDetailPlanId] = useState<string | null>(null);
 	const [editOpen, setEditOpen] = useState(false);
@@ -347,15 +348,11 @@ export default function PlansPage() {
 
 	return (
 		<div className="flex flex-col gap-6">
-			<div className="flex flex-col gap-1">
+			{!embedded ? (
 				<h1 className="text-balance text-2xl font-semibold tracking-tight">
 					Subscription plans
 				</h1>
-				<p className="text-sm text-muted-foreground">
-					Create, review, and archive plans. Archived plans stay visible when you
-					include them in the list.
-				</p>
-			</div>
+			) : null}
 
 			<div aria-live="polite" className="min-h-0">
 				{banner && (
@@ -836,4 +833,12 @@ export default function PlansPage() {
 			</AlertDialog>
 		</div>
 	);
+}
+
+export default function PlansPage() {
+	const router = useRouter();
+	useEffect(() => {
+		router.replace("/admin/settings?tab=plans");
+	}, [router]);
+	return null;
 }

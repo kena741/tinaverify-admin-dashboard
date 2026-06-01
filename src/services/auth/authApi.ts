@@ -142,6 +142,7 @@ export const authApi = createApi({
 export const {
 	useRegisterUserMutation,
 	useLoginUserMutation,
+	useReadMeQuery,
 	useLazyReadMeQuery,
 	useRefreshTokenMutation,
 	useListMyBusinessesQuery,

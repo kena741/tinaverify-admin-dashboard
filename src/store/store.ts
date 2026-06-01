@@ -7,6 +7,8 @@ import { branchManagementApi } from "../services/branch-management/branchManagem
 import { roleApi } from "../services/role/roleApi";
 import { subscriptionApi } from "../services/subscription/subscriptionApi";
 import { subscriptionPlanApi } from "../services/subscription-plan/subscriptionPlanApi";
+import { referralsApi } from "../services/referrals/referralsApi";
+import { smsApi } from "../services/sms/smsApi";
 import { transactionsApi } from "../services/transactions/transactionsApi";
 
 // Combine all reducers
@@ -18,6 +20,8 @@ const appReducer = combineReducers({
 	[roleApi.reducerPath]: roleApi.reducer,
 	[subscriptionApi.reducerPath]: subscriptionApi.reducer,
 	[subscriptionPlanApi.reducerPath]: subscriptionPlanApi.reducer,
+	[referralsApi.reducerPath]: referralsApi.reducer,
+	[smsApi.reducerPath]: smsApi.reducer,
 	[transactionsApi.reducerPath]: transactionsApi.reducer,
 });
 
@@ -48,6 +52,8 @@ export const store = configureStore({
 			roleApi.middleware,
 			subscriptionApi.middleware,
 			subscriptionPlanApi.middleware,
+			referralsApi.middleware,
+			smsApi.middleware,
 			transactionsApi.middleware,
 		),
 });

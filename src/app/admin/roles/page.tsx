@@ -1,16 +1,28 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { Loader2Icon, PlusIcon } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { Loader2Icon, PlusIcon, Trash2Icon } from "lucide-react";
 
 import { PageHeader } from "@/components/admin/page-header";
 import { RoleDetailSheet } from "@/components/admin/role-detail-sheet";
 import {
 	useCreatePermissionMutation,
 	useCreateRoleMutation,
+	useDeleteRoleMutation,
 	useListPermissionsQuery,
 	useListRolesQuery,
 } from "../../../services/role/roleApi";
+import {
+	AlertDialog,
+	AlertDialogAction,
+	AlertDialogCancel,
+	AlertDialogContent,
+	AlertDialogDescription,
+	AlertDialogFooter,
+	AlertDialogHeader,
+	AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -61,7 +73,7 @@ function getErrorMessage(error: unknown, fallback: string): string {
 	return fallback;
 }
 
-export default function RolesPage() {
+export function RolesAdminPanel({ embedded = false }: { embedded?: boolean }) {
 	const {
 		data: roles,
 		isLoading: rolesLoading,
@@ -79,8 +91,14 @@ export default function RolesPage() {
 
 	const [createRole, createRoleState] = useCreateRoleMutation();
 	const [createPermission, createPermissionState] = useCreatePermissionMutation();
+	const [deleteRole, deleteRoleState] = useDeleteRoleMutation();
 
 	const [roleSearch, setRoleSearch] = useState("");
+	const [rolePendingDelete, setRolePendingDelete] = useState<{
+		id: string;
+		name: string;
+	} | null>(null);
+	const [deleteRoleError, setDeleteRoleError] = useState("");
 	const [permissionSearch, setPermissionSearch] = useState("");
 	const [addRoleOpen, setAddRoleOpen] = useState(false);
 	const [addPermissionOpen, setAddPermissionOpen] = useState(false);
@@ -144,12 +162,28 @@ export default function RolesPage() {
 		}
 	};
 
+	const handleDeleteRoleConfirm = async () => {
+		if (!rolePendingDelete) return;
+		setDeleteRoleError("");
+		try {
+			await deleteRole({ roleId: rolePendingDelete.id }).unwrap();
+			if (selectedRoleId === rolePendingDelete.id) {
+				setSelectedRoleId(null);
+			}
+			setRolePendingDelete(null);
+		} catch (err) {
+			setDeleteRoleError(getErrorMessage(err, "Failed to delete role."));
+		}
+	};
+
 	return (
 		<div className="flex flex-col gap-6">
-			<PageHeader
-				title="Roles & permissions"
-				description="Manage roles and the permissions that can be assigned to staff."
-			/>
+			{!embedded ? (
+				<PageHeader
+					title="Roles & permissions"
+					description="Manage roles and the permissions that can be assigned to staff."
+				/>
+			) : null}
 
 			<Card>
 				<CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -203,13 +237,16 @@ export default function RolesPage() {
 							<TableHeader>
 								<TableRow>
 									<TableHead>Name</TableHead>
+									<TableHead className="w-[4.5rem] text-right">
+										<span className="sr-only">Actions</span>
+									</TableHead>
 								</TableRow>
 							</TableHeader>
 							<TableBody>
 								{filteredRoles.length === 0 ? (
 									<TableRow>
 										<TableCell
-											colSpan={1}
+											colSpan={2}
 											className="py-10 text-center text-muted-foreground"
 										>
 											{roleSearch.trim()
@@ -225,6 +262,27 @@ export default function RolesPage() {
 											onClick={() => setSelectedRoleId(role.id)}
 										>
 											<TableCell className="font-medium">{role.name}</TableCell>
+											<TableCell
+												className="text-right"
+												onClick={(e) => e.stopPropagation()}
+											>
+												<Button
+													type="button"
+													variant="ghost"
+													size="icon-sm"
+													className="text-muted-foreground hover:text-destructive"
+													aria-label={`Delete ${role.name}`}
+													onClick={() => {
+														setDeleteRoleError("");
+														setRolePendingDelete({
+															id: role.id,
+															name: role.name,
+														});
+													}}
+												>
+													<Trash2Icon aria-hidden />
+												</Button>
+											</TableCell>
 										</TableRow>
 									))
 								)}
@@ -457,6 +515,67 @@ export default function RolesPage() {
 					if (!open) setSelectedRoleId(null);
 				}}
 			/>
+
+			<AlertDialog
+				open={rolePendingDelete !== null}
+				onOpenChange={(open) => {
+					if (!open) {
+						setRolePendingDelete(null);
+						setDeleteRoleError("");
+					}
+				}}
+			>
+				<AlertDialogContent>
+					<AlertDialogHeader>
+						<AlertDialogTitle>Delete role?</AlertDialogTitle>
+						<AlertDialogDescription>
+							You are about to permanently delete{" "}
+							<strong>{rolePendingDelete?.name}</strong>. Staff with this role may
+							lose access until they are assigned another role. This cannot be
+							undone.
+						</AlertDialogDescription>
+					</AlertDialogHeader>
+					{deleteRoleError ? (
+						<Alert variant="destructive">
+							<AlertDescription>{deleteRoleError}</AlertDescription>
+						</Alert>
+					) : null}
+					<AlertDialogFooter>
+						<AlertDialogCancel disabled={deleteRoleState.isLoading}>
+							Cancel
+						</AlertDialogCancel>
+						<AlertDialogAction
+							className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+							disabled={deleteRoleState.isLoading}
+							onClick={(e) => {
+								e.preventDefault();
+								void handleDeleteRoleConfirm();
+							}}
+						>
+							{deleteRoleState.isLoading ? (
+								<>
+									<Loader2Icon
+										data-icon="inline-start"
+										className="animate-spin"
+										aria-hidden
+									/>
+									Deleting…
+								</>
+							) : (
+								"Delete role"
+							)}
+						</AlertDialogAction>
+					</AlertDialogFooter>
+				</AlertDialogContent>
+			</AlertDialog>
 		</div>
 	);
+}
+
+export default function RolesPage() {
+	const router = useRouter();
+	useEffect(() => {
+		router.replace("/admin/settings?tab=roles");
+	}, [router]);
+	return null;
 }

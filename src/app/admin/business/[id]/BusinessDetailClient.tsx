@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
-import { ArrowLeft, MoreHorizontal, Power, Trash2 } from "lucide-react";
+import { ArrowLeft, MessageSquare, Power, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -69,6 +69,8 @@ import type {
 import { useListRolesQuery } from "../../../../services/role/roleApi";
 import { useGetUserByIdQuery } from "../../../../services/auth/authApi";
 import { BusinessPaymentsTab } from "@/components/admin/business-payments-tab";
+import { BusinessReferralsTab } from "@/components/admin/business-referrals-tab";
+import { SendBusinessSmsDialog } from "@/components/admin/send-business-sms-dialog";
 import { cn } from "@/lib/utils";
 import { getSubscriptionPlanLabel } from "@/lib/subscription-filters";
 import { formatUserDisplayName } from "@/lib/userDisplay";
@@ -122,6 +124,7 @@ export default function BusinessDetailClient({
 	const router = useRouter();
 	const businessId = params.id;
 	const missingBusinessId = !businessId;
+	const [sendSmsOpen, setSendSmsOpen] = useState(false);
 
 	const {
 		data: business,
@@ -360,11 +363,11 @@ export default function BusinessDetailClient({
 					<button
 						type="button"
 						className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
-						disabled
-						aria-label="More actions"
+						disabled={!user?.phone_number}
+						onClick={() => setSendSmsOpen(true)}
 					>
-						<MoreHorizontal data-icon="inline-start" />
-						Actions
+						<MessageSquare data-icon="inline-start" />
+						Send SMS
 					</button>
 
 					<AlertDialog>
@@ -436,13 +439,21 @@ export default function BusinessDetailClient({
 				</div>
 			</div>
 
+			<SendBusinessSmsDialog
+				open={sendSmsOpen}
+				onOpenChange={setSendSmsOpen}
+				businessName={business.name}
+				phoneNumber={user?.phone_number}
+			/>
+
 			<Tabs defaultValue="overview">
 				<TabsList>
 					<TabsTrigger value="overview">Overview</TabsTrigger>
 					<TabsTrigger value="employees">Employees</TabsTrigger>
 					<TabsTrigger value="branches">Branches</TabsTrigger>
 					<TabsTrigger value="bank-accounts">Bank Accounts</TabsTrigger>
-					<TabsTrigger value="payments">Payments</TabsTrigger>
+					<TabsTrigger value="payments">Verified payments</TabsTrigger>
+					<TabsTrigger value="referrals">Referrals</TabsTrigger>
 					<TabsTrigger value="subscription">Subscription</TabsTrigger>
 				</TabsList>
 
@@ -468,6 +479,14 @@ export default function BusinessDetailClient({
 									<span className="text-sm text-muted-foreground">Status</span>
 									<span className="font-medium">
 										{business.is_active ? "Active" : "Inactive"}
+									</span>
+								</div>
+								<div className="flex flex-col gap-1">
+									<span className="text-sm text-muted-foreground">
+										Owner phone
+									</span>
+									<span className="font-medium tabular-nums">
+										{user?.phone_number ?? "—"}
 									</span>
 								</div>
 							</div>
@@ -735,6 +754,10 @@ export default function BusinessDetailClient({
 
 				<TabsContent value="payments">
 					<BusinessPaymentsTab businessId={businessId} />
+				</TabsContent>
+
+				<TabsContent value="referrals">
+					<BusinessReferralsTab />
 				</TabsContent>
 
 				<TabsContent value="subscription">
