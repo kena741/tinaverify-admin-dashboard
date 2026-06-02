@@ -10,6 +10,8 @@ import { subscriptionPlanApi } from "../services/subscription-plan/subscriptionP
 import { referralsApi } from "../services/referrals/referralsApi";
 import { smsApi } from "../services/sms/smsApi";
 import { transactionsApi } from "../services/transactions/transactionsApi";
+import { bannersApi } from "../services/banners/bannersApi";
+import { analyticsApi } from "../services/analytics/analyticsApi";
 
 // Combine all reducers
 const appReducer = combineReducers({
@@ -23,6 +25,8 @@ const appReducer = combineReducers({
 	[referralsApi.reducerPath]: referralsApi.reducer,
 	[smsApi.reducerPath]: smsApi.reducer,
 	[transactionsApi.reducerPath]: transactionsApi.reducer,
+	[bannersApi.reducerPath]: bannersApi.reducer,
+	[analyticsApi.reducerPath]: analyticsApi.reducer,
 });
 
 // Reset the store when resetStore action is dispatched
@@ -55,6 +59,8 @@ export const store = configureStore({
 			referralsApi.middleware,
 			smsApi.middleware,
 			transactionsApi.middleware,
+			bannersApi.middleware,
+			analyticsApi.middleware,
 		),
 });
 

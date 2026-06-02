@@ -495,6 +495,68 @@ export type SendCustomSmsResponse = {
 };
 
 // -----------------------------
+// Analytics
+// -----------------------------
+
+/** `GET /api/v1/analytics/summary` — platform KPIs (admin only). */
+export type AnalyticsRevenueOutput = {
+	daily: string;
+	weekly: string;
+	monthly: string;
+	/** Revenue for the requested `start_date` / `end_date` range. */
+	custom: string;
+};
+
+export type AnalyticsTopPlanOutput = {
+	plan_id: UUID;
+	plan_name: string;
+	subscription_count: number;
+};
+
+export type AnalyticsSummaryOutput = {
+	revenue: AnalyticsRevenueOutput;
+	total_paying_businesses: number;
+	total_businesses: number;
+	top_plan: AnalyticsTopPlanOutput | null;
+	total_verified_transactions: number;
+	total_failed_transactions: number;
+};
+
+// -----------------------------
+// Banners
+// -----------------------------
+
+/** `GET/POST/PATCH /api/v1/banners` */
+export type BannerOutput = {
+	id: UUID;
+	/** Public URL of the banner image (set by server after upload). */
+	image_url: string;
+	/** Internal storage object path. */
+	image_path: string;
+	/** Where users go when they tap the banner. */
+	redirect_url?: string | null;
+	is_active: boolean;
+	click_count: number;
+	created_at: string;
+	updated_at: string;
+};
+
+export type CreateBannerRequest = {
+	/** Tap destination (`multipart` field: `redirect_url`). */
+	redirect_url: string;
+	is_active: boolean;
+	/** Banner image file (`multipart` field: `image`). Server sets `image_url`. */
+	image: File;
+};
+
+/** `PATCH /api/v1/banners/{banner_id}` */
+export type UpdateBannerRequest = {
+	redirect_url?: string;
+	is_active?: boolean;
+	image?: File;
+};
+
+// -----------------------------
 // Misc
 // -----------------------------
 

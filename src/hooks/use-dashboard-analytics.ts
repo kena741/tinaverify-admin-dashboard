@@ -1,119 +1,115 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 
-import { useAppDispatch } from "@/store/hooks";
-import { useAuth } from "@/store/useAuth";
-import { useListMyBusinessesQuery } from "@/services/auth/authApi";
-import { useListAllBusinessesQuery } from "@/services/branch-management/branchManagementApi";
-import { transactionsApi } from "@/services/transactions/transactionsApi";
-import type { BusinessOutput, VerifiedTransactionOutput } from "@/services/types";
 import {
-	type BuiltInAnalyticsPreset,
-	computeDashboardAnalytics,
+	type DashboardAnalyticsPreset,
 	isoRangeForAnalyticsPreset,
+	isoRangeFromLocalDates,
+	parseAnalyticsCount,
+	parseRevenueAmount,
 } from "@/lib/analytics";
+import { useGetAnalyticsSummaryQuery } from "@/services/analytics/analyticsApi";
+import { useAuth } from "@/store/useAuth";
 
-const MAX_BUSINESSES_TO_FETCH = 25;
+export type DashboardAnalyticsRange = {
+	preset: DashboardAnalyticsPreset;
+	customStart?: string;
+	customEnd?: string;
+};
 
-export function useDashboardAnalytics(preset: BuiltInAnalyticsPreset) {
-	const dispatch = useAppDispatch();
+export function useDashboardAnalytics(range: DashboardAnalyticsRange) {
 	const { isSystemAdmin } = useAuth();
 	const systemAdmin = isSystemAdmin();
 
-	const { data: allBusinesses, isLoading: allBusinessesLoading } =
-		useListAllBusinessesQuery(undefined, { skip: !systemAdmin });
-
-	const { data: myBusinesses, isLoading: myBusinessesLoading } =
-		useListMyBusinessesQuery(undefined, { skip: systemAdmin });
-
-	const businesses = useMemo(
-		() => (systemAdmin ? allBusinesses : myBusinesses) ?? [],
-		[systemAdmin, allBusinesses, myBusinesses],
-	);
-
-	const activeBusinesses = useMemo(
-		() => businesses.filter((b) => b.is_active && !b.is_archived),
-		[businesses],
-	);
-
-	const { startDate, endDate } = useMemo(
-		() => isoRangeForAnalyticsPreset(preset),
-		[preset],
-	);
-
-	const [transactions, setTransactions] = useState<VerifiedTransactionOutput[]>(
-		[],
-	);
-	const [txLoading, setTxLoading] = useState(false);
-	const [txError, setTxError] = useState<string | null>(null);
-
-	useEffect(() => {
-		if (businesses.length === 0) {
-			setTransactions([]);
-			setTxError(null);
-			setTxLoading(false);
-			return;
-		}
-
-		let cancelled = false;
-
-		async function load() {
-			setTxLoading(true);
-			setTxError(null);
-
-			try {
-				const targets = businesses.slice(0, MAX_BUSINESSES_TO_FETCH);
-				const results = await Promise.all(
-					targets.map((b: BusinessOutput) =>
-						dispatch(
-							transactionsApi.endpoints.listTransactionsByBusiness.initiate(
-								{
-									businessId: b.id,
-									startDate,
-									endDate,
-								},
-								{ forceRefetch: true },
-							),
-						).unwrap(),
-					),
-				);
-
-				if (!cancelled) {
-					setTransactions(results.flat());
-				}
-			} catch {
-				if (!cancelled) {
-					setTxError("Failed to load transaction analytics.");
-					setTransactions([]);
-				}
-			} finally {
-				if (!cancelled) setTxLoading(false);
+	const { startDate, endDate, customRangeValid } = useMemo(() => {
+		if (range.preset === "custom") {
+			const custom = isoRangeFromLocalDates(
+				range.customStart ?? "",
+				range.customEnd ?? "",
+			);
+			if (custom) {
+				return { ...custom, customRangeValid: true };
 			}
+			return {
+				startDate: "",
+				endDate: "",
+				customRangeValid: false,
+			};
 		}
+		const builtIn = isoRangeForAnalyticsPreset(range.preset);
+		return { ...builtIn, customRangeValid: true };
+	}, [range.preset, range.customStart, range.customEnd]);
 
-		void load();
-
-		return () => {
-			cancelled = true;
-		};
-	}, [businesses, dispatch, startDate, endDate]);
-
-	const analytics = useMemo(
-		() => computeDashboardAnalytics(transactions, businesses),
-		[transactions, businesses],
+	const {
+		data: summary,
+		isLoading,
+		isFetching,
+		error,
+		refetch,
+	} = useGetAnalyticsSummaryQuery(
+		{ startDate, endDate },
+		{ skip: !systemAdmin || !customRangeValid },
 	);
 
-	const businessesLoading = systemAdmin
-		? allBusinessesLoading
-		: myBusinessesLoading;
+	const periodRevenue = useMemo(
+		() => parseRevenueAmount(summary?.revenue.custom),
+		[summary],
+	);
+
+	const totalVerifiedTransactions = useMemo(
+		() => parseAnalyticsCount(summary?.total_verified_transactions),
+		[summary],
+	);
+
+	const totalFailedTransactions = useMemo(
+		() => parseAnalyticsCount(summary?.total_failed_transactions),
+		[summary],
+	);
+
+	const successRate = useMemo(() => {
+		const total = totalVerifiedTransactions + totalFailedTransactions;
+		if (total === 0) return 0;
+		return Math.round((totalVerifiedTransactions / total) * 100);
+	}, [totalVerifiedTransactions, totalFailedTransactions]);
+
+	const errorMessage = useMemo(() => {
+		if (!systemAdmin) {
+			return "Platform analytics are available to system administrators only.";
+		}
+		if (range.preset === "custom" && !customRangeValid) {
+			return "Choose a valid start and end date (start must be on or before end).";
+		}
+		if (!error) return null;
+		if (
+			typeof error === "object" &&
+			error !== null &&
+			"data" in error &&
+			typeof (error as { data?: unknown }).data === "string"
+		) {
+			return (error as { data: string }).data;
+		}
+		if (
+			typeof error === "object" &&
+			error !== null &&
+			"status" in error &&
+			(error as { status: unknown }).status === 403
+		) {
+			return "You do not have permission to view platform analytics.";
+		}
+		return "Failed to load analytics.";
+	}, [systemAdmin, range.preset, customRangeValid, error]);
 
 	return {
-		analytics,
-		activeBusinessCount: activeBusinesses.length,
-		totalBusinessCount: businesses.length,
-		isLoading: businessesLoading || txLoading,
-		error: txError,
-		truncatedBusinessFetch: businesses.length > MAX_BUSINESSES_TO_FETCH,
+		summary,
+		periodRevenue,
+		totalVerifiedTransactions,
+		totalFailedTransactions,
+		successRate,
+		isLoading: systemAdmin && customRangeValid && (isLoading || isFetching),
+		error: errorMessage,
+		refetch,
+		isSystemAdmin: systemAdmin,
+		customRangeValid,
 	};
 }
