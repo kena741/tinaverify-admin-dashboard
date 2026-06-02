@@ -126,9 +126,7 @@ export default function TransactionsPage() {
 
 	/** Separate cache from filtered table query so summary cards stay global. */
 	const { data: statsTransactions, isLoading: statsLoading } =
-		useListAdminSubscriptionTransactionsQuery(undefined, {
-			fixedCacheKey: "admin-business-subscription-stats",
-		});
+		useListAdminSubscriptionTransactionsQuery();
 
 	const filteredRows = useMemo(() => {
 		let rows: AdminSubscriptionOutput[];
