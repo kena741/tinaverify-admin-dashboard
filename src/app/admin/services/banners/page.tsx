@@ -3,15 +3,16 @@
 import { useEffect, useMemo, useState } from "react";
 import { format } from "date-fns";
 import {
-	ImageIcon,
+	ExternalLinkIcon,
 	Loader2Icon,
 	PencilIcon,
 	PlusIcon,
 	Trash2Icon,
 } from "lucide-react";
 
+import { BannerImage } from "@/components/admin/banner-image";
 import { PageHeader } from "@/components/admin/page-header";
-import { resolveBannerImageSrc } from "@/lib/banner";
+import { useBannerImageSrc } from "@/hooks/use-banner-image-src";
 import {
 	useCreateBannerMutation,
 	useDeleteBannerMutation,
@@ -41,7 +42,12 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "@/components/ui/dialog";
-import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
+import {
+	Field,
+	FieldDescription,
+	FieldGroup,
+	FieldLabel,
+} from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import {
 	Select,
@@ -161,10 +167,15 @@ export default function ServiceBannersPage() {
 		setEditBanner(banner);
 	};
 
-	const validateForm = (requireImage: boolean): string | null => {
+	const validateForm = (
+		requireImage: boolean,
+		requireRedirect: boolean,
+	): string | null => {
 		const redirectUrl = form.redirectUrl.trim();
-		if (!redirectUrl) return "Redirect URL is required.";
-		if (!isValidRedirectUrl(redirectUrl)) {
+		if (requireRedirect && !redirectUrl) {
+			return "Redirect URL is required.";
+		}
+		if (redirectUrl && !isValidRedirectUrl(redirectUrl)) {
 			return "Enter a valid http or https redirect URL.";
 		}
 		if (requireImage && !form.imageFile) {
@@ -175,7 +186,7 @@ export default function ServiceBannersPage() {
 
 	const handleCreate = async (e: React.FormEvent) => {
 		e.preventDefault();
-		const validationError = validateForm(true);
+		const validationError = validateForm(true, true);
 		if (validationError) {
 			setFormError(validationError);
 			return;
@@ -200,7 +211,7 @@ export default function ServiceBannersPage() {
 		if (!editBanner) return;
 		setFormError("");
 
-		const validationError = validateForm(false);
+		const validationError = validateForm(false, false);
 		if (validationError) {
 			setFormError(validationError);
 			return;
@@ -310,6 +321,7 @@ export default function ServiceBannersPage() {
 								<TableHeader>
 									<TableRow>
 										<TableHead>Banner</TableHead>
+										<TableHead>Redirect URL</TableHead>
 										<TableHead>Status</TableHead>
 										<TableHead className="text-right">Clicks</TableHead>
 										<TableHead>Updated</TableHead>
@@ -397,7 +409,7 @@ export default function ServiceBannersPage() {
 							form={form}
 							setForm={setForm}
 							mode="edit"
-							currentImageUrl={editBanner?.image_url}
+							previewBanner={editBanner ?? undefined}
 						/>
 						{formError ? (
 							<p className="text-sm text-destructive" role="alert">
@@ -468,16 +480,18 @@ function BannerFormFields({
 	form,
 	setForm,
 	mode,
-	currentImageUrl,
+	previewBanner,
 }: {
 	form: BannerFormState;
 	setForm: React.Dispatch<React.SetStateAction<BannerFormState>>;
 	mode: "create" | "edit";
-	currentImageUrl?: string;
+	previewBanner?: BannerOutput;
 }) {
 	const isCreate = mode === "create";
 	const idPrefix = isCreate ? "banner-create" : "banner-edit";
-	const savedPreviewSrc = resolveBannerImageSrc(currentImageUrl ?? "");
+	const { src: savedPreviewSrc } = useBannerImageSrc(
+		isCreate ? null : previewBanner,
+	);
 	const [uploadPreviewUrl, setUploadPreviewUrl] = useState<string | null>(null);
 
 	const previewSrc =
@@ -504,19 +518,6 @@ function BannerFormFields({
 				</Field>
 			) : null}
 			<Field>
-				<FieldLabel htmlFor={`${idPrefix}-redirect-url`}>Redirect URL</FieldLabel>
-				<Input
-					id={`${idPrefix}-redirect-url`}
-					type="url"
-					placeholder="https://example.com/promo"
-					value={form.redirectUrl}
-					onChange={(e) =>
-						setForm((prev) => ({ ...prev, redirectUrl: e.target.value }))
-					}
-					required
-				/>
-			</Field>
-			<Field>
 				<FieldLabel htmlFor={`${idPrefix}-image`}>
 					Banner image{isCreate ? "" : " (optional)"}
 				</FieldLabel>
@@ -535,6 +536,22 @@ function BannerFormFields({
 					}}
 				/>
 			</Field>
+			<Field>
+				<FieldLabel htmlFor={`${idPrefix}-redirect-url`}>Redirect URL</FieldLabel>
+				<Input
+					id={`${idPrefix}-redirect-url`}
+					type="url"
+					placeholder="https://example.com/promo"
+					value={form.redirectUrl}
+					onChange={(e) =>
+						setForm((prev) => ({ ...prev, redirectUrl: e.target.value }))
+					}
+					required={isCreate}
+				/>
+				<FieldDescription>
+					Where users go when they tap the banner (not the image file).
+				</FieldDescription>
+			</Field>
 			<Field orientation="horizontal">
 				<Checkbox
 					id={`${idPrefix}-active`}
@@ -551,13 +568,6 @@ function BannerFormFields({
 	);
 }
 
-function bannerImageSrc(banner: BannerOutput): string {
-	return (
-		resolveBannerImageSrc(banner.image_url) ||
-		resolveBannerImageSrc(banner.image_path)
-	);
-}
-
 function BannerTableRow({
 	banner,
 	onEdit,
@@ -567,26 +577,29 @@ function BannerTableRow({
 	onEdit: () => void;
 	onDelete: () => void;
 }) {
-	const imageSrc = bannerImageSrc(banner);
-	const [imageError, setImageError] = useState(false);
-	const showImage = Boolean(imageSrc) && !imageError;
-
 	return (
 		<TableRow>
 			<TableCell>
-				{showImage ? (
-					// eslint-disable-next-line @next/next/no-img-element -- GCS-hosted banner asset
-					<img
-						src={imageSrc}
-						alt="Banner"
-						className="h-20 max-h-24 w-auto max-w-56 rounded-md border bg-muted object-contain"
-						referrerPolicy="no-referrer"
-						onError={() => setImageError(true)}
-					/>
+				<BannerImage
+					banner={banner}
+					className="h-20 max-h-24 w-auto max-w-56 rounded-md border bg-muted object-contain"
+					fallbackClassName="h-20 w-36"
+				/>
+			</TableCell>
+			<TableCell className="max-w-xs">
+				{banner.redirect_url ? (
+					<a
+						href={banner.redirect_url}
+						target="_blank"
+						rel="noopener noreferrer"
+						className="inline-flex items-center gap-1 truncate text-sm text-primary hover:underline"
+						title={banner.redirect_url}
+					>
+						<span className="truncate">{banner.redirect_url}</span>
+						<ExternalLinkIcon className="size-3.5 shrink-0" aria-hidden />
+					</a>
 				) : (
-					<div className="flex h-20 w-36 items-center justify-center rounded-md border bg-muted">
-						<ImageIcon className="size-5 text-muted-foreground" aria-hidden />
-					</div>
+					<span className="text-muted-foreground">—</span>
 				)}
 			</TableCell>
 			<TableCell>

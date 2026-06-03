@@ -60,3 +60,40 @@ export async function backendFetchJson<T>(
 	}
 	return res.json() as Promise<T>;
 }
+
+/** Authenticated fetch for binary responses (e.g. banner images from the API). */
+export async function backendFetchBlob(
+	path: string,
+	init: RequestInit & { accessToken?: string } = {},
+): Promise<Blob> {
+	const { accessToken, ...rest } = init;
+
+	const doFetch = async (token: string | null): Promise<Response> => {
+		if (!token) {
+			throw new Error("Not authenticated");
+		}
+		const url = path.startsWith("http") ? path : `${backendBaseUrl}${path}`;
+		const headers = new Headers(rest.headers);
+		headers.set("Authorization", `Bearer ${token}`);
+		if (!headers.has("Accept")) {
+			headers.set("Accept", "image/*,*/*");
+		}
+		return fetch(url, { ...rest, headers });
+	};
+
+	let token = accessToken ?? getStoredAccessToken();
+	let res = await doFetch(token);
+
+	if (res.status === 401 && getStoredRefreshToken()) {
+		const ok = await refreshAccessToken();
+		if (ok) {
+			token = accessToken ?? getStoredAccessToken();
+			res = await doFetch(token);
+		}
+	}
+
+	if (!res.ok) {
+		throw new Error(await parseError(res));
+	}
+	return res.blob();
+}
