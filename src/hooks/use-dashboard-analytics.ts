@@ -57,6 +57,11 @@ export function useDashboardAnalytics(range: DashboardAnalyticsRange) {
 		[summary],
 	);
 
+	const totalVerifiedAmount = useMemo(
+		() => parseRevenueAmount(summary?.total_verified_amount),
+		[summary],
+	);
+
 	const totalVerifiedTransactions = useMemo(
 		() => parseAnalyticsCount(summary?.total_verified_transactions),
 		[summary],
@@ -103,6 +108,7 @@ export function useDashboardAnalytics(range: DashboardAnalyticsRange) {
 	return {
 		summary,
 		periodRevenue,
+		totalVerifiedAmount,
 		totalVerifiedTransactions,
 		totalFailedTransactions,
 		successRate,

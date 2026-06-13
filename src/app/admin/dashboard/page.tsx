@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { format, parseISO } from "date-fns";
 import {
+	BanknoteIcon,
 	Building2Icon,
 	CheckCircle2Icon,
 	CreditCardIcon,
@@ -71,6 +72,7 @@ export default function DashboardPage() {
 	const {
 		summary,
 		periodRevenue,
+		totalVerifiedAmount,
 		totalVerifiedTransactions,
 		totalFailedTransactions,
 		successRate,
@@ -183,7 +185,7 @@ export default function DashboardPage() {
 				</Alert>
 			) : null}
 
-			<div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+			<div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5">
 				<StatCard
 					label={`Revenue (${periodLabelText})`}
 					value={isLoading ? null : formatRevenueAmount(periodRevenue)}
@@ -191,7 +193,13 @@ export default function DashboardPage() {
 					loading={isLoading}
 				/>
 				<StatCard
-					label="Total verified transactions"
+					label={`Verified amount (${periodLabelText})`}
+					value={isLoading ? null : formatRevenueAmount(totalVerifiedAmount)}
+					icon={BanknoteIcon}
+					loading={isLoading}
+				/>
+				<StatCard
+					label="Verified transactions"
 					value={
 						isLoading ? null : totalVerifiedTransactions.toLocaleString()
 					}
@@ -257,15 +265,21 @@ export default function DashboardPage() {
 				</CardHeader>
 				<CardContent>
 					{isLoading ? (
-						<div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-							<Skeleton className="h-20 w-full" />
-							<Skeleton className="h-20 w-full" />
+						<div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+							{Array.from({ length: 3 }).map((_, i) => (
+								<Skeleton key={i} className="h-20 w-full" />
+							))}
 						</div>
 					) : (
-						<div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+						<div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
 							<MetricTile
-								label="Total verified transactions"
+								label="Verified transactions"
 								value={totalVerifiedTransactions}
+							/>
+							<MetricTile
+								label="Verified amount"
+								value={formatRevenueAmount(totalVerifiedAmount)}
+								isText
 							/>
 							<MetricTile
 								label="Failed/Fake transactions"
@@ -282,13 +296,13 @@ export default function DashboardPage() {
 				</CardHeader>
 				<CardContent>
 					{isLoading ? (
-						<div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-							{Array.from({ length: 3 }).map((_, i) => (
+						<div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+							{Array.from({ length: 4 }).map((_, i) => (
 								<Skeleton key={i} className="h-16 w-full" />
 							))}
 						</div>
 					) : (
-						<div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+						<div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
 							<RevenueTile
 								label="Daily"
 								amount={parseRevenueAmount(revenue?.daily)}
@@ -300,6 +314,10 @@ export default function DashboardPage() {
 							<RevenueTile
 								label="Monthly"
 								amount={parseRevenueAmount(revenue?.monthly)}
+							/>
+							<RevenueTile
+								label={`Custom (${periodLabelText})`}
+								amount={parseRevenueAmount(revenue?.custom)}
 							/>
 						</div>
 					)}
@@ -339,12 +357,26 @@ function StatCard({
 	);
 }
 
-function MetricTile({ label, value }: { label: string; value: number }) {
+function MetricTile({
+	label,
+	value,
+	isText = false,
+}: {
+	label: string;
+	value: number | string;
+	isText?: boolean;
+}) {
 	return (
 		<div className="rounded-lg border bg-muted/30 p-4">
 			<p className="text-sm text-muted-foreground">{label}</p>
-			<p className="mt-1 text-3xl font-semibold tabular-nums">
-				{value.toLocaleString()}
+			<p
+				className={
+					isText
+						? "mt-1 text-xl font-semibold tabular-nums"
+						: "mt-1 text-3xl font-semibold tabular-nums"
+				}
+			>
+				{typeof value === "number" ? value.toLocaleString() : value}
 			</p>
 		</div>
 	);

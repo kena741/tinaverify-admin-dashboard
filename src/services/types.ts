@@ -519,6 +519,8 @@ export type AnalyticsSummaryOutput = {
 	total_businesses: number;
 	top_plan: AnalyticsTopPlanOutput | null;
 	total_verified_transactions: number;
+	/** Sum of verified transaction amounts for the selected period. */
+	total_verified_amount: string;
 	total_failed_transactions: number;
 };
 

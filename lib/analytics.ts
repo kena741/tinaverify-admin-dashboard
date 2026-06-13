@@ -31,14 +31,24 @@ export function isoRangeFromLocalDates(
 	return { startDate: start.toISOString(), endDate: end.toISOString() };
 }
 
-/** Parse API revenue amounts (string or number). */
+/** Parse API revenue amounts (string or number). Handles leading zeros and sign. */
 export function parseRevenueAmount(
 	value: string | number | null | undefined,
 ): number {
 	if (value === null || value === undefined) return 0;
 	if (typeof value === "number") return Number.isFinite(value) ? value : 0;
-	const n = Number.parseFloat(String(value).replace(/,/g, ""));
-	return Number.isFinite(n) ? n : 0;
+
+	let s = String(value).trim().replace(/,/g, "");
+	if (!s) return 0;
+
+	const negative = s.startsWith("-");
+	if (negative) s = s.slice(1).trim();
+	s = s.replace(/^0+(?=\d)/, "");
+	if (s === "" || s === ".") s = "0";
+
+	const n = Number.parseFloat(s);
+	if (!Number.isFinite(n)) return 0;
+	return negative ? -n : n;
 }
 
 /** Coerce analytics count fields (API may return number or string). */
@@ -52,6 +62,7 @@ export function parseAnalyticsCount(
 }
 
 export function formatRevenueAmount(amount: number, currency = "ETB"): string {
+	if (!Number.isFinite(amount)) return `${currency} —`;
 	const formatted = amount.toLocaleString(undefined, {
 		maximumFractionDigits: 2,
 	});
