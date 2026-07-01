@@ -103,7 +103,7 @@ export default function AdminLayout({
 						<Input
 							type="search"
 							placeholder="Search…"
-							className="h-9 bg-muted/50 pl-9"
+							className="h-9 bg-muted/50 pl-9 text-sm"
 							aria-label="Search"
 						/>
 					</div>
@@ -128,7 +128,9 @@ export default function AdminLayout({
 							{notificationsOpen && (
 								<div className="absolute right-0 z-50 mt-2 w-80 overflow-hidden rounded-xl border bg-popover text-popover-foreground shadow-lg">
 									<div className="flex items-center justify-between gap-2 border-b px-4 py-3">
-										<h3 className="font-semibold">Notifications</h3>
+										<h3 className="text-sm font-semibold tracking-tight">
+											Notifications
+										</h3>
 										<Button variant="link" className="h-auto p-0 text-xs">
 											Mark all read
 										</Button>

@@ -2,6 +2,6 @@
 
 import { ReferralsAdminPanel } from "@/components/admin/referrals-admin-panel";
 
-export function BusinessReferralsTab() {
-	return <ReferralsAdminPanel embedded />;
+export default function ReferralsPage() {
+	return <ReferralsAdminPanel />;
 }

@@ -477,6 +477,16 @@ export type ReferralPerformance = {
 	active_subscriptions: number;
 };
 
+/** OpenAPI commission rate response — `GET/PUT /api/v1/admin/referrals/commission-rate` */
+export type CommissionRateOutput = {
+	commission_rate: number;
+};
+
+/** OpenAPI commission rate request body */
+export type CommissionRateUpdateRequest = {
+	commission_rate: number;
+};
+
 // -----------------------------
 // SMS (GeezSMS)
 // -----------------------------

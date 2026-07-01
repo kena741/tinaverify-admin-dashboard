@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import type { LucideIcon } from "lucide-react";
-import { ImageIcon, TicketIcon } from "lucide-react";
+import { ImageIcon, Share2Icon, TicketIcon } from "lucide-react";
 
 import { adminPathMatches } from "@/lib/admin-sidebar-path";
 import {
@@ -23,6 +23,7 @@ const serviceLinks: {
 }[] = [
 	{ name: "Banners", href: "/admin/services/banners", icon: ImageIcon },
 	{ name: "Coupon", href: "/admin/services/coupons", icon: TicketIcon },
+	{ name: "Referrals", href: "/admin/referrals", icon: Share2Icon },
 ];
 
 export function ServiceManagementNav({ pathname }: { pathname: string }) {

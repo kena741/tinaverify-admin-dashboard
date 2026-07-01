@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { ChevronsUpDownIcon, Loader2Icon } from "lucide-react";
 
+import { PageHeader } from "@/components/admin/page-header";
 import { useListAllBusinessesQuery } from "../../../services/branch-management/branchManagementApi";
 import {
 	useCheckoutSubscriptionCustomMutation,
@@ -259,14 +260,10 @@ export default function SubscriptionPage() {
 
 	return (
 		<div className="flex flex-col gap-6">
-			<div>
-				<h1 className="text-2xl font-semibold tracking-tight">Subscription</h1>
-				<p className="text-muted-foreground">
-					Choose a business, then subscribe at a plan&apos;s list price, open
-					checkout for a payment amount (no plan required), or grant credits
-					directly.
-				</p>
-			</div>
+			<PageHeader
+				title="Subscription"
+				description="Choose a business, then subscribe at a plan's list price, open checkout for a payment amount (no plan required), or grant credits directly."
+			/>
 
 			{businessesError ? (
 				<Alert variant="destructive">

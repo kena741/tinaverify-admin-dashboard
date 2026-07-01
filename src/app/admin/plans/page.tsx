@@ -12,6 +12,7 @@ import {
 	Trash2Icon,
 } from "lucide-react";
 
+import { PageHeader } from "@/components/admin/page-header";
 import {
 	useArchiveSubscriptionPlanMutation,
 	useCreateSubscriptionPlanMutation,
@@ -349,9 +350,10 @@ export function PlansAdminPanel({ embedded = false }: { embedded?: boolean }) {
 	return (
 		<div className="flex flex-col gap-6">
 			{!embedded ? (
-				<h1 className="text-balance text-2xl font-semibold tracking-tight">
-					Subscription plans
-				</h1>
+				<PageHeader
+					title="Subscription plans"
+					description="Create and manage subscription plans available to businesses."
+				/>
 			) : null}
 
 			<div aria-live="polite" className="min-h-0">

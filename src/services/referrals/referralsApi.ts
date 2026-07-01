@@ -7,6 +7,8 @@ import { backendBaseQuery } from "../baseQuery";
 import type {
 	CampaignCreateRequest,
 	CampaignOutput,
+	CommissionRateOutput,
+	CommissionRateUpdateRequest,
 	ReferralPerformance,
 } from "../types";
 
@@ -23,7 +25,7 @@ function bearerHeaders(accessToken?: string | null) {
 export const referralsApi = createApi({
 	reducerPath: "referralsApi",
 	baseQuery: backendBaseQuery,
-	tagTypes: ["ReferralCampaigns", "ReferralPerformance"],
+	tagTypes: ["ReferralCampaigns", "ReferralPerformance", "ReferralCommissionRate"],
 	endpoints: (builder) => ({
 		/** `GET /api/v1/admin/referrals/campaigns` */
 		listReferralCampaigns: builder.query<CampaignOutput[], void>({
@@ -68,6 +70,29 @@ export const referralsApi = createApi({
 			}),
 			providesTags: [{ type: "ReferralPerformance" as const, id: "LIST" }],
 		}),
+
+		/** `GET /api/v1/admin/referrals/commission-rate` */
+		getReferralCommissionRate: builder.query<CommissionRateOutput, void>({
+			query: () => ({
+				url: "/api/v1/admin/referrals/commission-rate",
+				headers: bearerHeaders(),
+			}),
+			providesTags: [{ type: "ReferralCommissionRate" as const, id: "CURRENT" }],
+		}),
+
+		/** `PUT /api/v1/admin/referrals/commission-rate` */
+		updateReferralCommissionRate: builder.mutation<
+			CommissionRateOutput,
+			{ body: CommissionRateUpdateRequest }
+		>({
+			query: ({ body }) => ({
+				url: "/api/v1/admin/referrals/commission-rate",
+				method: "PUT",
+				body,
+				headers: bearerHeaders(),
+			}),
+			invalidatesTags: [{ type: "ReferralCommissionRate", id: "CURRENT" }],
+		}),
 	}),
 });
 
@@ -75,4 +100,6 @@ export const {
 	useListReferralCampaignsQuery,
 	useCreateReferralCampaignMutation,
 	useGetReferralPerformanceQuery,
+	useGetReferralCommissionRateQuery,
+	useUpdateReferralCommissionRateMutation,
 } = referralsApi;
