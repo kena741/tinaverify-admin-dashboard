@@ -47,7 +47,7 @@ export async function backendFetchJson<T>(
 	if (res.status === 401 && getStoredRefreshToken()) {
 		const ok = await refreshAccessToken();
 		if (ok) {
-			token = accessToken ?? getStoredAccessToken();
+			token = getStoredAccessToken();
 			res = await doFetch(token);
 		}
 	}
@@ -87,7 +87,7 @@ export async function backendFetchBlob(
 	if (res.status === 401 && getStoredRefreshToken()) {
 		const ok = await refreshAccessToken();
 		if (ok) {
-			token = accessToken ?? getStoredAccessToken();
+			token = getStoredAccessToken();
 			res = await doFetch(token);
 		}
 	}

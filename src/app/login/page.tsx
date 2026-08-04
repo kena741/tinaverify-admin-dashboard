@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { Loader2Icon } from "lucide-react";
+import { EyeIcon, EyeOffIcon, Loader2Icon } from "lucide-react";
 
 import { BrandLogo } from "@/components/brand-logo";
 import { useAuth } from "../../store/useAuth";
@@ -15,7 +15,12 @@ import {
 	CardTitle,
 } from "@/components/ui/card";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
-import { InputGroup, InputGroupInput } from "@/components/ui/input-group";
+import {
+	InputGroup,
+	InputGroupAddon,
+	InputGroupButton,
+	InputGroupInput,
+} from "@/components/ui/input-group";
 import { Separator } from "@/components/ui/separator";
 
 export default function LoginPage() {
@@ -23,6 +28,7 @@ export default function LoginPage() {
 	const { login, loading: authLoading, error: authError } = useAuth();
 	const [emailOrPhone, setEmailOrPhone] = useState("");
 	const [password, setPassword] = useState("");
+	const [showPassword, setShowPassword] = useState(false);
 	const [error, setError] = useState("");
 
 	const uiError = error || authError || "";
@@ -103,13 +109,30 @@ export default function LoginPage() {
 									<InputGroupInput
 										id="password"
 										name="password"
-										type="password"
+										type={showPassword ? "text" : "password"}
 										autoComplete="current-password"
 										required
 										placeholder="Enter your password"
 										value={password}
 										onChange={(e) => setPassword(e.target.value)}
 									/>
+									<InputGroupAddon align="inline-end">
+										<InputGroupButton
+											type="button"
+											size="icon-xs"
+											aria-label={
+												showPassword ? "Hide password" : "Show password"
+											}
+											aria-pressed={showPassword}
+											onClick={() => setShowPassword((v) => !v)}
+										>
+											{showPassword ? (
+												<EyeOffIcon aria-hidden />
+											) : (
+												<EyeIcon aria-hidden />
+											)}
+										</InputGroupButton>
+									</InputGroupAddon>
 								</InputGroup>
 							</Field>
 						</FieldGroup>

@@ -4,7 +4,11 @@ import {
 	type FetchArgs,
 } from "@reduxjs/toolkit/query/react";
 import type { FetchBaseQueryError } from "@reduxjs/toolkit/query";
-import { getStoredRefreshToken, refreshAccessToken } from "./authTokens";
+import {
+	getStoredAccessToken,
+	getStoredRefreshToken,
+	refreshAccessToken,
+} from "./authTokens";
 import {
 	backendBaseUrl,
 	BACKEND_NOT_CONFIGURED_MESSAGE,
@@ -17,6 +21,9 @@ const rawBaseQuery = fetchBaseQuery({
 	baseUrl: backendBaseUrl,
 	prepareHeaders: (headers) => {
 		headers.set("Accept", "application/json");
+		const token = getStoredAccessToken();
+		if (token) headers.set("Authorization", `Bearer ${token}`);
+		else headers.delete("Authorization");
 		return headers;
 	},
 });
