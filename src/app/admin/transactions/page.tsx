@@ -100,6 +100,9 @@ function statusBadgeVariant(
 	return "outline";
 }
 
+const PAGE_SIZE_OPTIONS = [10, 20, 50] as const;
+type PageSize = (typeof PAGE_SIZE_OPTIONS)[number];
+
 export default function TransactionsPage() {
 	const router = useRouter();
 	const [businessId, setBusinessId] = useState(BUSINESS_FILTER_ALL);
@@ -107,6 +110,9 @@ export default function TransactionsPage() {
 	const [statusFilter, setStatusFilter] =
 		useState<SubscriptionStatusFilter>("all");
 	const [searchTerm, setSearchTerm] = useState("");
+	// ponytail: client slice only; server page params when list endpoint grows large
+	const [page, setPage] = useState(1);
+	const [pageSize, setPageSize] = useState<PageSize>(20);
 
 	const { data: businesses, isLoading: businessesLoading } =
 		useListAllBusinessesQuery();
@@ -172,6 +178,16 @@ export default function TransactionsPage() {
 		planId,
 		searchTerm,
 	]);
+
+	const totalItems = filteredRows.length;
+	const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+	const currentPage = Math.min(page, totalPages);
+	const pageStart = (currentPage - 1) * pageSize;
+	const pageRows = filteredRows.slice(pageStart, pageStart + pageSize);
+
+	useEffect(() => {
+		setPage(1);
+	}, [businessId, planId, statusFilter, searchTerm, pageSize]);
 
 	const [summarySnapshot, setSummarySnapshot] = useState<{
 		total: number;
@@ -298,7 +314,9 @@ export default function TransactionsPage() {
 								type="search"
 								placeholder="Search business, plan, or reference…"
 								value={searchTerm}
-								onChange={(e) => setSearchTerm(e.target.value)}
+								onChange={(e) => {
+									setSearchTerm(e.target.value);
+								}}
 								className="h-10"
 							/>
 						</FilterField>
@@ -405,7 +423,7 @@ export default function TransactionsPage() {
 									</TableRow>
 								</TableHeader>
 								<TableBody>
-									{filteredRows.map((row) => (
+									{pageRows.map((row) => (
 										<SubscriptionRow
 											key={row.id}
 											row={row}
@@ -419,14 +437,61 @@ export default function TransactionsPage() {
 						</div>
 					)}
 
-					{!listBusy && filteredRows.length > 0 ? (
-						<p className="text-xs text-muted-foreground">
-							Showing {filteredRows.length} transaction
-							{filteredRows.length === 1 ? "" : "s"}
-							{statusFilter !== "all"
-								? ` · ${getSubscriptionStatusFilterLabel(statusFilter)}`
-								: ""}
-						</p>
+					{!listBusy && totalItems > 0 ? (
+						<div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+							<p className="text-xs text-muted-foreground">
+								Showing {pageStart + 1}–
+								{Math.min(pageStart + pageSize, totalItems)} of{" "}
+								{totalItems}
+								{statusFilter !== "all"
+									? ` · ${getSubscriptionStatusFilterLabel(statusFilter)}`
+									: ""}
+							</p>
+							<div className="flex flex-wrap items-center gap-2">
+								<span className="text-xs text-muted-foreground">Per page</span>
+								<Select
+									value={String(pageSize)}
+									onValueChange={(v) => {
+										const next = Number(v) as PageSize;
+										if (PAGE_SIZE_OPTIONS.includes(next)) setPageSize(next);
+									}}
+								>
+									<SelectTrigger className="h-8 w-[4.5rem]" size="sm">
+										<span>{pageSize}</span>
+									</SelectTrigger>
+									<SelectContent>
+										{PAGE_SIZE_OPTIONS.map((n) => (
+											<SelectItem key={n} value={String(n)}>
+												{n}
+											</SelectItem>
+										))}
+									</SelectContent>
+								</Select>
+								<Button
+									type="button"
+									variant="outline"
+									size="sm"
+									disabled={currentPage <= 1}
+									onClick={() => setPage(Math.max(1, currentPage - 1))}
+								>
+									Previous
+								</Button>
+								<span className="text-xs tabular-nums text-muted-foreground">
+									Page {currentPage} of {totalPages}
+								</span>
+								<Button
+									type="button"
+									variant="outline"
+									size="sm"
+									disabled={currentPage >= totalPages}
+									onClick={() =>
+										setPage(Math.min(totalPages, currentPage + 1))
+									}
+								>
+									Next
+								</Button>
+							</div>
+						</div>
 					) : null}
 				</CardContent>
 			</Card>
