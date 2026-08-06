@@ -1,13 +1,18 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useMemo, useState } from "react";
-import { ArrowLeft, MessageSquare, Power, Trash2 } from "lucide-react";
+import {
+	ArrowLeft,
+	MessageSquare,
+	Power,
+	Trash2,
+} from "lucide-react";
 import { format } from "date-fns";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
-import { buttonVariants } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import {
 	Card,
 	CardContent,
@@ -47,6 +52,7 @@ import {
 import {
 	useDeleteBusinessMutation,
 	useGetBusinessQuery,
+	useListAllBusinessesQuery,
 	useListBusinessEmployeesQuery,
 	useListBusinessBranchesQuery,
 	useSetBusinessActiveMutation,
@@ -62,6 +68,7 @@ import { useListSubscriptionPlansQuery } from "../../../../services/subscription
 import type {
 	BankAccountResponse,
 	BranchOutput,
+	BusinessOutput,
 	EmployeeOutput,
 	RoleOutput,
 	SubscriptionOutput,
@@ -116,15 +123,55 @@ function getErrorMessage(error: unknown, fallback: string): string {
 	return fallback;
 }
 
+const DETAIL_TABS = [
+	"overview",
+	"employees",
+	"branches",
+	"bank-accounts",
+	"payments",
+	"referrals",
+	"subscription",
+] as const;
+
+type DetailTab = (typeof DETAIL_TABS)[number];
+
+function isDetailTab(value: string | null | undefined): value is DetailTab {
+	return (
+		typeof value === "string" &&
+		(DETAIL_TABS as readonly string[]).includes(value)
+	);
+}
+
+function businessDetailPath(businessId: string, tab: DetailTab): string {
+	if (tab === "overview") return `/admin/business/${businessId}`;
+	return `/admin/business/${businessId}?tab=${tab}`;
+}
+
 export default function BusinessDetailClient({
 	params,
 }: {
 	params: { id: string };
 }) {
 	const router = useRouter();
+	const searchParams = useSearchParams();
 	const businessId = params.id;
 	const missingBusinessId = !businessId;
 	const [sendSmsOpen, setSendSmsOpen] = useState(false);
+
+	const tabParam = searchParams.get("tab");
+	const activeTab: DetailTab = isDetailTab(tabParam) ? tabParam : "overview";
+
+	function goToBusiness(nextBusinessId: string) {
+		router.push(businessDetailPath(nextBusinessId, activeTab), {
+			scroll: false,
+		});
+	}
+
+	function onTabChange(next: DetailTab | string | number | null) {
+		const tab = typeof next === "string" ? next : String(next ?? "");
+		if (!isDetailTab(tab) || tab === activeTab) return;
+		router.replace(businessDetailPath(businessId, tab), { scroll: false });
+	}
 
 	const {
 		data: business,
@@ -140,6 +187,17 @@ export default function BusinessDetailClient({
 	);
 
 	const { data: user } = useGetUserByIdQuery({ userId: business?.owner_id ?? "" }, { skip: businessLoading || businessFetching || missingBusinessId });
+
+	const { data: allBusinesses, isLoading: allBusinessesLoading } =
+		useListAllBusinessesQuery(undefined, { skip: missingBusinessId });
+
+	const ownerBusinesses = useMemo(() => {
+		const ownerId = business?.owner_id;
+		if (!ownerId) return [] as BusinessOutput[];
+		return (allBusinesses ?? [])
+			.filter((b) => b.owner_id === ownerId)
+			.toSorted((a, b) => a.name.localeCompare(b.name));
+	}, [allBusinesses, business?.owner_id]);
 
 	const {
 		data: employees,
@@ -324,120 +382,239 @@ export default function BusinessDetailClient({
 	}
 
 	return (
-		<div className="flex flex-col gap-6">
-			<div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-				<div className="flex flex-col gap-1">
-					<div className="flex items-center gap-2">
-						<button
+		<div className="flex flex-col gap-5">
+			<header className="flex flex-col gap-3 border-b border-border pb-4">
+				<div className="flex flex-wrap items-start justify-between gap-3">
+					<div className="flex min-w-0 flex-1 flex-col gap-2">
+						<div className="flex min-w-0 items-center gap-2">
+							<button
+								type="button"
+								className={cn(buttonVariants({ variant: "ghost", size: "sm" }))}
+								onClick={() => router.push("/admin/transactions")}
+							>
+								<ArrowLeft data-icon="inline-start" />
+								Back to owners
+							</button>
+							{businessFetching ? (
+								<Badge variant="outline">Updating…</Badge>
+							) : null}
+						</div>
+
+						<div className="min-w-0">
+							<p className="text-xs text-muted-foreground">Owner</p>
+							<h1 className="truncate text-xl font-semibold tracking-tight">
+								{user ? formatUserDisplayName(user) : "No owner found"}
+							</h1>
+							<p className="mt-0.5 truncate text-sm text-muted-foreground">
+								{user?.phone_number ? (
+									<span className="tabular-nums">{user.phone_number}</span>
+								) : (
+									<span>No phone</span>
+								)}
+								<span>
+									{" · "}
+									{ownerBusinesses.length === 1
+										? "1 business"
+										: `${ownerBusinesses.length || 0} businesses`}
+								</span>
+							</p>
+						</div>
+					</div>
+
+					<div className="flex flex-wrap items-center gap-1.5">
+						<Button
 							type="button"
-							className={cn(buttonVariants({ variant: "ghost", size: "sm" }))}
-							onClick={() => router.push("/admin/transactions")}
+							variant="outline"
+							size="sm"
+							disabled={!user?.phone_number}
+							onClick={() => setSendSmsOpen(true)}
 						>
-							<ArrowLeft data-icon="inline-start" />
-							Back
-						</button>
-						{businessFetching ? (
-							<Badge variant="outline">Updating…</Badge>
-						) : null}
-					</div>
+							<MessageSquare data-icon="inline-start" />
+							SMS
+						</Button>
 
-					<h1 className="text-2xl font-semibold tracking-tight">
-						{business.name}
-					</h1>
-					<div className="flex flex-wrap items-center gap-2">
-						{business.is_active ? (
-							<Badge variant="secondary">Active</Badge>
-						) : (
-							<Badge variant="outline">Inactive</Badge>
-						)}
-						{business.is_archived ? (
-							<Badge variant="outline">Archived</Badge>
-						) : null}
-						<span className="text-sm text-muted-foreground">
-							TIN: {business.tin_number}
-						</span>
+						<AlertDialog>
+							<AlertDialogTrigger
+								className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+								disabled={setBusinessActiveState.isLoading}
+							>
+								<Power data-icon="inline-start" />
+								{business.is_active ? "Deactivate" : "Activate"}
+							</AlertDialogTrigger>
+							<AlertDialogContent>
+								<AlertDialogHeader>
+									<AlertDialogTitle>
+										{business.is_active
+											? "Deactivate this business?"
+											: "Activate this business?"}
+									</AlertDialogTitle>
+									<AlertDialogDescription>
+										Applies only to{" "}
+										<span className="font-medium text-foreground">
+											{business.name || "this business"}
+										</span>
+										, not the owner’s other businesses.
+									</AlertDialogDescription>
+								</AlertDialogHeader>
+								<AlertDialogFooter>
+									<AlertDialogCancel>Cancel</AlertDialogCancel>
+									<AlertDialogAction
+										onClick={async () => {
+											await setBusinessActive({
+												businessId,
+												body: { is_active: !business.is_active },
+											}).unwrap();
+										}}
+									>
+										Confirm
+									</AlertDialogAction>
+								</AlertDialogFooter>
+							</AlertDialogContent>
+						</AlertDialog>
+
+						<AlertDialog>
+							<AlertDialogTrigger
+								className={cn(
+									buttonVariants({ variant: "destructive", size: "sm" }),
+								)}
+								disabled={deleteBusinessState.isLoading}
+							>
+								<Trash2 data-icon="inline-start" />
+								Delete
+							</AlertDialogTrigger>
+							<AlertDialogContent>
+								<AlertDialogHeader>
+									<AlertDialogTitle>Delete this business?</AlertDialogTitle>
+									<AlertDialogDescription>
+										Deletes{" "}
+										<span className="font-medium text-foreground">
+											{business.name || "this business"}
+										</span>
+										. This cannot be undone.
+									</AlertDialogDescription>
+								</AlertDialogHeader>
+								<AlertDialogFooter>
+									<AlertDialogCancel>Cancel</AlertDialogCancel>
+									<AlertDialogAction
+										onClick={async () => {
+											await deleteBusiness({ businessId }).unwrap();
+											router.push("/admin/transactions");
+										}}
+									>
+										Delete
+									</AlertDialogAction>
+								</AlertDialogFooter>
+							</AlertDialogContent>
+						</AlertDialog>
 					</div>
 				</div>
 
-				<div className="flex flex-wrap items-center gap-2">
-					<button
-						type="button"
-						className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
-						disabled={!user?.phone_number}
-						onClick={() => setSendSmsOpen(true)}
-					>
-						<MessageSquare data-icon="inline-start" />
-						Send SMS
-					</button>
+				{/* Scope control: which business tabs operate on */}
+				<div className="flex flex-col gap-1.5">
+					<div className="flex flex-wrap items-baseline justify-between gap-2">
+						<p className="text-xs font-medium text-muted-foreground">
+							Managing business
+						</p>
+						<p className="text-xs text-muted-foreground">
+							Tabs below apply only to the selected business
+						</p>
+					</div>
 
-					<AlertDialog>
-						<AlertDialogTrigger
-							className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
-							disabled={setBusinessActiveState.isLoading}
-						>
-							<Power data-icon="inline-start" />
-							{business.is_active ? "Deactivate" : "Activate"}
-						</AlertDialogTrigger>
-						<AlertDialogContent>
-							<AlertDialogHeader>
-								<AlertDialogTitle>
-									{business.is_active
-										? "Deactivate business?"
-										: "Activate business?"}
-								</AlertDialogTitle>
-								<AlertDialogDescription>
-									This changes whether the business is active. You can toggle it
-									back later.
-								</AlertDialogDescription>
-							</AlertDialogHeader>
-							<AlertDialogFooter>
-								<AlertDialogCancel>Cancel</AlertDialogCancel>
-								<AlertDialogAction
-									onClick={async () => {
-										await setBusinessActive({
-											businessId,
-											body: { is_active: !business.is_active },
-										}).unwrap();
-									}}
-								>
-									Confirm
-								</AlertDialogAction>
-							</AlertDialogFooter>
-						</AlertDialogContent>
-					</AlertDialog>
-
-					<AlertDialog>
-						<AlertDialogTrigger
-							className={cn(
-								buttonVariants({ variant: "destructive", size: "sm" }),
+					{allBusinessesLoading ? (
+						<Skeleton className="h-8 w-full max-w-md" />
+					) : ownerBusinesses.length === 0 ? (
+						<p className="text-sm text-muted-foreground">
+							No businesses for this owner.
+						</p>
+					) : ownerBusinesses.length === 1 ? (
+						<div className="flex flex-wrap items-center gap-2">
+							<span className="font-medium">{business.name || "—"}</span>
+							<span className="text-sm text-muted-foreground">
+								TIN {business.tin_number}
+							</span>
+							{business.is_active ? (
+								<Badge variant="secondary">Active</Badge>
+							) : (
+								<Badge variant="outline">Inactive</Badge>
 							)}
-							disabled={deleteBusinessState.isLoading}
+						</div>
+					) : ownerBusinesses.length <= 6 ? (
+						<div
+							role="tablist"
+							aria-label="Select business to manage"
+							className="flex max-w-full flex-wrap gap-1.5"
 						>
-							<Trash2 data-icon="inline-start" />
-							Delete
-						</AlertDialogTrigger>
-						<AlertDialogContent>
-							<AlertDialogHeader>
-								<AlertDialogTitle>Delete business?</AlertDialogTitle>
-								<AlertDialogDescription>
-									This action cannot be undone.
-								</AlertDialogDescription>
-							</AlertDialogHeader>
-							<AlertDialogFooter>
-								<AlertDialogCancel>Cancel</AlertDialogCancel>
-								<AlertDialogAction
-									onClick={async () => {
-										await deleteBusiness({ businessId }).unwrap();
-										router.push("/admin/transactions");
-									}}
+							{ownerBusinesses.map((b) => {
+								const isCurrent = b.id === businessId;
+								return (
+									<button
+										key={b.id}
+										type="button"
+										role="tab"
+										aria-selected={isCurrent}
+										onClick={() => {
+											if (!isCurrent) goToBusiness(b.id);
+										}}
+										className={cn(
+											"h-8 max-w-44 truncate rounded-md border px-2.5 text-left text-sm transition-colors",
+											isCurrent
+												? "border-primary bg-primary font-medium text-primary-foreground"
+												: "border-border bg-background hover:bg-muted",
+										)}
+									>
+										{b.name || "Untitled"}
+									</button>
+								);
+							})}
+						</div>
+					) : (
+						<div className="flex flex-wrap items-center gap-2">
+							<label htmlFor="manage-business" className="sr-only">
+								Managing business
+							</label>
+							<Select
+								value={businessId}
+								onValueChange={(id) => {
+									if (id && id !== businessId) goToBusiness(id);
+								}}
+							>
+								<SelectTrigger
+									id="manage-business"
+									className="h-8 max-w-sm min-w-[12rem] border-border"
+									aria-label="Managing business"
 								>
-									Delete
-								</AlertDialogAction>
-							</AlertDialogFooter>
-						</AlertDialogContent>
-					</AlertDialog>
+									<span className="truncate font-medium">
+										{business.name || "Select business"}
+									</span>
+								</SelectTrigger>
+								<SelectContent align="start">
+									{ownerBusinesses.map((b) => (
+										<SelectItem key={b.id} value={b.id}>
+											{b.name || "Untitled"} · TIN {b.tin_number}
+										</SelectItem>
+									))}
+								</SelectContent>
+							</Select>
+							{business.is_active ? (
+								<Badge variant="secondary">Active</Badge>
+							) : (
+								<Badge variant="outline">Inactive</Badge>
+							)}
+							<span className="text-sm text-muted-foreground">
+								TIN {business.tin_number}
+							</span>
+						</div>
+					)}
+
+					{ownerBusinesses.length > 1 && ownerBusinesses.length <= 6 ? (
+						<p className="text-xs text-muted-foreground">
+							TIN {business.tin_number}
+							{business.is_active ? "" : " · Inactive"}
+							{business.is_archived ? " · Archived" : ""}
+						</p>
+					) : null}
 				</div>
-			</div>
+			</header>
 
 			<SendBusinessSmsDialog
 				open={sendSmsOpen}
@@ -446,7 +623,7 @@ export default function BusinessDetailClient({
 				phoneNumber={user?.phone_number}
 			/>
 
-			<Tabs defaultValue="overview">
+			<Tabs value={activeTab} onValueChange={onTabChange}>
 				<TabsList>
 					<TabsTrigger value="overview">Overview</TabsTrigger>
 					<TabsTrigger value="employees">Employees</TabsTrigger>
@@ -459,11 +636,21 @@ export default function BusinessDetailClient({
 
 				<TabsContent value="overview">
 					<Card>
+						<CardHeader>
+							<CardTitle className="text-base">
+								{business.name || "Business"}
+							</CardTitle>
+							<CardDescription>
+								Details for the business you are managing above.
+							</CardDescription>
+						</CardHeader>
 						<CardContent className="flex flex-col gap-4">
 							<div className="grid gap-4 sm:grid-cols-2">
 								<div className="flex flex-col gap-1">
-									<span className="text-sm text-muted-foreground">Name</span>
-									<span className="font-medium">{business.name}</span>
+									<span className="text-sm text-muted-foreground">
+										Business name
+									</span>
+									<span className="font-medium">{business.name || "—"}</span>
 								</div>
 								<div className="flex flex-col gap-1">
 									<span className="text-sm text-muted-foreground">TIN</span>
@@ -473,6 +660,14 @@ export default function BusinessDetailClient({
 									<span className="text-sm text-muted-foreground">Owner</span>
 									<span className="font-medium truncate">
 										{user ? formatUserDisplayName(user) : "No owner found"}
+									</span>
+								</div>
+								<div className="flex flex-col gap-1">
+									<span className="text-sm text-muted-foreground">
+										Businesses owned
+									</span>
+									<span className="font-medium tabular-nums">
+										{ownerBusinesses.length}
 									</span>
 								</div>
 								<div className="flex flex-col gap-1">

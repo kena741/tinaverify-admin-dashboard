@@ -73,6 +73,68 @@ export function buildUnsubscribedBusinessRows(
 		}));
 }
 
+/** One row per business: latest subscription (by started_at / created_at). */
+export function buildLatestBusinessSubscriptionRows(
+	subscriptionRows: AdminSubscriptionOutput[],
+): AdminSubscriptionOutput[] {
+	return Array.from(
+		latestSubscriptionByBusiness(subscriptionRows).values(),
+	).toSorted((a, b) =>
+		(a.business?.name ?? a.business_id).localeCompare(
+			b.business?.name ?? b.business_id,
+		),
+	);
+}
+
+const STATUS_PRIORITY: Record<string, number> = {
+	active: 5,
+	pending: 4,
+	insufficient_credits: 3,
+	expired: 2,
+	cancelled: 1,
+	unsubscribed: 0,
+};
+
+function subscriptionStatusPriority(status: string): number {
+	return STATUS_PRIORITY[status.toLowerCase()] ?? -1;
+}
+
+/**
+ * Collapse to one row per owner (prefer strongest status, then newest).
+ * `ownerIdByBusinessId` maps business_id → owner_id; missing owners key as biz:id.
+ */
+export function collapseSubscriptionRowsByOwner(
+	rows: AdminSubscriptionOutput[],
+	ownerIdByBusinessId: Map<string, string>,
+): AdminSubscriptionOutput[] {
+	const byOwner = new Map<string, AdminSubscriptionOutput>();
+
+	for (const row of rows) {
+		const ownerKey =
+			ownerIdByBusinessId.get(row.business_id) ?? `biz:${row.business_id}`;
+		const existing = byOwner.get(ownerKey);
+		if (!existing) {
+			byOwner.set(ownerKey, row);
+			continue;
+		}
+		const rankNew = subscriptionStatusPriority(row.status);
+		const rankOld = subscriptionStatusPriority(existing.status);
+		if (
+			rankNew > rankOld ||
+			(rankNew === rankOld &&
+				subscriptionRowTimestamp(row) >= subscriptionRowTimestamp(existing))
+		) {
+			byOwner.set(ownerKey, row);
+		}
+	}
+
+	return Array.from(byOwner.values()).toSorted((a, b) =>
+		(a.business?.name ?? a.business_id).localeCompare(
+			b.business?.name ?? b.business_id,
+		),
+	);
+}
+
 export function countUniqueBusinesses(rows: AdminSubscriptionOutput[]): number {
 	return new Set(rows.map((r) => r.business_id)).size;
 }

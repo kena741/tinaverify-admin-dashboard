@@ -2,7 +2,6 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import { format } from "date-fns";
 import {
 	Building2Icon,
 	CheckCircle2Icon,
@@ -12,14 +11,15 @@ import {
 } from "lucide-react";
 
 import { PageHeader } from "@/components/admin/page-header";
+import { useGetUserByIdQuery } from "@/services/auth/authApi";
 import { useListAllBusinessesQuery } from "@/services/branch-management/branchManagementApi";
 import { useListAdminSubscriptionTransactionsQuery } from "@/services/subscription/subscriptionApi";
 import { useListSubscriptionPlansQuery } from "@/services/subscription-plan/subscriptionPlanApi";
-import type { AdminSubscriptionOutput } from "@/services/types";
+import type { AdminSubscriptionOutput, BusinessOutput } from "@/services/types";
 import {
-	apiStatusForStatusFilter,
+	buildLatestBusinessSubscriptionRows,
 	buildUnsubscribedBusinessRows,
-	BUSINESS_FILTER_ALL,
+	collapseSubscriptionRowsByOwner,
 	getSubscriptionPlanLabel,
 	getSubscriptionStatusFilterLabel,
 	getSubscriptionStatusLabel,
@@ -28,6 +28,7 @@ import {
 	type BusinessSubscriptionStats,
 	type SubscriptionStatusFilter,
 } from "@/lib/subscription-filters";
+import { formatUserDisplayName } from "@/lib/userDisplay";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -76,19 +77,6 @@ function getErrorMessage(error: unknown, fallback: string): string {
 	return fallback;
 }
 
-function formatDateTime(value: string | null | undefined): string {
-	if (!value) return "—";
-	const d = new Date(value);
-	if (Number.isNaN(d.getTime())) return "—";
-	return format(d, "MMM d, yyyy HH:mm");
-}
-
-function formatAmount(amount: number | null | undefined): string {
-	if (amount === null || amount === undefined) return "—";
-	if (!Number.isFinite(amount)) return "—";
-	return amount.toLocaleString(undefined, { maximumFractionDigits: 2 });
-}
-
 function statusBadgeVariant(
 	status: string,
 ): "default" | "secondary" | "destructive" | "outline" {
@@ -100,12 +88,18 @@ function statusBadgeVariant(
 	return "outline";
 }
 
+function formatBusinessNames(list: BusinessOutput[], max = 2): string {
+	if (list.length === 0) return "—";
+	const names = list.map((b) => b.name || "Untitled").filter(Boolean);
+	if (names.length <= max) return names.join(", ");
+	return `${names.slice(0, max).join(", ")} +${names.length - max} more`;
+}
+
 const PAGE_SIZE_OPTIONS = [10, 20, 50] as const;
 type PageSize = (typeof PAGE_SIZE_OPTIONS)[number];
 
 export default function TransactionsPage() {
 	const router = useRouter();
-	const [businessId, setBusinessId] = useState(BUSINESS_FILTER_ALL);
 	const [planId, setPlanId] = useState(PLAN_FILTER_ALL);
 	const [statusFilter, setStatusFilter] =
 		useState<SubscriptionStatusFilter>("all");
@@ -119,64 +113,97 @@ export default function TransactionsPage() {
 	const { data: plans } = useListSubscriptionPlansQuery();
 
 	const {
-		data: transactions,
-		isLoading,
+		data: statsTransactions,
+		isLoading: statsLoading,
 		isFetching,
 		error,
 		refetch,
-	} = useListAdminSubscriptionTransactionsQuery({
-		businessId: businessId === BUSINESS_FILTER_ALL ? null : businessId,
-		planId: planId === PLAN_FILTER_ALL ? null : planId,
-		status: apiStatusForStatusFilter(statusFilter),
-	});
+	} = useListAdminSubscriptionTransactionsQuery();
 
-	/** Separate cache from filtered table query so summary cards stay global. */
-	const { data: statsTransactions, isLoading: statsLoading } =
-		useListAdminSubscriptionTransactionsQuery();
+	const ownerIdByBusinessId = useMemo(() => {
+		const map = new Map<string, string>();
+		for (const b of businesses ?? []) {
+			if (b.owner_id) map.set(b.id, b.owner_id);
+		}
+		return map;
+	}, [businesses]);
+
+	const businessesByOwnerId = useMemo(() => {
+		const map = new Map<string, BusinessOutput[]>();
+		for (const b of businesses ?? []) {
+			if (!b.owner_id) continue;
+			const list = map.get(b.owner_id) ?? [];
+			list.push(b);
+			map.set(b.owner_id, list);
+		}
+		for (const list of map.values()) {
+			list.sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+		}
+		return map;
+	}, [businesses]);
 
 	const filteredRows = useMemo(() => {
-		let rows: AdminSubscriptionOutput[];
+		let businessRows: AdminSubscriptionOutput[];
 
 		if (statusFilter === "unsubscribed") {
-			rows = buildUnsubscribedBusinessRows(
+			businessRows = buildUnsubscribedBusinessRows(
 				businesses ?? [],
 				statsTransactions ?? [],
 			);
-			if (businessId !== BUSINESS_FILTER_ALL) {
-				rows = rows.filter((r) => r.business_id === businessId);
-			}
 			if (planId !== PLAN_FILTER_ALL) {
-				rows = [];
+				businessRows = [];
 			}
 		} else {
-			rows = transactions ?? [];
+			businessRows = buildLatestBusinessSubscriptionRows(
+				statsTransactions ?? [],
+			);
+			if (planId !== PLAN_FILTER_ALL) {
+				businessRows = businessRows.filter(
+					(r) => r.plan_id === planId || r.plan?.id === planId,
+				);
+			}
+			if (statusFilter !== "all") {
+				businessRows = businessRows.filter(
+					(r) => r.status.toLowerCase() === statusFilter,
+				);
+			}
 		}
 
 		const q = searchTerm.trim().toLowerCase();
-		if (!q) return rows;
+		if (q) {
+			businessRows = businessRows.filter((row) => {
+				const ownerId = ownerIdByBusinessId.get(row.business_id);
+				const ownerBizNames = ownerId
+					? (businessesByOwnerId.get(ownerId) ?? [])
+							.map((b) => b.name)
+							.join(" ")
+					: "";
+				const hay = [
+					row.business?.name,
+					row.business?.tin_number,
+					row.plan?.name,
+					row.status,
+					row.chapa_transaction_reference,
+					row.business_id,
+					ownerBizNames,
+				]
+					.filter(Boolean)
+					.join(" ")
+					.toLowerCase();
+				return hay.includes(q);
+			});
+		}
 
-		return rows.filter((row) => {
-			const hay = [
-				row.business?.name,
-				row.business?.tin_number,
-				row.plan?.name,
-				row.status,
-				row.chapa_transaction_reference,
-				row.business_id,
-			]
-				.filter(Boolean)
-				.join(" ")
-				.toLowerCase();
-			return hay.includes(q);
-		});
+		// One row per owner (subscription columns show their primary business).
+		return collapseSubscriptionRowsByOwner(businessRows, ownerIdByBusinessId);
 	}, [
 		statusFilter,
-		transactions,
 		businesses,
 		statsTransactions,
-		businessId,
 		planId,
 		searchTerm,
+		ownerIdByBusinessId,
+		businessesByOwnerId,
 	]);
 
 	const totalItems = filteredRows.length;
@@ -187,7 +214,7 @@ export default function TransactionsPage() {
 
 	useEffect(() => {
 		setPage(1);
-	}, [businessId, planId, statusFilter, searchTerm, pageSize]);
+	}, [planId, statusFilter, searchTerm, pageSize]);
 
 	const [summarySnapshot, setSummarySnapshot] = useState<{
 		total: number;
@@ -208,11 +235,6 @@ export default function TransactionsPage() {
 	const businessesBusy = businessesLoading && summarySnapshot === null;
 	const statsBusy = statsLoading && summarySnapshot === null;
 
-	const businessLabel =
-		businessId === BUSINESS_FILTER_ALL
-			? "All businesses"
-			: (businesses?.find((b) => b.id === businessId)?.name ?? "All businesses");
-
 	const planLabel =
 		planId === PLAN_FILTER_ALL
 			? "All plans"
@@ -221,15 +243,18 @@ export default function TransactionsPage() {
 	const listBusy =
 		statusFilter === "unsubscribed"
 			? businessesLoading || statsLoading
-			: isLoading || isFetching;
+			: statsLoading || isFetching || businessesLoading;
 
 	return (
 		<div className="flex flex-col gap-6">
-			<PageHeader title="Business" />
+			<PageHeader
+				title="Owners"
+				description="Each row is an owner. Open a row to manage their businesses, staff, and subscriptions."
+			/>
 
 			{error ? (
 				<Alert variant="destructive">
-					<AlertTitle>Failed to load transactions</AlertTitle>
+					<AlertTitle>Failed to load owners</AlertTitle>
 					<AlertDescription className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
 						<span>{getErrorMessage(error, "Request failed.")}</span>
 						<Button type="button" variant="outline" size="sm" onClick={() => refetch()}>
@@ -241,7 +266,7 @@ export default function TransactionsPage() {
 
 			<div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
 				<SummaryCard
-					label="Total"
+					label="Total businesses"
 					value={
 						summarySnapshot
 							? summarySnapshot.total.toLocaleString()
@@ -312,7 +337,7 @@ export default function TransactionsPage() {
 						<FilterField label="Search" className="min-w-48 flex-1 lg:min-w-64">
 							<Input
 								type="search"
-								placeholder="Search business, plan, or reference…"
+								placeholder="Search business name, TIN, or plan…"
 								value={searchTerm}
 								onChange={(e) => {
 									setSearchTerm(e.target.value);
@@ -321,7 +346,7 @@ export default function TransactionsPage() {
 							/>
 						</FilterField>
 
-						<FilterField label="Status" className="min-w-40 flex-1">
+						<FilterField label="Subscription status" className="min-w-40 flex-1">
 							<Select
 								value={statusFilter}
 								onValueChange={(v) => {
@@ -351,7 +376,7 @@ export default function TransactionsPage() {
 							</Select>
 						</FilterField>
 
-						<FilterField label="Subscription plan" className="min-w-48 flex-1">
+						<FilterField label="Plan" className="min-w-48 flex-1">
 							<Select
 								value={planId}
 								onValueChange={(v) => {
@@ -373,29 +398,6 @@ export default function TransactionsPage() {
 								</SelectContent>
 							</Select>
 						</FilterField>
-
-						<FilterField label="Business" className="min-w-48 flex-1">
-							<Select
-								value={businessId}
-								onValueChange={(v) => {
-									if (v != null && v !== "") setBusinessId(v);
-								}}
-							>
-								<SelectTrigger className="h-10 w-full">
-									<span className="flex flex-1 truncate text-left">
-										{businessLabel}
-									</span>
-								</SelectTrigger>
-								<SelectContent>
-									<SelectItem value={BUSINESS_FILTER_ALL}>All businesses</SelectItem>
-									{(businesses ?? []).map((b) => (
-										<SelectItem key={b.id} value={b.id}>
-											{b.name}
-										</SelectItem>
-									))}
-								</SelectContent>
-							</Select>
-						</FilterField>
 					</div>
 
 					{listBusy ? (
@@ -406,32 +408,39 @@ export default function TransactionsPage() {
 						</div>
 					) : filteredRows.length === 0 ? (
 						<p className="py-10 text-center text-sm text-muted-foreground">
-							No subscription transactions match your filters.
+							No owners match your filters.
 						</p>
 					) : (
 						<div className="overflow-x-auto rounded-lg border">
 							<Table>
 								<TableHeader>
 									<TableRow>
-										<TableHead>Business</TableHead>
-										<TableHead>Plan</TableHead>
+										<TableHead>Owner</TableHead>
+										<TableHead>Businesses</TableHead>
+										<TableHead>Primary plan</TableHead>
 										<TableHead>Status</TableHead>
 										<TableHead className="text-right">Amount</TableHead>
 										<TableHead className="text-right">Credits</TableHead>
-										<TableHead>Started</TableHead>
-										<TableHead>Reference</TableHead>
 									</TableRow>
 								</TableHeader>
 								<TableBody>
-									{pageRows.map((row) => (
-										<SubscriptionRow
-											key={row.id}
-											row={row}
-											onSelect={() =>
-												router.push(`/admin/business/${row.business_id}`)
-											}
-										/>
-									))}
+									{pageRows.map((row) => {
+										const ownerId = ownerIdByBusinessId.get(row.business_id);
+										const ownerBusinesses = ownerId
+											? (businessesByOwnerId.get(ownerId) ?? [])
+											: [];
+										return (
+											<OwnerRow
+												key={ownerId ?? row.id}
+												row={row}
+												ownerId={ownerId}
+												ownerBusinesses={ownerBusinesses}
+												onSelect={() =>
+													router.push(`/admin/business/${row.business_id}`)
+												}
+											/>
+										);
+									})}
 								</TableBody>
 							</Table>
 						</div>
@@ -441,8 +450,8 @@ export default function TransactionsPage() {
 						<div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
 							<p className="text-xs text-muted-foreground">
 								Showing {pageStart + 1}–
-								{Math.min(pageStart + pageSize, totalItems)} of{" "}
-								{totalItems}
+								{Math.min(pageStart + pageSize, totalItems)} of {totalItems}{" "}
+								owner{totalItems === 1 ? "" : "s"}
 								{statusFilter !== "all"
 									? ` · ${getSubscriptionStatusFilterLabel(statusFilter)}`
 									: ""}
@@ -456,7 +465,7 @@ export default function TransactionsPage() {
 										if (PAGE_SIZE_OPTIONS.includes(next)) setPageSize(next);
 									}}
 								>
-									<SelectTrigger className="h-8 w-[4.5rem]" size="sm">
+									<SelectTrigger className="h-8 w-18" size="sm">
 										<span>{pageSize}</span>
 									</SelectTrigger>
 									<SelectContent>
@@ -499,13 +508,27 @@ export default function TransactionsPage() {
 	);
 }
 
-function SubscriptionRow({
+function OwnerRow({
 	row,
+	ownerId,
+	ownerBusinesses,
 	onSelect,
 }: {
 	row: AdminSubscriptionOutput;
+	ownerId: string | undefined;
+	ownerBusinesses: BusinessOutput[];
 	onSelect: () => void;
 }) {
+	const { data: user, isLoading, isError } = useGetUserByIdQuery(
+		{ userId: ownerId ?? "" },
+		{ skip: !ownerId },
+	);
+	const ownerLabel = user
+		? formatUserDisplayName(user)
+		: "owner";
+	const count = ownerBusinesses.length;
+	const namesSummary = formatBusinessNames(ownerBusinesses);
+
 	return (
 		<TableRow
 			className="cursor-pointer hover:bg-muted/50"
@@ -518,37 +541,56 @@ function SubscriptionRow({
 			}}
 			tabIndex={0}
 			role="button"
-			aria-label={`View details for ${row.business?.name ?? "business"}`}
+			aria-label={`Open ${ownerLabel}, ${count} business${count === 1 ? "" : "es"}`}
 		>
 			<TableCell>
-				<div className="flex flex-col gap-0.5">
-					<span className="font-medium">{row.business?.name ?? "—"}</span>
-					{row.business?.tin_number ? (
-						<span className="text-xs text-muted-foreground">
-							TIN {row.business.tin_number}
-						</span>
-					) : null}
-				</div>
+				{!ownerId ? (
+					<span className="text-muted-foreground">Unknown owner</span>
+				) : isLoading ? (
+					<div className="flex flex-col gap-1">
+						<Skeleton className="h-4 w-28" />
+						<Skeleton className="h-3 w-24" />
+					</div>
+				) : isError || !user ? (
+					<span className="text-muted-foreground">Unknown owner</span>
+				) : (
+					<div className="flex flex-col gap-0.5">
+						<span className="font-medium">{formatUserDisplayName(user)}</span>
+						{user.phone_number ? (
+							<span className="text-xs tabular-nums text-muted-foreground">
+								{user.phone_number}
+							</span>
+						) : null}
+					</div>
+				)}
 			</TableCell>
 			<TableCell>
-				{getSubscriptionPlanLabel(row.plan)}
+				<div className="flex max-w-64 flex-col gap-0.5">
+					<span className="text-sm font-medium tabular-nums">
+						{count > 0
+							? `${count} business${count === 1 ? "" : "es"}`
+							: "—"}
+					</span>
+					<span className="truncate text-xs text-muted-foreground" title={namesSummary}>
+						{namesSummary}
+					</span>
+				</div>
 			</TableCell>
+			<TableCell>{getSubscriptionPlanLabel(row.plan)}</TableCell>
 			<TableCell>
 				<Badge variant={statusBadgeVariant(row.status)}>
 					{getSubscriptionStatusLabel(row.status)}
 				</Badge>
 			</TableCell>
 			<TableCell className="text-right tabular-nums">
-				{formatAmount(row.amount)}
+				{row.amount === null || row.amount === undefined
+					? "—"
+					: Number.isFinite(row.amount)
+						? row.amount.toLocaleString(undefined, { maximumFractionDigits: 2 })
+						: "—"}
 			</TableCell>
 			<TableCell className="text-right tabular-nums">
 				{row.credits_limit.toLocaleString()}
-			</TableCell>
-			<TableCell className="whitespace-nowrap text-muted-foreground">
-				{formatDateTime(row.started_at ?? row.created_at)}
-			</TableCell>
-			<TableCell className="max-w-40 truncate font-mono text-xs">
-				{row.chapa_transaction_reference ?? "—"}
 			</TableCell>
 		</TableRow>
 	);
