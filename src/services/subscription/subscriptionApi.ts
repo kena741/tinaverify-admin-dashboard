@@ -103,13 +103,26 @@ export const subscriptionApi = createApi({
 					: [{ type: "SubscriptionHistory" as const, id: businessId }],
 		}),
 
-		/** `GET /api/v1/subscriptions/usage` */
-		getSubscriptionUsage: builder.query<UsageOutput, { businessId: string }>({
-			query: ({ businessId }) => ({
-				url: "/api/v1/subscriptions/usage",
-				params: { business_id: businessId },
-				headers: bearerHeaders(),
-			}),
+		/** `GET /api/v1/subscriptions/usage` — 404 when no active subscription → null */
+		getSubscriptionUsage: builder.query<UsageOutput | null, { businessId: string }>({
+			async queryFn({ businessId }, _api, _extra, baseQuery) {
+				const result = await baseQuery({
+					url: "/api/v1/subscriptions/usage",
+					params: { business_id: businessId },
+					headers: bearerHeaders(),
+				});
+				if (result.error) {
+					const status =
+						typeof result.error === "object" &&
+						result.error !== null &&
+						"status" in result.error
+							? (result.error as { status: unknown }).status
+							: undefined;
+					if (status === 404) return { data: null };
+					return { error: result.error };
+				}
+				return { data: result.data as UsageOutput };
+			},
 			providesTags: (_result, _err, { businessId }) => [
 				{ type: "SubscriptionUsage" as const, id: businessId },
 			],

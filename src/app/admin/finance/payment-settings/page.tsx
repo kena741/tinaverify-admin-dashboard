@@ -1,16 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import { Loader2Icon } from "lucide-react";
 
 import { PageHeader } from "@/components/admin/page-header";
 import {
-	defaultPaymentGatewaySettings,
-	loadPaymentGatewaySettings,
-	savePaymentGatewaySettings,
-	type PaymentGatewayKey,
-	type PaymentGatewaySettings,
-} from "@/lib/payment-gateway-settings";
+	useGetPaymentGatewaysQuery,
+	useUpdatePaymentGatewaysMutation,
+} from "@/services/payments/paymentsApi";
+import type { PaymentGatewayKey } from "@/lib/payment-gateway-settings";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -37,48 +35,56 @@ const gateways: {
 	},
 ];
 
+function getErrorMessage(error: unknown, fallback: string): string {
+	if (
+		typeof error === "object" &&
+		error !== null &&
+		"data" in error &&
+		(error as { data?: { detail?: unknown; message?: unknown } }).data
+	) {
+		const data = (error as { data: { detail?: unknown; message?: unknown } }).data;
+		if (typeof data.detail === "string") return data.detail;
+		if (typeof data.message === "string") return data.message;
+	}
+	if (error instanceof Error) return error.message;
+	return fallback;
+}
+
 export default function PaymentSettingsPage() {
-	const [settings, setSettings] = useState<PaymentGatewaySettings | null>(null);
+	const {
+		data: settings,
+		isLoading,
+		isError,
+		error,
+		refetch,
+	} = useGetPaymentGatewaysQuery();
+	const [updateGateways, updateState] = useUpdatePaymentGatewaysMutation();
 	const [savingKey, setSavingKey] = useState<PaymentGatewayKey | null>(null);
 	const [banner, setBanner] = useState<{
 		variant: "default" | "destructive";
 		message: string;
 	} | null>(null);
 
-	useEffect(() => {
-		setSettings(loadPaymentGatewaySettings());
-	}, []);
-
 	const setGatewayEnabled = useCallback(
 		async (key: PaymentGatewayKey, enabled: boolean) => {
 			setSavingKey(key);
 			setBanner(null);
-
-			const previous = settings ?? defaultPaymentGatewaySettings;
-			const next: PaymentGatewaySettings = {
-				...previous,
-				[key]: { enabled },
-			};
-
-			setSettings(next);
-
 			try {
-				savePaymentGatewaySettings(next);
+				await updateGateways({ [key]: { enabled } }).unwrap();
 				setBanner({
 					variant: "default",
 					message: `${key === "chapa" ? "Chapa" : "Telebirr"} ${enabled ? "enabled" : "disabled"}.`,
 				});
-			} catch {
-				setSettings(previous);
+			} catch (err) {
 				setBanner({
 					variant: "destructive",
-					message: "Could not save payment settings. Try again.",
+					message: getErrorMessage(err, "Could not save payment settings."),
 				});
 			} finally {
 				setSavingKey(null);
 			}
 		},
-		[settings],
+		[updateGateways],
 	);
 
 	return (
@@ -97,22 +103,31 @@ export default function PaymentSettingsPage() {
 				</Alert>
 			) : null}
 
-			<Alert>
-				<AlertTitle>Local configuration</AlertTitle>
-				<AlertDescription>
-					Gateway toggles are stored in this browser until the admin payment-settings
-					API is available on the backend.
-				</AlertDescription>
-			</Alert>
+			{isError ? (
+				<Alert variant="destructive">
+					<AlertTitle>Could not load payment gateways</AlertTitle>
+					<AlertDescription className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+						<span>{getErrorMessage(error, "Request failed.")}</span>
+						<button
+							type="button"
+							className="text-sm font-medium underline"
+							onClick={() => void refetch()}
+						>
+							Try again
+						</button>
+					</AlertDescription>
+				</Alert>
+			) : null}
 
 			<div className="grid gap-4 lg:grid-cols-2">
-				{settings === null
+				{isLoading || !settings
 					? Array.from({ length: 2 }).map((_, i) => (
 							<Skeleton key={i} className="h-40 w-full" />
 						))
 					: gateways.map((gateway) => {
 							const enabled = settings[gateway.key].enabled;
-							const isSaving = savingKey === gateway.key;
+							const isSaving =
+								savingKey === gateway.key || updateState.isLoading;
 
 							return (
 								<Card key={gateway.key}>

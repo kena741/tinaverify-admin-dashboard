@@ -580,7 +580,7 @@ export default function BusinessDetailClient({
 							>
 								<SelectTrigger
 									id="manage-business"
-									className="h-8 max-w-sm min-w-[12rem] border-border"
+									className="h-8 max-w-sm min-w-48 border-border"
 									aria-label="Managing business"
 								>
 									<span className="truncate font-medium">
@@ -1069,7 +1069,7 @@ export default function BusinessDetailClient({
 							<CardContent className="flex flex-col gap-4">
 								{subscriptionUsageError ? (
 									<Alert variant="destructive">
-										<AlertTitle>No usage data found</AlertTitle>
+										<AlertTitle>Could not load usage</AlertTitle>
 									</Alert>
 								) : subscriptionUsage ? (
 									<div className="grid gap-4 sm:grid-cols-3">
@@ -1105,7 +1105,9 @@ export default function BusinessDetailClient({
 										</p>
 									</div>
 								) : (
-									<p className="text-sm text-muted-foreground">No usage data.</p>
+									<p className="text-sm text-muted-foreground">
+										No active subscription — usage is empty for this business.
+									</p>
 								)}
 							</CardContent>
 						</Card>

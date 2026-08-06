@@ -8,6 +8,7 @@ import { useListAllBusinessesQuery } from "../../../services/branch-management/b
 import {
 	useCheckoutSubscriptionCustomMutation,
 	useCheckoutSubscriptionMutation,
+	useGetActiveSubscriptionQuery,
 	useGetSubscriptionUsageQuery,
 	useGrantSubscriptionCreditsMutation,
 } from "../../../services/subscription/subscriptionApi";
@@ -137,6 +138,14 @@ export default function SubscriptionPage() {
 		isFetching: usageFetching,
 		isError: usageError,
 	} = useGetSubscriptionUsageQuery({ businessId }, { skip: !businessId });
+
+	const {
+		data: activeSubscription,
+		isFetching: activeSubFetching,
+	} = useGetActiveSubscriptionQuery(
+		{ businessId },
+		{ skip: !businessId },
+	);
 
 	const selectedBusiness = useMemo(
 		() => businesses.find((b) => b.id === businessId) ?? null,
@@ -371,13 +380,15 @@ export default function SubscriptionPage() {
 						<CardTitle className="text-base">Current usage</CardTitle>
 					</CardHeader>
 					<CardContent className="text-sm">
-						{usageFetching && !usage ? (
+						{(usageFetching || activeSubFetching) && !usage ? (
 							<p className="text-muted-foreground">Loading usage…</p>
 						) : usageError ? (
-							<p className="text-muted-foreground">
-								Usage data isn’t available for this business (they may have no
-								active subscription yet).
-							</p>
+							<Alert variant="destructive">
+								<AlertTitle>Could not load usage</AlertTitle>
+								<AlertDescription>
+									Check your connection and try selecting the business again.
+								</AlertDescription>
+							</Alert>
 						) : usage ? (
 							<dl className="grid gap-2 sm:grid-cols-3">
 								<div>
@@ -400,7 +411,17 @@ export default function SubscriptionPage() {
 								</div>
 							</dl>
 						) : (
-							<p className="text-muted-foreground">No usage data.</p>
+							<div className="flex flex-col gap-1">
+								<p className="text-muted-foreground">
+									No active subscription for this business — usage is
+									unavailable until they have a plan.
+								</p>
+								{activeSubscription ? (
+									<p className="text-xs text-muted-foreground">
+										Latest status: {activeSubscription.status}
+									</p>
+								) : null}
+							</div>
 						)}
 					</CardContent>
 				</Card>

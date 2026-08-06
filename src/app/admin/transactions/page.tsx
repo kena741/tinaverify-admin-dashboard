@@ -1,21 +1,30 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { format } from "date-fns";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
+	ArrowDownIcon,
+	ArrowUpIcon,
+	ArrowUpDownIcon,
 	Building2Icon,
 	CheckCircle2Icon,
 	ClockIcon,
 	MinusCircleIcon,
+	UsersIcon,
 	XCircleIcon,
 } from "lucide-react";
 
 import { PageHeader } from "@/components/admin/page-header";
-import { useGetUserByIdQuery } from "@/services/auth/authApi";
+import { useLazyGetUserByIdQuery } from "@/services/auth/authApi";
 import { useListAllBusinessesQuery } from "@/services/branch-management/branchManagementApi";
 import { useListAdminSubscriptionTransactionsQuery } from "@/services/subscription/subscriptionApi";
 import { useListSubscriptionPlansQuery } from "@/services/subscription-plan/subscriptionPlanApi";
-import type { AdminSubscriptionOutput, BusinessOutput } from "@/services/types";
+import type {
+	AdminSubscriptionOutput,
+	BusinessOutput,
+	UserOutput,
+} from "@/services/types";
 import {
 	buildLatestBusinessSubscriptionRows,
 	buildUnsubscribedBusinessRows,
@@ -24,11 +33,13 @@ import {
 	getSubscriptionStatusFilterLabel,
 	getSubscriptionStatusLabel,
 	PLAN_FILTER_ALL,
-	summarizeBusinessSubscriptionStats,
-	type BusinessSubscriptionStats,
+	summarizePlatformSubscription,
+	subscriptionRowTimestamp,
+	type PlatformSubscriptionSummary,
 	type SubscriptionStatusFilter,
 } from "@/lib/subscription-filters";
 import { formatUserDisplayName } from "@/lib/userDisplay";
+import { cn } from "@/lib/utils";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -49,6 +60,183 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/components/ui/table";
+
+const OWNER_FETCH_CONCURRENCY = 3;
+
+const BIZ_COUNT_FILTER_ALL = "all";
+type BizCountFilter = typeof BIZ_COUNT_FILTER_ALL | "1" | "2" | "3+";
+
+type SortKey =
+	| "businesses"
+	| "plan"
+	| "status"
+	| "amount"
+	| "credits"
+	| "date";
+type SortDir = "asc" | "desc";
+
+const STATUS_SORT_RANK: Record<string, number> = {
+	active: 5,
+	pending: 4,
+	insufficient_credits: 3,
+	expired: 2,
+	cancelled: 1,
+	unsubscribed: 0,
+};
+
+function isStatusFilter(v: string): v is SubscriptionStatusFilter {
+	return (
+		v === "all" ||
+		v === "pending" ||
+		v === "active" ||
+		v === "expired" ||
+		v === "cancelled" ||
+		v === "insufficient_credits" ||
+		v === "unsubscribed"
+	);
+}
+
+function formatSubscriptionDate(iso: string | null | undefined): string {
+	if (!iso) return "—";
+	try {
+		return format(new Date(iso), "MMM d, yyyy");
+	} catch {
+		return iso;
+	}
+}
+
+function dayStartMs(yyyyMmDd: string): number {
+	const t = new Date(`${yyyyMmDd}T00:00:00`).getTime();
+	return Number.isNaN(t) ? 0 : t;
+}
+
+function dayEndMs(yyyyMmDd: string): number {
+	const t = new Date(`${yyyyMmDd}T23:59:59.999`).getTime();
+	return Number.isNaN(t) ? Number.POSITIVE_INFINITY : t;
+}
+
+function ownerBusinessCount(
+	row: AdminSubscriptionOutput,
+	ownerIdByBusinessId: Map<string, string>,
+	businessesByOwnerId: Map<string, BusinessOutput[]>,
+): number {
+	const ownerId = ownerIdByBusinessId.get(row.business_id);
+	if (!ownerId) return 0;
+	return businessesByOwnerId.get(ownerId)?.length ?? 0;
+}
+
+function compareOwnerRows(
+	a: AdminSubscriptionOutput,
+	b: AdminSubscriptionOutput,
+	sortKey: SortKey,
+	sortDir: SortDir,
+	ownerIdByBusinessId: Map<string, string>,
+	businessesByOwnerId: Map<string, BusinessOutput[]>,
+): number {
+	const dir = sortDir === "asc" ? 1 : -1;
+	let cmp = 0;
+	switch (sortKey) {
+		case "businesses":
+			cmp =
+				ownerBusinessCount(a, ownerIdByBusinessId, businessesByOwnerId) -
+				ownerBusinessCount(b, ownerIdByBusinessId, businessesByOwnerId);
+			break;
+		case "plan":
+			cmp = getSubscriptionPlanLabel(a.plan).localeCompare(
+				getSubscriptionPlanLabel(b.plan),
+			);
+			break;
+		case "status":
+			cmp =
+				(STATUS_SORT_RANK[a.status.toLowerCase()] ?? -1) -
+				(STATUS_SORT_RANK[b.status.toLowerCase()] ?? -1);
+			break;
+		case "amount":
+			cmp = (a.amount ?? -1) - (b.amount ?? -1);
+			break;
+		case "credits":
+			cmp = a.credits_limit - b.credits_limit;
+			break;
+		case "date":
+			cmp = subscriptionRowTimestamp(a) - subscriptionRowTimestamp(b);
+			break;
+		default:
+			cmp = 0;
+	}
+	if (cmp !== 0) return cmp * dir;
+	return (a.business?.name ?? a.business_id).localeCompare(
+		b.business?.name ?? b.business_id,
+	);
+}
+
+function usePageOwnerUsers(ownerIds: string[]) {
+	const [trigger] = useLazyGetUserByIdQuery();
+	const [usersById, setUsersById] = useState<
+		Record<string, UserOutput | null>
+	>({});
+	const cacheRef = useRef(usersById);
+	cacheRef.current = usersById;
+
+	const orderedKey = ownerIds.join(",");
+
+	useEffect(() => {
+		const ids = orderedKey.length > 0 ? orderedKey.split(",") : [];
+		if (ids.length === 0) return;
+		let cancelled = false;
+
+		const missing = ids.filter((id) => !(id in cacheRef.current));
+		if (missing.length === 0) return;
+
+		async function loadOne(id: string) {
+			try {
+				const user = await trigger({ userId: id }, true).unwrap();
+				if (!cancelled) {
+					setUsersById((prev) =>
+						id in prev ? prev : { ...prev, [id]: user },
+					);
+				}
+			} catch {
+				if (cancelled) return;
+				try {
+					await new Promise((r) => window.setTimeout(r, 250));
+					const user = await trigger({ userId: id }, false).unwrap();
+					if (!cancelled) {
+						setUsersById((prev) =>
+							id in prev ? prev : { ...prev, [id]: user },
+						);
+					}
+				} catch {
+					if (!cancelled) {
+						setUsersById((prev) =>
+							id in prev ? prev : { ...prev, [id]: null },
+						);
+					}
+				}
+			}
+		}
+
+		async function run() {
+			let cursor = 0;
+			async function worker() {
+				while (cursor < missing.length && !cancelled) {
+					const id = missing[cursor];
+					cursor += 1;
+					if (id) await loadOne(id);
+				}
+			}
+			await Promise.all(
+				Array.from({ length: OWNER_FETCH_CONCURRENCY }, () => worker()),
+			);
+		}
+
+		void run();
+		return () => {
+			cancelled = true;
+		};
+	}, [orderedKey, trigger]);
+
+	return usersById;
+}
 
 function getErrorMessage(error: unknown, fallback: string): string {
 	if (
@@ -104,6 +292,13 @@ export default function TransactionsPage() {
 	const [statusFilter, setStatusFilter] =
 		useState<SubscriptionStatusFilter>("all");
 	const [searchTerm, setSearchTerm] = useState("");
+	const [dateFrom, setDateFrom] = useState("");
+	const [dateTo, setDateTo] = useState("");
+	const [bizCountFilter, setBizCountFilter] =
+		useState<BizCountFilter>(BIZ_COUNT_FILTER_ALL);
+	const [minAmount, setMinAmount] = useState("");
+	const [sortKey, setSortKey] = useState<SortKey>("date");
+	const [sortDir, setSortDir] = useState<SortDir>("desc");
 	// ponytail: client slice only; server page params when list endpoint grows large
 	const [page, setPage] = useState(1);
 	const [pageSize, setPageSize] = useState<PageSize>(20);
@@ -143,31 +338,40 @@ export default function TransactionsPage() {
 	}, [businesses]);
 
 	const filteredRows = useMemo(() => {
+		const allBusinesses = businesses ?? [];
+		const transactions = statsTransactions ?? [];
+		const withSubscription =
+			buildLatestBusinessSubscriptionRows(transactions);
+		const unsubscribed = buildUnsubscribedBusinessRows(
+			allBusinesses,
+			transactions,
+		);
+
 		let businessRows: AdminSubscriptionOutput[];
 
 		if (statusFilter === "unsubscribed") {
-			businessRows = buildUnsubscribedBusinessRows(
-				businesses ?? [],
-				statsTransactions ?? [],
-			);
+			businessRows = planId === PLAN_FILTER_ALL ? unsubscribed : [];
+		} else if (statusFilter === "all") {
+			businessRows = [...withSubscription, ...unsubscribed];
 			if (planId !== PLAN_FILTER_ALL) {
-				businessRows = [];
+				businessRows = withSubscription.filter(
+					(r) => r.plan_id === planId || r.plan?.id === planId,
+				);
 			}
 		} else {
-			businessRows = buildLatestBusinessSubscriptionRows(
-				statsTransactions ?? [],
+			businessRows = withSubscription.filter(
+				(r) => r.status.toLowerCase() === statusFilter,
 			);
 			if (planId !== PLAN_FILTER_ALL) {
 				businessRows = businessRows.filter(
 					(r) => r.plan_id === planId || r.plan?.id === planId,
 				);
 			}
-			if (statusFilter !== "all") {
-				businessRows = businessRows.filter(
-					(r) => r.status.toLowerCase() === statusFilter,
-				);
-			}
 		}
+
+		businessRows = businessRows.filter((r) =>
+			ownerIdByBusinessId.has(r.business_id),
+		);
 
 		const q = searchTerm.trim().toLowerCase();
 		if (q) {
@@ -194,8 +398,58 @@ export default function TransactionsPage() {
 			});
 		}
 
-		// One row per owner (subscription columns show their primary business).
-		return collapseSubscriptionRowsByOwner(businessRows, ownerIdByBusinessId);
+		let rows = collapseSubscriptionRowsByOwner(
+			businessRows,
+			ownerIdByBusinessId,
+		);
+
+		if (bizCountFilter !== BIZ_COUNT_FILTER_ALL) {
+			rows = rows.filter((row) => {
+				const n = ownerBusinessCount(
+					row,
+					ownerIdByBusinessId,
+					businessesByOwnerId,
+				);
+				if (bizCountFilter === "1") return n === 1;
+				if (bizCountFilter === "2") return n === 2;
+				return n >= 3;
+			});
+		}
+
+		const minAmt = minAmount.trim() === "" ? null : Number(minAmount);
+		if (minAmt != null && Number.isFinite(minAmt)) {
+			rows = rows.filter(
+				(row) =>
+					row.amount != null &&
+					Number.isFinite(row.amount) &&
+					row.amount >= minAmt,
+			);
+		}
+
+		if (dateFrom) {
+			const start = dayStartMs(dateFrom);
+			rows = rows.filter(
+				(row) => subscriptionRowTimestamp(row) >= start,
+			);
+		}
+		if (dateTo) {
+			const end = dayEndMs(dateTo);
+			rows = rows.filter((row) => {
+				const t = subscriptionRowTimestamp(row);
+				return t > 0 && t <= end;
+			});
+		}
+
+		return rows.toSorted((a, b) =>
+			compareOwnerRows(
+				a,
+				b,
+				sortKey,
+				sortDir,
+				ownerIdByBusinessId,
+				businessesByOwnerId,
+			),
+		);
 	}, [
 		statusFilter,
 		businesses,
@@ -204,6 +458,12 @@ export default function TransactionsPage() {
 		searchTerm,
 		ownerIdByBusinessId,
 		businessesByOwnerId,
+		bizCountFilter,
+		minAmount,
+		dateFrom,
+		dateTo,
+		sortKey,
+		sortDir,
 	]);
 
 	const totalItems = filteredRows.length;
@@ -212,33 +472,94 @@ export default function TransactionsPage() {
 	const pageStart = (currentPage - 1) * pageSize;
 	const pageRows = filteredRows.slice(pageStart, pageStart + pageSize);
 
+	const pageOwnerIds = useMemo(() => {
+		const ids: string[] = [];
+		const seen = new Set<string>();
+		for (const row of pageRows) {
+			const ownerId = ownerIdByBusinessId.get(row.business_id);
+			if (ownerId && !seen.has(ownerId)) {
+				seen.add(ownerId);
+				ids.push(ownerId);
+			}
+		}
+		return ids;
+	}, [pageRows, ownerIdByBusinessId]);
+
+	const usersById = usePageOwnerUsers(pageOwnerIds);
+
+	const filtersActive =
+		planId !== PLAN_FILTER_ALL ||
+		statusFilter !== "all" ||
+		searchTerm.trim() !== "" ||
+		dateFrom !== "" ||
+		dateTo !== "" ||
+		bizCountFilter !== BIZ_COUNT_FILTER_ALL ||
+		minAmount.trim() !== "";
+
+	function clearFilters() {
+		setPlanId(PLAN_FILTER_ALL);
+		setStatusFilter("all");
+		setSearchTerm("");
+		setDateFrom("");
+		setDateTo("");
+		setBizCountFilter(BIZ_COUNT_FILTER_ALL);
+		setMinAmount("");
+		setPage(1);
+	}
+
+	function toggleSort(key: SortKey) {
+		if (sortKey === key) {
+			setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+		} else {
+			setSortKey(key);
+			setSortDir(
+				key === "plan" || key === "status" || key === "businesses"
+					? "asc"
+					: "desc",
+			);
+		}
+		setPage(1);
+	}
+
 	useEffect(() => {
 		setPage(1);
-	}, [planId, statusFilter, searchTerm, pageSize]);
+	}, [
+		planId,
+		statusFilter,
+		searchTerm,
+		pageSize,
+		dateFrom,
+		dateTo,
+		bizCountFilter,
+		minAmount,
+	]);
 
-	const [summarySnapshot, setSummarySnapshot] = useState<{
-		total: number;
-		stats: BusinessSubscriptionStats;
-	} | null>(null);
-
-	useEffect(() => {
-		if (businessesLoading || statsLoading) return;
-		setSummarySnapshot({
-			total: businesses?.length ?? 0,
-			stats: summarizeBusinessSubscriptionStats(
-				statsTransactions ?? [],
-				businesses?.length ?? 0,
-			),
-		});
+	const summarySnapshot = useMemo((): PlatformSubscriptionSummary | null => {
+		if (businessesLoading || statsLoading) return null;
+		if (!businesses) return null;
+		return summarizePlatformSubscription(
+			businesses,
+			statsTransactions ?? [],
+		);
 	}, [businessesLoading, statsLoading, businesses, statsTransactions]);
 
 	const businessesBusy = businessesLoading && summarySnapshot === null;
 	const statsBusy = statsLoading && summarySnapshot === null;
+	const summaryBusy = businessesBusy || statsBusy;
 
 	const planLabel =
 		planId === PLAN_FILTER_ALL
 			? "All plans"
 			: (plans?.find((p) => p.id === planId)?.name ?? "All plans");
+
+	const bizCountLabel =
+		bizCountFilter === BIZ_COUNT_FILTER_ALL
+			? "Any count"
+			: bizCountFilter === "3+"
+				? "3 or more"
+				: bizCountFilter === "1"
+					? "1 business"
+					: "2 businesses";
 
 	const listBusy =
 		statusFilter === "unsubscribed"
@@ -264,12 +585,23 @@ export default function TransactionsPage() {
 				</Alert>
 			) : null}
 
-			<div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+			<div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-6">
 				<SummaryCard
-					label="Total businesses"
+					label="Owners"
 					value={
-						summarySnapshot
-							? summarySnapshot.total.toLocaleString()
+						summarySnapshot?.totalOwners != null
+							? summarySnapshot.totalOwners.toLocaleString()
+							: null
+					}
+					icon={UsersIcon}
+					loading={businessesBusy}
+					variant="total"
+				/>
+				<SummaryCard
+					label="Businesses"
+					value={
+						summarySnapshot?.totalBusinesses != null
+							? summarySnapshot.totalBusinesses.toLocaleString()
 							: null
 					}
 					icon={Building2Icon}
@@ -277,10 +609,10 @@ export default function TransactionsPage() {
 					variant="total"
 				/>
 				<SummaryCard
-					label="Active"
+					label="Active businesses"
 					value={
-						summarySnapshot
-							? summarySnapshot.stats.active.toLocaleString()
+						summarySnapshot?.active != null
+							? summarySnapshot.active.toLocaleString()
 							: null
 					}
 					icon={CheckCircle2Icon}
@@ -288,10 +620,10 @@ export default function TransactionsPage() {
 					variant="active"
 				/>
 				<SummaryCard
-					label="Pending"
+					label="Pending businesses"
 					value={
-						summarySnapshot
-							? summarySnapshot.stats.pending.toLocaleString()
+						summarySnapshot?.pending != null
+							? summarySnapshot.pending.toLocaleString()
 							: null
 					}
 					icon={XCircleIcon}
@@ -299,10 +631,10 @@ export default function TransactionsPage() {
 					variant="pending"
 				/>
 				<SummaryCard
-					label="Expired"
+					label="Expired businesses"
 					value={
-						summarySnapshot
-							? summarySnapshot.stats.expired.toLocaleString()
+						summarySnapshot?.expired != null
+							? summarySnapshot.expired.toLocaleString()
 							: null
 					}
 					icon={ClockIcon}
@@ -310,24 +642,28 @@ export default function TransactionsPage() {
 					variant="expired"
 				/>
 				<SummaryCard
-					label="Unsubscribed"
+					label="Unsubscribed businesses"
 					value={
-						summarySnapshot
-							? summarySnapshot.stats.noSubscription.toLocaleString()
+						summarySnapshot?.noSubscription != null
+							? summarySnapshot.noSubscription.toLocaleString()
 							: null
 					}
 					icon={MinusCircleIcon}
-					loading={businessesBusy || statsBusy}
+					loading={summaryBusy}
 					variant="none"
 				/>
 			</div>
 
-			{summarySnapshot && summarySnapshot.stats.other > 0 ? (
+			{summarySnapshot ? (
 				<p className="text-xs text-muted-foreground">
-					{summarySnapshot.stats.other} business
-					{summarySnapshot.stats.other === 1 ? "" : "es"} with another status
-					(e.g. cancelled or insufficient credits) are included in total but
-					not in active, pending, or expired.
+					Status cards count businesses by each business’s latest
+					subscription (not owners). Active + pending + expired + other
+					statuses
+					{summarySnapshot.other > 0
+						? ` including ${summarySnapshot.other.toLocaleString()} other`
+						: ""}{" "}
+					+ unsubscribed = all businesses. The table below lists one row
+					per owner.
 				</p>
 			) : null}
 
@@ -350,15 +686,7 @@ export default function TransactionsPage() {
 							<Select
 								value={statusFilter}
 								onValueChange={(v) => {
-									if (
-										v === "all" ||
-										v === "pending" ||
-										v === "active" ||
-										v === "expired" ||
-										v === "unsubscribed"
-									) {
-										setStatusFilter(v);
-									}
+									if (v != null && isStatusFilter(v)) setStatusFilter(v);
 								}}
 							>
 								<SelectTrigger className="h-10 w-full">
@@ -371,6 +699,10 @@ export default function TransactionsPage() {
 									<SelectItem value="pending">Pending</SelectItem>
 									<SelectItem value="active">Active</SelectItem>
 									<SelectItem value="expired">Expired</SelectItem>
+									<SelectItem value="cancelled">Cancelled</SelectItem>
+									<SelectItem value="insufficient_credits">
+										Insufficient credits
+									</SelectItem>
 									<SelectItem value="unsubscribed">Unsubscribed</SelectItem>
 								</SelectContent>
 							</Select>
@@ -398,6 +730,80 @@ export default function TransactionsPage() {
 								</SelectContent>
 							</Select>
 						</FilterField>
+
+						<FilterField label="Businesses" className="min-w-36 flex-1">
+							<Select
+								value={bizCountFilter}
+								onValueChange={(v) => {
+									if (
+										v === BIZ_COUNT_FILTER_ALL ||
+										v === "1" ||
+										v === "2" ||
+										v === "3+"
+									) {
+										setBizCountFilter(v);
+									}
+								}}
+							>
+								<SelectTrigger className="h-10 w-full">
+									<span className="flex flex-1 truncate text-left">
+										{bizCountLabel}
+									</span>
+								</SelectTrigger>
+								<SelectContent>
+									<SelectItem value={BIZ_COUNT_FILTER_ALL}>Any count</SelectItem>
+									<SelectItem value="1">1 business</SelectItem>
+									<SelectItem value="2">2 businesses</SelectItem>
+									<SelectItem value="3+">3 or more</SelectItem>
+								</SelectContent>
+							</Select>
+						</FilterField>
+
+						<FilterField label="Min amount" className="min-w-28 flex-1">
+							<Input
+								type="number"
+								inputMode="decimal"
+								min={0}
+								step="any"
+								placeholder="Any"
+								value={minAmount}
+								onChange={(e) => setMinAmount(e.target.value)}
+								className="h-10"
+							/>
+						</FilterField>
+
+						<FilterField label="From" className="min-w-36 flex-1">
+							<Input
+								type="date"
+								value={dateFrom}
+								max={dateTo || undefined}
+								onChange={(e) => setDateFrom(e.target.value)}
+								className="h-10"
+							/>
+						</FilterField>
+
+						<FilterField label="To" className="min-w-36 flex-1">
+							<Input
+								type="date"
+								value={dateTo}
+								min={dateFrom || undefined}
+								onChange={(e) => setDateTo(e.target.value)}
+								className="h-10"
+							/>
+						</FilterField>
+
+						{filtersActive ? (
+							<div className="flex items-end">
+								<Button
+									type="button"
+									variant="outline"
+									className="h-10"
+									onClick={clearFilters}
+								>
+									Clear filters
+								</Button>
+							</div>
+						) : null}
 					</div>
 
 					{listBusy ? (
@@ -416,11 +822,50 @@ export default function TransactionsPage() {
 								<TableHeader>
 									<TableRow>
 										<TableHead>Owner</TableHead>
-										<TableHead>Businesses</TableHead>
-										<TableHead>Primary plan</TableHead>
-										<TableHead>Status</TableHead>
-										<TableHead className="text-right">Amount</TableHead>
-										<TableHead className="text-right">Credits</TableHead>
+										<SortableHead
+											label="Businesses"
+											column="businesses"
+											sortKey={sortKey}
+											sortDir={sortDir}
+											onSort={toggleSort}
+										/>
+										<SortableHead
+											label="Primary plan"
+											column="plan"
+											sortKey={sortKey}
+											sortDir={sortDir}
+											onSort={toggleSort}
+										/>
+										<SortableHead
+											label="Status"
+											column="status"
+											sortKey={sortKey}
+											sortDir={sortDir}
+											onSort={toggleSort}
+										/>
+										<SortableHead
+											label="Amount"
+											column="amount"
+											sortKey={sortKey}
+											sortDir={sortDir}
+											onSort={toggleSort}
+											align="right"
+										/>
+										<SortableHead
+											label="Credits"
+											column="credits"
+											sortKey={sortKey}
+											sortDir={sortDir}
+											onSort={toggleSort}
+											align="right"
+										/>
+										<SortableHead
+											label="Date"
+											column="date"
+											sortKey={sortKey}
+											sortDir={sortDir}
+											onSort={toggleSort}
+										/>
 									</TableRow>
 								</TableHeader>
 								<TableBody>
@@ -429,11 +874,24 @@ export default function TransactionsPage() {
 										const ownerBusinesses = ownerId
 											? (businessesByOwnerId.get(ownerId) ?? [])
 											: [];
+										const ownerUser = ownerId
+											? usersById[ownerId]
+											: undefined;
+										const ownerLoadState: "loading" | "ready" | "missing" =
+											!ownerId
+												? "missing"
+												: ownerId in usersById
+													? ownerUser
+														? "ready"
+														: "missing"
+													: "loading";
 										return (
 											<OwnerRow
 												key={ownerId ?? row.id}
 												row={row}
 												ownerId={ownerId}
+												owner={ownerUser ?? null}
+												ownerLoadState={ownerLoadState}
 												ownerBusinesses={ownerBusinesses}
 												onSelect={() =>
 													router.push(`/admin/business/${row.business_id}`)
@@ -455,6 +913,7 @@ export default function TransactionsPage() {
 								{statusFilter !== "all"
 									? ` · ${getSubscriptionStatusFilterLabel(statusFilter)}`
 									: ""}
+								{` · sorted by ${sortKey} (${sortDir})`}
 							</p>
 							<div className="flex flex-wrap items-center gap-2">
 								<span className="text-xs text-muted-foreground">Per page</span>
@@ -511,23 +970,26 @@ export default function TransactionsPage() {
 function OwnerRow({
 	row,
 	ownerId,
+	owner,
+	ownerLoadState,
 	ownerBusinesses,
 	onSelect,
 }: {
 	row: AdminSubscriptionOutput;
 	ownerId: string | undefined;
+	owner: UserOutput | null;
+	ownerLoadState: "loading" | "ready" | "missing";
 	ownerBusinesses: BusinessOutput[];
 	onSelect: () => void;
 }) {
-	const { data: user, isLoading, isError } = useGetUserByIdQuery(
-		{ userId: ownerId ?? "" },
-		{ skip: !ownerId },
-	);
-	const ownerLabel = user
-		? formatUserDisplayName(user)
-		: "owner";
 	const count = ownerBusinesses.length;
 	const namesSummary = formatBusinessNames(ownerBusinesses);
+	const ownerLabel = owner
+		? formatUserDisplayName(owner)
+		: namesSummary !== "—"
+			? namesSummary
+			: "owner";
+	const dateLabel = formatSubscriptionDate(row.started_at ?? row.created_at);
 
 	return (
 		<TableRow
@@ -545,22 +1007,30 @@ function OwnerRow({
 		>
 			<TableCell>
 				{!ownerId ? (
-					<span className="text-muted-foreground">Unknown owner</span>
-				) : isLoading ? (
+					<span className="text-muted-foreground">No owner linked</span>
+				) : ownerLoadState === "loading" ? (
 					<div className="flex flex-col gap-1">
 						<Skeleton className="h-4 w-28" />
 						<Skeleton className="h-3 w-24" />
 					</div>
-				) : isError || !user ? (
-					<span className="text-muted-foreground">Unknown owner</span>
-				) : (
+				) : owner ? (
 					<div className="flex flex-col gap-0.5">
-						<span className="font-medium">{formatUserDisplayName(user)}</span>
-						{user.phone_number ? (
+						<span className="font-medium">{formatUserDisplayName(owner)}</span>
+						{owner.phone_number ? (
 							<span className="text-xs tabular-nums text-muted-foreground">
-								{user.phone_number}
+								{owner.phone_number}
 							</span>
 						) : null}
+					</div>
+				) : (
+					<div className="flex flex-col gap-0.5">
+						<span className="text-muted-foreground">Owner lookup failed</span>
+						<span
+							className="font-mono text-xs text-muted-foreground"
+							title={ownerId}
+						>
+							{ownerId.slice(0, 8)}…
+						</span>
 					</div>
 				)}
 			</TableCell>
@@ -592,7 +1062,51 @@ function OwnerRow({
 			<TableCell className="text-right tabular-nums">
 				{row.credits_limit.toLocaleString()}
 			</TableCell>
+			<TableCell className="whitespace-nowrap text-sm tabular-nums text-muted-foreground">
+				{dateLabel}
+			</TableCell>
 		</TableRow>
+	);
+}
+
+function SortableHead({
+	label,
+	column,
+	sortKey,
+	sortDir,
+	onSort,
+	align = "left",
+}: {
+	label: string;
+	column: SortKey;
+	sortKey: SortKey;
+	sortDir: SortDir;
+	onSort: (key: SortKey) => void;
+	align?: "left" | "right";
+}) {
+	const active = sortKey === column;
+	const Icon = !active
+		? ArrowUpDownIcon
+		: sortDir === "asc"
+			? ArrowUpIcon
+			: ArrowDownIcon;
+
+	return (
+		<TableHead className={align === "right" ? "text-right" : undefined}>
+			<button
+				type="button"
+				className={cn(
+					"inline-flex items-center gap-1 rounded-sm font-medium transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+					align === "right" && "w-full justify-end",
+					active ? "text-foreground" : "text-muted-foreground",
+				)}
+				onClick={() => onSort(column)}
+				aria-label={`Sort by ${label}${active ? `, ${sortDir}ending` : ""}`}
+			>
+				{label}
+				<Icon className="size-3.5 shrink-0 opacity-70" aria-hidden />
+			</button>
+		</TableHead>
 	);
 }
 

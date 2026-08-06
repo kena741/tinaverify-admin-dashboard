@@ -12,6 +12,8 @@ export type SubscriptionStatusFilter =
 	| "pending"
 	| "active"
 	| "expired"
+	| "cancelled"
+	| "insufficient_credits"
 	| "unsubscribed";
 
 export const SUBSCRIPTION_STATUS_FILTER_LABELS: Record<
@@ -22,6 +24,8 @@ export const SUBSCRIPTION_STATUS_FILTER_LABELS: Record<
 	pending: "Pending",
 	active: "Active",
 	expired: "Expired",
+	cancelled: "Cancelled",
+	insufficient_credits: "Insufficient credits",
 	unsubscribed: "Unsubscribed",
 };
 
@@ -128,18 +132,23 @@ export function collapseSubscriptionRowsByOwner(
 		}
 	}
 
-	return Array.from(byOwner.values()).toSorted((a, b) =>
-		(a.business?.name ?? a.business_id).localeCompare(
+	return Array.from(byOwner.values()).toSorted((a, b) => {
+		// Prefer real subscription rows over junk-named unsubscribed placeholders.
+		const pr =
+			subscriptionStatusPriority(b.status) -
+			subscriptionStatusPriority(a.status);
+		if (pr !== 0) return pr;
+		return (a.business?.name ?? a.business_id).localeCompare(
 			b.business?.name ?? b.business_id,
-		),
-	);
+		);
+	});
 }
 
 export function countUniqueBusinesses(rows: AdminSubscriptionOutput[]): number {
 	return new Set(rows.map((r) => r.business_id)).size;
 }
 
-function subscriptionRowTimestamp(row: AdminSubscriptionOutput): number {
+export function subscriptionRowTimestamp(row: AdminSubscriptionOutput): number {
 	const raw = row.started_at ?? row.created_at;
 	if (!raw) return 0;
 	const t = new Date(raw).getTime();
@@ -172,10 +181,27 @@ export type BusinessSubscriptionStats = {
 	noSubscription: number;
 };
 
+export type PlatformSubscriptionSummary = BusinessSubscriptionStats & {
+	totalBusinesses: number;
+	totalOwners: number;
+};
+
+/** Distinct owners among businesses (missing owner_id ignored). */
+export function countUniqueOwners(businesses: BusinessOutput[]): number {
+	const ids = new Set<string>();
+	for (const b of businesses) {
+		if (b.owner_id) ids.add(b.owner_id);
+	}
+	return ids.size;
+}
+
 /**
  * Count businesses by latest subscription status. `totalBusinesses` should be
  * the full business list length; `noSubscription` fills the gap for businesses
  * with no subscription transaction.
+ *
+ * These are business-level counts (not owners). An owner with 3 businesses can
+ * contribute 3 to the totals.
  */
 export function summarizeBusinessSubscriptionStats(
 	rows: AdminSubscriptionOutput[],
@@ -199,6 +225,22 @@ export function summarizeBusinessSubscriptionStats(
 	const noSubscription = Math.max(0, totalBusinesses - withSubscription);
 
 	return { active, pending, expired, other, noSubscription };
+}
+
+export function summarizePlatformSubscription(
+	businesses: BusinessOutput[],
+	subscriptionRows: AdminSubscriptionOutput[],
+): PlatformSubscriptionSummary {
+	const totalBusinesses = businesses.length;
+	const stats = summarizeBusinessSubscriptionStats(
+		subscriptionRows,
+		totalBusinesses,
+	);
+	return {
+		...stats,
+		totalBusinesses,
+		totalOwners: countUniqueOwners(businesses),
+	};
 }
 
 export const CUSTOM_SUBSCRIPTION_PLAN_LABEL = "Custom";

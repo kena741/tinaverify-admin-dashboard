@@ -29,7 +29,10 @@ export const smsApi = createApi({
 				url: "/api/v1/sms/geezsms/send",
 				method: "POST",
 				body,
-				headers: bearerHeaders(),
+				headers: {
+					"Content-Type": "application/json",
+					...bearerHeaders(),
+				},
 			}),
 		}),
 	}),

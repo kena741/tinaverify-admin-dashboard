@@ -510,28 +510,48 @@ export type SendCustomSmsResponse = {
 
 /** `GET /api/v1/analytics/summary` — platform KPIs (admin only). */
 export type AnalyticsRevenueOutput = {
-	daily: string;
-	weekly: string;
-	monthly: string;
+	daily: string | number;
+	weekly: string | number;
+	monthly: string | number;
+	/** Platform lifetime paid subscription revenue. */
+	all_time?: string | number;
 	/** Revenue for the requested `start_date` / `end_date` range. */
-	custom: string;
+	custom: string | number;
 };
 
 export type AnalyticsTopPlanOutput = {
-	plan_id: UUID;
-	plan_name: string;
+	plan_id?: UUID | null;
+	plan_name?: string | null;
 	subscription_count: number;
 };
 
 export type AnalyticsSummaryOutput = {
 	revenue: AnalyticsRevenueOutput;
-	total_paying_businesses: number;
-	total_businesses: number;
+	total_paying_businesses: number | string;
+	total_businesses: number | string;
 	top_plan: AnalyticsTopPlanOutput | null;
-	total_verified_transactions: number;
+	total_verified_transactions: number | string;
 	/** Sum of verified transaction amounts for the selected period. */
-	total_verified_amount: string;
-	total_failed_transactions: number;
+	total_verified_amount: string | number;
+	total_failed_transactions: number | string;
+};
+
+// -----------------------------
+// Payments / gateways
+// -----------------------------
+
+export type PaymentGatewayState = {
+	enabled: boolean;
+};
+
+export type PaymentGatewaysOutput = {
+	chapa: PaymentGatewayState;
+	telebirr: PaymentGatewayState;
+};
+
+export type PaymentGatewaysUpdateRequest = {
+	chapa?: PaymentGatewayState;
+	telebirr?: PaymentGatewayState;
 };
 
 // -----------------------------

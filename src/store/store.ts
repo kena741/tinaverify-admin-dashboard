@@ -12,6 +12,7 @@ import { smsApi } from "../services/sms/smsApi";
 import { transactionsApi } from "../services/transactions/transactionsApi";
 import { bannersApi } from "../services/banners/bannersApi";
 import { analyticsApi } from "../services/analytics/analyticsApi";
+import { paymentsApi } from "../services/payments/paymentsApi";
 
 // Combine all reducers
 const appReducer = combineReducers({
@@ -27,6 +28,7 @@ const appReducer = combineReducers({
 	[transactionsApi.reducerPath]: transactionsApi.reducer,
 	[bannersApi.reducerPath]: bannersApi.reducer,
 	[analyticsApi.reducerPath]: analyticsApi.reducer,
+	[paymentsApi.reducerPath]: paymentsApi.reducer,
 });
 
 // Reset the store when resetStore action is dispatched
@@ -61,6 +63,7 @@ export const store = configureStore({
 			transactionsApi.middleware,
 			bannersApi.middleware,
 			analyticsApi.middleware,
+			paymentsApi.middleware,
 		),
 });
 

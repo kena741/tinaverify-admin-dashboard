@@ -32,7 +32,7 @@ export function StatCard({
 					{loading ? (
 						<Skeleton className="mt-2 h-8 w-28" />
 					) : (
-						<p className="admin-stat-value mt-1 truncate">{value}</p>
+						<p className="admin-stat-value mt-1 truncate">{value ?? "—"}</p>
 					)}
 					{hint && !loading ? (
 						<p className="mt-1 text-xs text-muted-foreground">{hint}</p>
