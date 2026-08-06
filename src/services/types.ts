@@ -536,6 +536,18 @@ export type AnalyticsSummaryOutput = {
 	total_failed_transactions: number | string;
 };
 
+/** `GET /api/v1/analytics/user-acquisition` */
+export type UserAcquisitionBucketOutput = {
+	period_start: string;
+	new_users: number;
+};
+
+export type UserAcquisitionOutput = {
+	total_new_users: number;
+	granularity: "day" | "week" | "month";
+	buckets: UserAcquisitionBucketOutput[];
+};
+
 // -----------------------------
 // Payments / gateways
 // -----------------------------

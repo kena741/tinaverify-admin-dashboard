@@ -2,7 +2,10 @@ import { createApi } from "@reduxjs/toolkit/query/react";
 
 import { getStoredAccessToken } from "../authTokens";
 import { backendBaseQuery } from "../baseQuery";
-import type { AnalyticsSummaryOutput } from "../types";
+import type {
+	AnalyticsSummaryOutput,
+	UserAcquisitionOutput,
+} from "../types";
 
 function bearerHeaders(accessToken?: string | null) {
 	const token =
@@ -17,7 +20,7 @@ function bearerHeaders(accessToken?: string | null) {
 export const analyticsApi = createApi({
 	reducerPath: "analyticsApi",
 	baseQuery: backendBaseQuery,
-	tagTypes: ["AnalyticsSummary"],
+	tagTypes: ["AnalyticsSummary", "UserAcquisition"],
 	endpoints: (builder) => ({
 		/** `GET /api/v1/analytics/summary` — optional `start_date`, `end_date` (ISO). */
 		getAnalyticsSummary: builder.query<
@@ -36,7 +39,26 @@ export const analyticsApi = createApi({
 			},
 			providesTags: [{ type: "AnalyticsSummary" as const, id: "SUMMARY" }],
 		}),
+
+		/** `GET /api/v1/analytics/user-acquisition` — new signups for a range. */
+		getUserAcquisition: builder.query<
+			UserAcquisitionOutput,
+			{ startDate: string; endDate: string }
+		>({
+			query: ({ startDate, endDate }) => ({
+				url: "/api/v1/analytics/user-acquisition",
+				params: {
+					start_date: startDate,
+					end_date: endDate,
+				},
+				headers: bearerHeaders(),
+			}),
+			providesTags: [{ type: "UserAcquisition" as const, id: "SERIES" }],
+		}),
 	}),
 });
 
-export const { useGetAnalyticsSummaryQuery } = analyticsApi;
+export const {
+	useGetAnalyticsSummaryQuery,
+	useGetUserAcquisitionQuery,
+} = analyticsApi;

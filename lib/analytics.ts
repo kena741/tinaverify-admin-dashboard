@@ -1,6 +1,10 @@
 import type { BusinessOutput, VerifiedTransactionOutput } from "@/services/types";
 
-export type BuiltInAnalyticsPreset = "last_7_days" | "last_30_days" | "this_month";
+export type BuiltInAnalyticsPreset =
+	| "last_7_days"
+	| "last_30_days"
+	| "this_month"
+	| "all";
 
 export type DashboardAnalyticsPreset = BuiltInAnalyticsPreset | "custom";
 
@@ -92,6 +96,12 @@ export function isoRangeForAnalyticsPreset(preset: BuiltInAnalyticsPreset): {
 			start.setHours(0, 0, 0, 0);
 			end.setHours(23, 59, 59, 999);
 			break;
+		case "all":
+			// Match backend all-time window (epoch → now) so revenue.custom is full history.
+			return {
+				startDate: new Date(0).toISOString(),
+				endDate: end.toISOString(),
+			};
 	}
 
 	return { startDate: start.toISOString(), endDate: end.toISOString() };

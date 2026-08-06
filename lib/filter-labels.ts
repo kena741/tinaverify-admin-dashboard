@@ -26,6 +26,7 @@ export const DATE_RANGE_LABELS = {
 	last_7_days: "Last 7 days",
 	last_30_days: "Last 30 days",
 	this_month: "This month",
+	all: "All time",
 	custom: "Custom range",
 } as const;
 

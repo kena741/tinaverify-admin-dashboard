@@ -117,5 +117,7 @@ export function useDashboardAnalytics(range: DashboardAnalyticsRange) {
 		refetch,
 		isSystemAdmin: systemAdmin,
 		customRangeValid,
+		startDate,
+		endDate,
 	};
 }
