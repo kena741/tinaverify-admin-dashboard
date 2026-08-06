@@ -6,12 +6,10 @@ import {
 	Area,
 	AreaChart,
 	Bar,
-	BarChart,
 	CartesianGrid,
 	Cell,
 	ComposedChart,
 	Label,
-	LabelList,
 	Line,
 	Pie,
 	PieChart,
@@ -25,7 +23,6 @@ import {
 	formatDateInputValue,
 	formatRevenueAmount,
 	parseAnalyticsCount,
-	parseRevenueAmount,
 	type DashboardAnalyticsPreset,
 } from "@/lib/analytics";
 import { getDateRangeLabel } from "@/lib/filter-labels";
@@ -156,7 +153,14 @@ function compactMoney(value: number): string {
 	return value.toLocaleString(undefined, { maximumFractionDigits: 0 });
 }
 
-type RevenueRow = { window: string; revenue: number };
+type RevenueGranularity = "day" | "week" | "month";
+
+type PeriodRevenuePoint = {
+	key: string;
+	label: string;
+	revenue: number;
+};
+
 type ShareSlice = {
 	segment: "paying" | "notPaying";
 	count: number;
@@ -174,6 +178,61 @@ type AcquisitionPoint = {
 	label: string;
 	newUsers: number;
 };
+
+function startOfLocalDay(d: Date): Date {
+	return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+}
+
+function startOfLocalWeek(d: Date): Date {
+	const day = d.getDay();
+	const offset = day === 0 ? -6 : 1 - day;
+	return new Date(d.getFullYear(), d.getMonth(), d.getDate() + offset);
+}
+
+function startOfLocalMonth(d: Date): Date {
+	return new Date(d.getFullYear(), d.getMonth(), 1);
+}
+
+function bucketStart(d: Date, granularity: RevenueGranularity): Date {
+	if (granularity === "day") return startOfLocalDay(d);
+	if (granularity === "week") return startOfLocalWeek(d);
+	return startOfLocalMonth(d);
+}
+
+function bucketKey(d: Date, granularity: RevenueGranularity): string {
+	const start = bucketStart(d, granularity);
+	if (granularity === "month") {
+		return `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, "0")}`;
+	}
+	return formatDateInputValue(start);
+}
+
+function bucketLabel(key: string, granularity: RevenueGranularity): string {
+	if (granularity === "month") {
+		const [y, m] = key.split("-").map(Number);
+		return format(new Date(y, m - 1, 1), "MMM yy");
+	}
+	const d = parseISO(`${key}T00:00:00`);
+	if (Number.isNaN(d.getTime())) return key;
+	if (granularity === "week") return `W/c ${format(d, "MMM d")}`;
+	return format(d, "MMM d");
+}
+
+function advanceBucket(d: Date, granularity: RevenueGranularity): Date {
+	if (granularity === "day") {
+		return new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1);
+	}
+	if (granularity === "week") {
+		return new Date(d.getFullYear(), d.getMonth(), d.getDate() + 7);
+	}
+	return new Date(d.getFullYear(), d.getMonth() + 1, 1);
+}
+
+function revenueGranularityForSpan(spanDays: number): RevenueGranularity {
+	if (spanDays <= 45) return "day";
+	if (spanDays <= 180) return "week";
+	return "month";
+}
 
 function formatAcquisitionLabel(
 	iso: string,
@@ -229,33 +288,99 @@ export default function DashboardPage() {
 	const { data: businesses, isLoading: businessesLoading } =
 		useListAllBusinessesQuery(undefined, { skip: !isSystemAdmin });
 
-	const revenue = summary?.revenue;
 	const periodLabelText = periodLabel(preset, customStart, customEnd);
 	const hasSummary = Boolean(summary) && !error;
 	const statsReady = hasSummary && !isLoading;
 	const chartsLoading = isLoading || subsLoading || businessesLoading;
 	const acquisitionBusy = acquisitionLoading || acquisitionFetching;
 
-	const revenueChartData = useMemo((): RevenueRow[] => {
-		if (!revenue) return [];
-		const rows: RevenueRow[] = [
-			{ window: "Today", revenue: parseRevenueAmount(revenue.daily) },
-			{ window: "This week", revenue: parseRevenueAmount(revenue.weekly) },
-			{
-				window: "Last 30 days",
-				revenue: parseRevenueAmount(revenue.monthly),
-			},
-			{ window: "All time", revenue: parseRevenueAmount(revenue.all_time) },
-		];
-		// Avoid a duplicate bar when the selected period already is all-time.
-		if (preset !== "all") {
-			rows.push({
-				window: "Selected",
-				revenue: parseRevenueAmount(revenue.custom),
-			});
+	const { periodRevenueSeries, revenueBucketLabel } = useMemo(() => {
+		const empty = {
+			periodRevenueSeries: [] as PeriodRevenuePoint[],
+			revenueBucketLabel: "day",
+		};
+		if (!startDate || !endDate) return empty;
+
+		const rangeStart = new Date(startDate);
+		const rangeEnd = new Date(endDate);
+		if (
+			Number.isNaN(rangeStart.getTime()) ||
+			Number.isNaN(rangeEnd.getTime())
+		) {
+			return empty;
 		}
-		return rows;
-	}, [revenue, preset]);
+
+		const spanDays = Math.max(
+			1,
+			(rangeEnd.getTime() - rangeStart.getTime()) / 86_400_000,
+		);
+		const granularity = revenueGranularityForSpan(spanDays);
+		const byKey = new Map<string, number>();
+
+		for (const row of subscriptionRows ?? []) {
+			const ts = row.started_at ?? row.created_at;
+			if (!ts) continue;
+			const t = new Date(ts);
+			if (Number.isNaN(t.getTime()) || t < rangeStart || t > rangeEnd) {
+				continue;
+			}
+			if (
+				row.amount == null ||
+				!Number.isFinite(row.amount) ||
+				row.amount <= 0
+			) {
+				continue;
+			}
+			if (String(row.status ?? "").toLowerCase() === "pending") continue;
+
+			const key = bucketKey(t, granularity);
+			byKey.set(key, (byKey.get(key) ?? 0) + row.amount);
+		}
+
+		const cursor = bucketStart(rangeStart, granularity);
+		const endBucket = bucketStart(rangeEnd, granularity);
+		const estimatedBuckets =
+			granularity === "day"
+				? spanDays + 1
+				: granularity === "week"
+					? spanDays / 7 + 1
+					: spanDays / 30 + 1;
+
+		const points: PeriodRevenuePoint[] = [];
+		// Long ranges: only non-empty buckets so we never plot 600 empty months.
+		if (estimatedBuckets > 48) {
+			for (const [key, amount] of byKey) {
+				if (amount <= 0) continue;
+				points.push({
+					key,
+					label: bucketLabel(key, granularity),
+					revenue: amount,
+				});
+			}
+			points.sort((a, b) => a.key.localeCompare(b.key));
+		} else {
+			let walk = cursor;
+			while (walk.getTime() <= endBucket.getTime()) {
+				const key = bucketKey(walk, granularity);
+				points.push({
+					key,
+					label: bucketLabel(key, granularity),
+					revenue: byKey.get(key) ?? 0,
+				});
+				walk = advanceBucket(walk, granularity);
+			}
+		}
+
+		return {
+			periodRevenueSeries: points,
+			revenueBucketLabel:
+				granularity === "day"
+					? "day"
+					: granularity === "week"
+						? "week"
+						: "month",
+		};
+	}, [subscriptionRows, startDate, endDate]);
 
 	const shareChartData = useMemo((): ShareSlice[] => {
 		if (!statsReady) return [];
@@ -343,8 +468,8 @@ export default function DashboardPage() {
 			: null;
 
 	const hasRevenuePlot =
-		revenueChartData.length > 0 &&
-		revenueChartData.some((r) => r.revenue > 0);
+		periodRevenueSeries.length > 0 &&
+		periodRevenueSeries.some((r) => r.revenue > 0);
 	const hasSharePlot = shareChartData.some((s) => s.count > 0);
 
 	return (
@@ -735,44 +860,68 @@ export default function DashboardPage() {
 						Compare
 					</h2>
 					<p className="text-sm text-muted-foreground">
-						Revenue windows, paying mix, and owners against subscription
-						revenue by month.
+						Revenue in the selected period, paying mix, and owners against
+						subscription revenue by month.
 					</p>
 				</div>
 
 				<div className="grid grid-cols-1 gap-4 lg:grid-cols-5">
 					<Card size="sm" className="lg:col-span-3">
 						<CardHeader className="border-b">
-							<CardTitle>Revenue windows</CardTitle>
+							<CardTitle>Revenue over time</CardTitle>
 							<CardDescription>
-								How fixed windows compare. Axes scale to the largest bar.
+								Paid subscriptions in {periodLabelText}, by{" "}
+								{revenueBucketLabel}. Total for this range:{" "}
+								{statsReady
+									? formatRevenueAmount(periodRevenue)
+									: "—"}
 							</CardDescription>
 						</CardHeader>
 						<CardContent className="pt-4">
-							{chartsLoading && !hasSummary ? (
+							{chartsLoading && periodRevenueSeries.length === 0 ? (
 								<Skeleton className="h-[260px] w-full" />
 							) : !hasRevenuePlot ? (
 								<ChartEmpty
 									title="Nothing to plot"
-									body="No paid subscription revenue recorded for these windows yet."
+									body="No paid subscription revenue in this period yet."
 								/>
 							) : (
 								<ChartContainer
 									config={revenueChartConfig}
 									className="aspect-auto h-[280px] w-full"
 								>
-									<BarChart
+									<AreaChart
 										accessibilityLayer
-										data={revenueChartData}
+										data={periodRevenueSeries}
 										margin={{ top: 8, right: 8, left: 4, bottom: 0 }}
 									>
+										<defs>
+											<linearGradient
+												id="fillPeriodRevenue"
+												x1="0"
+												y1="0"
+												x2="0"
+												y2="1"
+											>
+												<stop
+													offset="0%"
+													stopColor="var(--color-revenue)"
+													stopOpacity={0.35}
+												/>
+												<stop
+													offset="100%"
+													stopColor="var(--color-revenue)"
+													stopOpacity={0.02}
+												/>
+											</linearGradient>
+										</defs>
 										<CartesianGrid vertical={false} />
 										<XAxis
-											dataKey="window"
+											dataKey="label"
 											tickLine={false}
 											axisLine={false}
 											tickMargin={10}
-											interval={0}
+											minTickGap={24}
 											tick={{ fontSize: 11 }}
 										/>
 										<YAxis
@@ -783,32 +932,25 @@ export default function DashboardPage() {
 											tick={{ fontSize: 11 }}
 										/>
 										<ChartTooltip
-											cursor={{ fill: "var(--muted)" }}
 											content={
 												<ChartTooltipContent
+													labelKey="label"
 													formatter={(value) =>
 														formatRevenueAmount(Number(value ?? 0))
 													}
 												/>
 											}
 										/>
-										<Bar
+										<Area
 											dataKey="revenue"
-											fill="var(--color-revenue)"
-											radius={[6, 6, 0, 0]}
-											maxBarSize={48}
-										>
-											<LabelList
-												dataKey="revenue"
-												position="top"
-												className="fill-muted-foreground"
-												fontSize={10}
-												formatter={(v) =>
-													typeof v === "number" ? compactMoney(v) : ""
-												}
-											/>
-										</Bar>
-									</BarChart>
+											type="monotone"
+											fill="url(#fillPeriodRevenue)"
+											stroke="var(--color-revenue)"
+											strokeWidth={2}
+											dot={periodRevenueSeries.length <= 14}
+											activeDot={{ r: 4 }}
+										/>
+									</AreaChart>
 								</ChartContainer>
 							)}
 						</CardContent>

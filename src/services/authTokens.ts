@@ -29,7 +29,8 @@ let refreshInFlight: Promise<boolean> | null = null;
 
 /**
  * Calls `POST /api/v1/users/refresh-token?refresh_token=...` and stores new tokens.
- * Concurrent callers share one refresh. Returns false if refresh fails (and clears tokens).
+ * Concurrent callers share one refresh. Returns false if refresh fails.
+ * Only clears stored tokens on auth failure (4xx), not on network blips.
  */
 export async function refreshAccessToken(): Promise<boolean> {
 	if (refreshInFlight) return refreshInFlight;
@@ -47,12 +48,16 @@ export async function refreshAccessToken(): Promise<boolean> {
 				headers: { Accept: "application/json" },
 			});
 			if (!res.ok) {
-				clearStoredTokens();
+				// Auth rejection / expired refresh — drop session.
+				// Leave tokens on 5xx so a brief outage doesn't force re-login.
+				if (res.status >= 400 && res.status < 500) {
+					clearStoredTokens();
+				}
 				return false;
 			}
 			const data = (await res.json()) as {
-				access_token: string;
-				refresh_token: string;
+				access_token?: string;
+				refresh_token?: string;
 			};
 			if (!data.access_token || !data.refresh_token) {
 				clearStoredTokens();
@@ -61,7 +66,7 @@ export async function refreshAccessToken(): Promise<boolean> {
 			setStoredTokens(data.access_token, data.refresh_token);
 			return true;
 		} catch {
-			clearStoredTokens();
+			// Network / parse error — keep existing session for retry.
 			return false;
 		} finally {
 			refreshInFlight = null;

@@ -107,6 +107,18 @@ export const initializeAuthSession = createAsyncThunk<
 
 	if ("data" in result && result.data) return result.data;
 
+	// Expired access while refresh still valid: baseQuery may already have
+	// tried once; try an explicit refresh + /me again before forcing logout.
+	if (getStoredRefreshToken()) {
+		const ok = await refreshAccessToken();
+		if (ok) {
+			const retry = await dispatch(
+				authApi.endpoints.readMe.initiate(undefined, { forceRefetch: true }),
+			);
+			if ("data" in retry && retry.data) return retry.data;
+		}
+	}
+
 	clearStoredTokens();
 	return rejectWithValue(null);
 });
