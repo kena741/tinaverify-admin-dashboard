@@ -7,15 +7,8 @@ import {
 	ArrowDownIcon,
 	ArrowUpIcon,
 	ArrowUpDownIcon,
-	Building2Icon,
-	CheckCircle2Icon,
-	ClockIcon,
-	MinusCircleIcon,
-	UsersIcon,
-	XCircleIcon,
 } from "lucide-react";
 
-import { PageHeader } from "@/components/admin/page-header";
 import { useLazyGetUserByIdQuery } from "@/services/auth/authApi";
 import { useListAllBusinessesQuery } from "@/services/branch-management/branchManagementApi";
 import { useListAdminSubscriptionTransactionsQuery } from "@/services/subscription/subscriptionApi";
@@ -43,11 +36,19 @@ import { cn } from "@/lib/utils";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import {
+	Card,
+	CardContent,
+	CardDescription,
+	CardHeader,
+	CardTitle,
+} from "@/components/ui/card";
+import { Field, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import {
 	Select,
 	SelectContent,
+	SelectGroup,
 	SelectItem,
 	SelectTrigger,
 } from "@/components/ui/select";
@@ -567,244 +568,334 @@ export default function TransactionsPage() {
 			: statsLoading || isFetching || businessesLoading;
 
 	return (
-		<div className="flex flex-col gap-6">
-			<PageHeader
-				title="Owners"
-				description="Each row is an owner. Open a row to manage their businesses, staff, and subscriptions."
-			/>
+		<div className="mx-auto flex w-full max-w-6xl flex-col gap-6 pb-8">
+			<header className="flex flex-col gap-4">
+				<div className="flex flex-col gap-1">
+					<p className="font-mono text-[11px] font-medium tracking-[0.14em] text-primary uppercase">
+						Operator roster
+					</p>
+					<div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+						<div className="min-w-0">
+							<h1 className="text-2xl font-semibold tracking-tight text-foreground sm:text-[1.75rem]">
+								Owners
+							</h1>
+							<p className="mt-1 max-w-xl text-sm leading-relaxed text-muted-foreground">
+								One row per owner. Open a row to manage their businesses,
+								staff, and subscription.
+							</p>
+						</div>
+						{summarySnapshot && !summaryBusy ? (
+							<p className="font-mono text-xs tabular-nums text-muted-foreground">
+								{filteredRows.length.toLocaleString()} shown ·{" "}
+								{summarySnapshot.totalOwners.toLocaleString()} total
+							</p>
+						) : null}
+					</div>
+				</div>
 
-			{error ? (
-				<Alert variant="destructive">
-					<AlertTitle>Failed to load owners</AlertTitle>
-					<AlertDescription className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-						<span>{getErrorMessage(error, "Request failed.")}</span>
-						<Button type="button" variant="outline" size="sm" onClick={() => refetch()}>
-							Try again
-						</Button>
-					</AlertDescription>
-				</Alert>
-			) : null}
+				{error ? (
+					<Alert variant="destructive">
+						<AlertTitle>Can’t load owners</AlertTitle>
+						<AlertDescription className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+							<span>{getErrorMessage(error, "Request failed.")}</span>
+							<Button
+								type="button"
+								variant="outline"
+								size="sm"
+								onClick={() => refetch()}
+							>
+								Try again
+							</Button>
+						</AlertDescription>
+					</Alert>
+				) : null}
+			</header>
 
-			<div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-6">
-				<SummaryCard
-					label="Owners"
-					value={
-						summarySnapshot?.totalOwners != null
-							? summarySnapshot.totalOwners.toLocaleString()
-							: null
-					}
-					icon={UsersIcon}
-					loading={businessesBusy}
-					variant="total"
-				/>
-				<SummaryCard
-					label="Businesses"
-					value={
-						summarySnapshot?.totalBusinesses != null
-							? summarySnapshot.totalBusinesses.toLocaleString()
-							: null
-					}
-					icon={Building2Icon}
-					loading={businessesBusy}
-					variant="total"
-				/>
-				<SummaryCard
-					label="Active businesses"
-					value={
-						summarySnapshot?.active != null
-							? summarySnapshot.active.toLocaleString()
-							: null
-					}
-					icon={CheckCircle2Icon}
-					loading={statsBusy}
-					variant="active"
-				/>
-				<SummaryCard
-					label="Pending businesses"
-					value={
-						summarySnapshot?.pending != null
-							? summarySnapshot.pending.toLocaleString()
-							: null
-					}
-					icon={XCircleIcon}
-					loading={statsBusy}
-					variant="pending"
-				/>
-				<SummaryCard
-					label="Expired businesses"
-					value={
-						summarySnapshot?.expired != null
-							? summarySnapshot.expired.toLocaleString()
-							: null
-					}
-					icon={ClockIcon}
-					loading={statsBusy}
-					variant="expired"
-				/>
-				<SummaryCard
-					label="Unsubscribed businesses"
-					value={
-						summarySnapshot?.noSubscription != null
-							? summarySnapshot.noSubscription.toLocaleString()
-							: null
-					}
-					icon={MinusCircleIcon}
-					loading={summaryBusy}
-					variant="none"
-				/>
-			</div>
+			{/* Signature strip: owners thesis + business status mix */}
+			<section
+				aria-labelledby="owners-closeout-heading"
+				className="overflow-hidden rounded-2xl border border-primary/15 bg-primary text-primary-foreground shadow-md"
+			>
+				<div className="flex flex-col gap-6 p-6 sm:p-8 lg:flex-row lg:items-stretch lg:justify-between lg:gap-10">
+					<div className="flex min-w-0 flex-1 flex-col justify-between gap-4">
+						<div className="flex flex-col gap-2">
+							<p
+								id="owners-closeout-heading"
+								className="font-mono text-[11px] font-medium tracking-[0.16em] text-primary-foreground/70 uppercase"
+							>
+								Platform owners
+							</p>
+							<p className="text-sm text-primary-foreground/80">
+								People who operate businesses on Zulu Dine
+							</p>
+						</div>
+						{summaryBusy ? (
+							<div className="flex flex-col gap-2">
+								<Skeleton className="h-12 w-28 bg-primary-foreground/20" />
+								<Skeleton className="h-4 w-40 bg-primary-foreground/15" />
+							</div>
+						) : (
+							<div className="flex flex-col gap-1">
+								<p className="font-mono text-[clamp(2rem,5vw,2.75rem)] leading-none font-semibold tracking-tight tabular-nums">
+									{summarySnapshot?.totalOwners != null
+										? summarySnapshot.totalOwners.toLocaleString()
+										: "—"}
+								</p>
+								<p className="text-sm text-primary-foreground/75">
+									{summarySnapshot?.totalBusinesses != null
+										? `${summarySnapshot.totalBusinesses.toLocaleString()} businesses across the roster`
+										: "Business counts load with the roster"}
+								</p>
+							</div>
+						)}
+					</div>
+
+					<div className="hidden w-px shrink-0 bg-primary-foreground/15 lg:block" />
+
+					<div className="grid flex-1 grid-cols-2 gap-x-6 gap-y-5 sm:grid-cols-2">
+						<OwnersLedgerStat
+							label="Active sub"
+							loading={summaryBusy}
+							value={
+								summarySnapshot?.active != null
+									? summarySnapshot.active.toLocaleString()
+									: null
+							}
+						/>
+						<OwnersLedgerStat
+							label="Pending"
+							loading={summaryBusy}
+							value={
+								summarySnapshot?.pending != null
+									? summarySnapshot.pending.toLocaleString()
+									: null
+							}
+						/>
+						<OwnersLedgerStat
+							label="Expired"
+							loading={summaryBusy}
+							value={
+								summarySnapshot?.expired != null
+									? summarySnapshot.expired.toLocaleString()
+									: null
+							}
+						/>
+						<OwnersLedgerStat
+							label="Unsubscribed"
+							loading={summaryBusy}
+							value={
+								summarySnapshot?.noSubscription != null
+									? summarySnapshot.noSubscription.toLocaleString()
+									: null
+							}
+						/>
+					</div>
+				</div>
+			</section>
 
 			{summarySnapshot ? (
-				<p className="text-xs text-muted-foreground">
-					Status cards count businesses by each business’s latest
-					subscription (not owners). Active + pending + expired + other
-					statuses
+				<p className="text-xs leading-relaxed text-muted-foreground">
+					Status counts are businesses by latest subscription, not owners.
 					{summarySnapshot.other > 0
-						? ` including ${summarySnapshot.other.toLocaleString()} other`
+						? ` Includes ${summarySnapshot.other.toLocaleString()} other status.`
 						: ""}{" "}
-					+ unsubscribed = all businesses. The table below lists one row
-					per owner.
+					The table lists one owner per row.
 				</p>
 			) : null}
 
-			<Card>
-				<CardContent className="flex flex-col gap-4 pt-6">
-					<div className="flex flex-col gap-4 lg:flex-row lg:flex-wrap lg:items-end">
-						<FilterField label="Search" className="min-w-48 flex-1 lg:min-w-64">
-							<Input
-								type="search"
-								placeholder="Search business name, TIN, or plan…"
-								value={searchTerm}
-								onChange={(e) => {
-									setSearchTerm(e.target.value);
-								}}
-								className="h-10"
-							/>
-						</FilterField>
+			<section aria-labelledby="owners-list-heading" className="flex flex-col gap-3">
+				<div className="flex flex-col gap-0.5">
+					<h2
+						id="owners-list-heading"
+						className="text-sm font-semibold tracking-tight text-foreground"
+					>
+						Owner list
+					</h2>
+					<p className="text-sm text-muted-foreground">
+						Filter and sort, then open a row to manage that owner’s businesses.
+					</p>
+				</div>
 
-						<FilterField label="Subscription status" className="min-w-40 flex-1">
-							<Select
-								value={statusFilter}
-								onValueChange={(v) => {
-									if (v != null && isStatusFilter(v)) setStatusFilter(v);
-								}}
-							>
-								<SelectTrigger className="h-10 w-full">
-									<span className="flex flex-1 truncate text-left">
-										{getSubscriptionStatusFilterLabel(statusFilter)}
-									</span>
-								</SelectTrigger>
-								<SelectContent>
-									<SelectItem value="all">All</SelectItem>
-									<SelectItem value="pending">Pending</SelectItem>
-									<SelectItem value="active">Active</SelectItem>
-									<SelectItem value="expired">Expired</SelectItem>
-									<SelectItem value="cancelled">Cancelled</SelectItem>
-									<SelectItem value="insufficient_credits">
-										Insufficient credits
-									</SelectItem>
-									<SelectItem value="unsubscribed">Unsubscribed</SelectItem>
-								</SelectContent>
-							</Select>
-						</FilterField>
-
-						<FilterField label="Plan" className="min-w-48 flex-1">
-							<Select
-								value={planId}
-								onValueChange={(v) => {
-									if (v != null && v !== "") setPlanId(v);
-								}}
-							>
-								<SelectTrigger className="h-10 w-full">
-									<span className="flex flex-1 truncate text-left">{planLabel}</span>
-								</SelectTrigger>
-								<SelectContent>
-									<SelectItem value={PLAN_FILTER_ALL}>All plans</SelectItem>
-									{(plans ?? [])
-										.filter((p) => !p.is_archived)
-										.map((p) => (
-											<SelectItem key={p.id} value={p.id}>
-												{p.name}
-											</SelectItem>
-										))}
-								</SelectContent>
-							</Select>
-						</FilterField>
-
-						<FilterField label="Businesses" className="min-w-36 flex-1">
-							<Select
-								value={bizCountFilter}
-								onValueChange={(v) => {
-									if (
-										v === BIZ_COUNT_FILTER_ALL ||
-										v === "1" ||
-										v === "2" ||
-										v === "3+"
-									) {
-										setBizCountFilter(v);
-									}
-								}}
-							>
-								<SelectTrigger className="h-10 w-full">
-									<span className="flex flex-1 truncate text-left">
-										{bizCountLabel}
-									</span>
-								</SelectTrigger>
-								<SelectContent>
-									<SelectItem value={BIZ_COUNT_FILTER_ALL}>Any count</SelectItem>
-									<SelectItem value="1">1 business</SelectItem>
-									<SelectItem value="2">2 businesses</SelectItem>
-									<SelectItem value="3+">3 or more</SelectItem>
-								</SelectContent>
-							</Select>
-						</FilterField>
-
-						<FilterField label="Min amount" className="min-w-28 flex-1">
-							<Input
-								type="number"
-								inputMode="decimal"
-								min={0}
-								step="any"
-								placeholder="Any"
-								value={minAmount}
-								onChange={(e) => setMinAmount(e.target.value)}
-								className="h-10"
-							/>
-						</FilterField>
-
-						<FilterField label="From" className="min-w-36 flex-1">
-							<Input
-								type="date"
-								value={dateFrom}
-								max={dateTo || undefined}
-								onChange={(e) => setDateFrom(e.target.value)}
-								className="h-10"
-							/>
-						</FilterField>
-
-						<FilterField label="To" className="min-w-36 flex-1">
-							<Input
-								type="date"
-								value={dateTo}
-								min={dateFrom || undefined}
-								onChange={(e) => setDateTo(e.target.value)}
-								className="h-10"
-							/>
-						</FilterField>
-
-						{filtersActive ? (
-							<div className="flex items-end">
+				<Card size="sm">
+					<CardHeader className="border-b">
+						<div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
+							<div>
+								<CardTitle>Find owners</CardTitle>
+								<CardDescription>
+									Search, subscription status, plan, and date filters.
+								</CardDescription>
+							</div>
+							{filtersActive ? (
 								<Button
 									type="button"
 									variant="outline"
-									className="h-10"
+									size="sm"
 									onClick={clearFilters}
 								>
 									Clear filters
 								</Button>
+							) : null}
+						</div>
+					</CardHeader>
+					<CardContent className="flex flex-col gap-4 pt-4">
+						<div className="flex flex-col gap-3 rounded-xl border border-border bg-muted/30 p-3 sm:p-4">
+							<div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+								<Field className="gap-1 sm:col-span-2">
+									<FieldLabel className="text-[11px] text-muted-foreground">
+										Search
+									</FieldLabel>
+									<Input
+										type="search"
+										placeholder="Business, TIN, or plan…"
+										value={searchTerm}
+										onChange={(e) => {
+											setSearchTerm(e.target.value);
+										}}
+										className="h-9 bg-background"
+									/>
+								</Field>
+
+								<Field className="gap-1">
+									<FieldLabel className="text-[11px] text-muted-foreground">
+										Status
+									</FieldLabel>
+									<Select
+										value={statusFilter}
+										onValueChange={(v) => {
+											if (v != null && isStatusFilter(v)) setStatusFilter(v);
+										}}
+									>
+										<SelectTrigger className="h-9 w-full bg-background">
+											<span className="flex flex-1 truncate text-left text-sm">
+												{getSubscriptionStatusFilterLabel(statusFilter)}
+											</span>
+										</SelectTrigger>
+										<SelectContent>
+											<SelectGroup>
+												<SelectItem value="all">All</SelectItem>
+												<SelectItem value="pending">Pending</SelectItem>
+												<SelectItem value="active">Active</SelectItem>
+												<SelectItem value="expired">Expired</SelectItem>
+												<SelectItem value="cancelled">Cancelled</SelectItem>
+												<SelectItem value="insufficient_credits">
+													Insufficient credits
+												</SelectItem>
+												<SelectItem value="unsubscribed">Unsubscribed</SelectItem>
+											</SelectGroup>
+										</SelectContent>
+									</Select>
+								</Field>
+
+								<Field className="gap-1">
+									<FieldLabel className="text-[11px] text-muted-foreground">
+										Plan
+									</FieldLabel>
+									<Select
+										value={planId}
+										onValueChange={(v) => {
+											if (v != null && v !== "") setPlanId(v);
+										}}
+									>
+										<SelectTrigger className="h-9 w-full bg-background">
+											<span className="flex flex-1 truncate text-left text-sm">
+												{planLabel}
+											</span>
+										</SelectTrigger>
+										<SelectContent>
+											<SelectGroup>
+												<SelectItem value={PLAN_FILTER_ALL}>All plans</SelectItem>
+												{(plans ?? [])
+													.filter((p) => !p.is_archived)
+													.map((p) => (
+														<SelectItem key={p.id} value={p.id}>
+															{p.name}
+														</SelectItem>
+													))}
+											</SelectGroup>
+										</SelectContent>
+									</Select>
+								</Field>
 							</div>
-						) : null}
-					</div>
+
+							<div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+								<Field className="gap-1">
+									<FieldLabel className="text-[11px] text-muted-foreground">
+										Businesses
+									</FieldLabel>
+									<Select
+										value={bizCountFilter}
+										onValueChange={(v) => {
+											if (
+												v === BIZ_COUNT_FILTER_ALL ||
+												v === "1" ||
+												v === "2" ||
+												v === "3+"
+											) {
+												setBizCountFilter(v);
+											}
+										}}
+									>
+										<SelectTrigger className="h-9 w-full bg-background">
+											<span className="flex flex-1 truncate text-left text-sm">
+												{bizCountLabel}
+											</span>
+										</SelectTrigger>
+										<SelectContent>
+											<SelectGroup>
+												<SelectItem value={BIZ_COUNT_FILTER_ALL}>
+													Any count
+												</SelectItem>
+												<SelectItem value="1">1 business</SelectItem>
+												<SelectItem value="2">2 businesses</SelectItem>
+												<SelectItem value="3+">3 or more</SelectItem>
+											</SelectGroup>
+										</SelectContent>
+									</Select>
+								</Field>
+
+								<Field className="gap-1">
+									<FieldLabel className="text-[11px] text-muted-foreground">
+										Min amount
+									</FieldLabel>
+									<Input
+										type="number"
+										inputMode="decimal"
+										min={0}
+										step="any"
+										placeholder="Any"
+										value={minAmount}
+										onChange={(e) => setMinAmount(e.target.value)}
+										className="h-9 bg-background"
+									/>
+								</Field>
+
+								<Field className="gap-1">
+									<FieldLabel className="text-[11px] text-muted-foreground">
+										From
+									</FieldLabel>
+									<Input
+										type="date"
+										value={dateFrom}
+										max={dateTo || undefined}
+										onChange={(e) => setDateFrom(e.target.value)}
+										className="h-9 bg-background"
+									/>
+								</Field>
+
+								<Field className="gap-1">
+									<FieldLabel className="text-[11px] text-muted-foreground">
+										To
+									</FieldLabel>
+									<Input
+										type="date"
+										value={dateTo}
+										min={dateFrom || undefined}
+										onChange={(e) => setDateTo(e.target.value)}
+										className="h-9 bg-background"
+									/>
+								</Field>
+							</div>
+						</div>
 
 					{listBusy ? (
 						<div className="flex flex-col gap-2">
@@ -813,14 +904,31 @@ export default function TransactionsPage() {
 							))}
 						</div>
 					) : filteredRows.length === 0 ? (
-						<p className="py-10 text-center text-sm text-muted-foreground">
-							No owners match your filters.
-						</p>
+						<div className="flex flex-col items-start gap-1 py-10">
+							<p className="text-sm font-medium text-foreground">
+								No owners match
+							</p>
+							<p className="max-w-md text-sm text-muted-foreground">
+								Widen the status or plan filter, or clear filters to see the full
+								roster.
+							</p>
+							{filtersActive ? (
+								<Button
+									type="button"
+									variant="outline"
+									size="sm"
+									className="mt-3"
+									onClick={clearFilters}
+								>
+									Clear filters
+								</Button>
+							) : null}
+						</div>
 					) : (
-						<div className="overflow-x-auto rounded-lg border">
+						<div className="overflow-x-auto rounded-xl border border-border">
 							<Table>
 								<TableHeader>
-									<TableRow>
+									<TableRow className="hover:bg-transparent">
 										<TableHead>Owner</TableHead>
 										<SortableHead
 											label="Businesses"
@@ -905,18 +1013,19 @@ export default function TransactionsPage() {
 					)}
 
 					{!listBusy && totalItems > 0 ? (
-						<div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-							<p className="text-xs text-muted-foreground">
-								Showing {pageStart + 1}–
+						<div className="flex flex-col gap-3 border-t border-border pt-4 sm:flex-row sm:items-center sm:justify-between">
+							<p className="font-mono text-xs tabular-nums text-muted-foreground">
+								{pageStart + 1}–
 								{Math.min(pageStart + pageSize, totalItems)} of {totalItems}{" "}
 								owner{totalItems === 1 ? "" : "s"}
 								{statusFilter !== "all"
 									? ` · ${getSubscriptionStatusFilterLabel(statusFilter)}`
 									: ""}
-								{` · sorted by ${sortKey} (${sortDir})`}
 							</p>
 							<div className="flex flex-wrap items-center gap-2">
-								<span className="text-xs text-muted-foreground">Per page</span>
+								<span className="text-[11px] text-muted-foreground">
+									Per page
+								</span>
 								<Select
 									value={String(pageSize)}
 									onValueChange={(v) => {
@@ -944,8 +1053,8 @@ export default function TransactionsPage() {
 								>
 									Previous
 								</Button>
-								<span className="text-xs tabular-nums text-muted-foreground">
-									Page {currentPage} of {totalPages}
+								<span className="font-mono text-xs tabular-nums text-muted-foreground">
+									{currentPage}/{totalPages}
 								</span>
 								<Button
 									type="button"
@@ -961,8 +1070,9 @@ export default function TransactionsPage() {
 							</div>
 						</div>
 					) : null}
-				</CardContent>
-			</Card>
+					</CardContent>
+				</Card>
+			</section>
 		</div>
 	);
 }
@@ -993,7 +1103,7 @@ function OwnerRow({
 
 	return (
 		<TableRow
-			className="cursor-pointer hover:bg-muted/50"
+			className="cursor-pointer motion-safe:transition-colors hover:bg-muted/40 focus-visible:bg-muted/50 focus-visible:outline-none"
 			onClick={onSelect}
 			onKeyDown={(e) => {
 				if (e.key === "Enter" || e.key === " ") {
@@ -1015,9 +1125,11 @@ function OwnerRow({
 					</div>
 				) : owner ? (
 					<div className="flex flex-col gap-0.5">
-						<span className="font-medium">{formatUserDisplayName(owner)}</span>
+						<span className="font-medium text-foreground">
+							{formatUserDisplayName(owner)}
+						</span>
 						{owner.phone_number ? (
-							<span className="text-xs tabular-nums text-muted-foreground">
+							<span className="font-mono text-xs tabular-nums text-muted-foreground">
 								{owner.phone_number}
 							</span>
 						) : null}
@@ -1036,12 +1148,15 @@ function OwnerRow({
 			</TableCell>
 			<TableCell>
 				<div className="flex max-w-64 flex-col gap-0.5">
-					<span className="text-sm font-medium tabular-nums">
+					<span className="font-mono text-sm font-medium tabular-nums">
 						{count > 0
 							? `${count} business${count === 1 ? "" : "es"}`
 							: "—"}
 					</span>
-					<span className="truncate text-xs text-muted-foreground" title={namesSummary}>
+					<span
+						className="truncate text-xs text-muted-foreground"
+						title={namesSummary}
+					>
 						{namesSummary}
 					</span>
 				</div>
@@ -1052,20 +1167,47 @@ function OwnerRow({
 					{getSubscriptionStatusLabel(row.status)}
 				</Badge>
 			</TableCell>
-			<TableCell className="text-right tabular-nums">
+			<TableCell className="text-right font-mono tabular-nums">
 				{row.amount === null || row.amount === undefined
 					? "—"
 					: Number.isFinite(row.amount)
-						? row.amount.toLocaleString(undefined, { maximumFractionDigits: 2 })
+						? row.amount.toLocaleString(undefined, {
+								maximumFractionDigits: 2,
+							})
 						: "—"}
 			</TableCell>
-			<TableCell className="text-right tabular-nums">
+			<TableCell className="text-right font-mono tabular-nums">
 				{row.credits_limit.toLocaleString()}
 			</TableCell>
-			<TableCell className="whitespace-nowrap text-sm tabular-nums text-muted-foreground">
+			<TableCell className="whitespace-nowrap font-mono text-sm tabular-nums text-muted-foreground">
 				{dateLabel}
 			</TableCell>
 		</TableRow>
+	);
+}
+
+function OwnersLedgerStat({
+	label,
+	value,
+	loading,
+}: {
+	label: string;
+	value: string | null;
+	loading: boolean;
+}) {
+	return (
+		<div className="flex flex-col gap-1">
+			<p className="text-[11px] font-medium tracking-wide text-primary-foreground/65 uppercase">
+				{label}
+			</p>
+			{loading ? (
+				<Skeleton className="h-7 w-16 bg-primary-foreground/20" />
+			) : (
+				<p className="font-mono text-lg leading-snug font-semibold tracking-tight tabular-nums">
+					{value ?? "—"}
+				</p>
+			)}
+		</div>
 	);
 }
 
@@ -1107,73 +1249,5 @@ function SortableHead({
 				<Icon className="size-3.5 shrink-0 opacity-70" aria-hidden />
 			</button>
 		</TableHead>
-	);
-}
-
-function FilterField({
-	label,
-	className,
-	children,
-}: {
-	label: string;
-	className?: string;
-	children: React.ReactNode;
-}) {
-	return (
-		<div className={`flex flex-col gap-2 ${className ?? ""}`}>
-			<span className="text-sm font-medium">{label}</span>
-			{children}
-		</div>
-	);
-}
-
-function SummaryCard({
-	label,
-	value,
-	icon: Icon,
-	loading,
-	variant,
-}: {
-	label: string;
-	value: string | null;
-	icon: React.ComponentType<{ className?: string }>;
-	loading: boolean;
-	variant: "total" | "active" | "pending" | "expired" | "none";
-}) {
-	const iconClass =
-		variant === "active"
-			? "text-primary"
-			: variant === "expired"
-				? "text-destructive"
-				: variant === "total"
-					? "text-foreground"
-					: variant === "none"
-						? "text-muted-foreground"
-						: "text-muted-foreground";
-	const bgClass =
-		variant === "active"
-			? "bg-primary/10"
-			: variant === "expired"
-				? "bg-destructive/10"
-				: "bg-muted";
-
-	return (
-		<Card>
-			<CardContent className="flex flex-row items-center gap-4 pt-6">
-				<div
-					className={`flex size-10 shrink-0 items-center justify-center rounded-lg ${bgClass}`}
-				>
-					<Icon className={`size-5 ${iconClass}`} aria-hidden />
-				</div>
-				<div className="min-w-0 flex-1">
-					<p className="text-sm text-muted-foreground">{label}</p>
-					{loading ? (
-						<Skeleton className="mt-1 h-7 w-16" />
-					) : (
-						<p className="text-2xl font-semibold tabular-nums">{value}</p>
-					)}
-				</div>
-			</CardContent>
-		</Card>
 	);
 }

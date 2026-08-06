@@ -35,24 +35,18 @@ export function isoRangeFromLocalDates(
 	return { startDate: start.toISOString(), endDate: end.toISOString() };
 }
 
-/** Parse API revenue amounts (string or number). Handles leading zeros and sign. */
+/** Parse API revenue amounts (string or number). Avoid mutating valid decimals. */
 export function parseRevenueAmount(
 	value: string | number | null | undefined,
 ): number {
 	if (value === null || value === undefined) return 0;
 	if (typeof value === "number") return Number.isFinite(value) ? value : 0;
 
-	let s = String(value).trim().replace(/,/g, "");
+	const s = String(value).trim().replace(/,/g, "");
 	if (!s) return 0;
 
-	const negative = s.startsWith("-");
-	if (negative) s = s.slice(1).trim();
-	s = s.replace(/^0+(?=\d)/, "");
-	if (s === "" || s === ".") s = "0";
-
-	const n = Number.parseFloat(s);
-	if (!Number.isFinite(n)) return 0;
-	return negative ? -n : n;
+	const n = Number(s);
+	return Number.isFinite(n) ? n : 0;
 }
 
 /** Coerce analytics count fields (API may return number or string). */
@@ -60,9 +54,11 @@ export function parseAnalyticsCount(
 	value: number | string | null | undefined,
 ): number {
 	if (value === null || value === undefined) return 0;
-	if (typeof value === "number") return Number.isFinite(value) ? value : 0;
-	const n = Number.parseInt(String(value).replace(/,/g, ""), 10);
-	return Number.isFinite(n) ? n : 0;
+	if (typeof value === "number") {
+		return Number.isFinite(value) ? Math.trunc(value) : 0;
+	}
+	const n = Number(String(value).trim().replace(/,/g, ""));
+	return Number.isFinite(n) ? Math.trunc(n) : 0;
 }
 
 export function formatRevenueAmount(amount: number, currency = "ETB"): string {

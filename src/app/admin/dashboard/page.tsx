@@ -289,7 +289,12 @@ export default function DashboardPage() {
 				revenue: 0,
 				owners: new Set<string>(),
 			};
-			if (row.amount != null && Number.isFinite(row.amount) && row.amount > 0) {
+			if (
+				row.amount != null &&
+				Number.isFinite(row.amount) &&
+				row.amount > 0 &&
+				String(row.status ?? "").toLowerCase() !== "pending"
+			) {
 				bucket.revenue += row.amount;
 			}
 			bucket.owners.add(ownerByBiz.get(row.business_id) ?? row.business_id);
@@ -483,7 +488,7 @@ export default function DashboardPage() {
 									{formatRevenueAmount(periodRevenue)}
 								</p>
 								<p className="text-sm text-primary-foreground/75">
-									Paid subscription revenue in the selected window
+									Collected subscription payments in the selected window
 								</p>
 							</div>
 						) : (
@@ -507,6 +512,7 @@ export default function DashboardPage() {
 							value={
 								statsReady ? formatRevenueAmount(totalVerifiedAmount) : null
 							}
+							hint={statsReady ? "In selected period" : undefined}
 						/>
 						<LedgerStat
 							label="Success rate"
@@ -516,7 +522,7 @@ export default function DashboardPage() {
 								statsReady
 									? `${(
 											totalVerifiedTransactions + totalFailedTransactions
-										).toLocaleString()} checks`
+										).toLocaleString()} checks in period`
 									: undefined
 							}
 						/>
@@ -528,6 +534,7 @@ export default function DashboardPage() {
 									? totalVerifiedTransactions.toLocaleString()
 									: null
 							}
+							hint={statsReady ? "In selected period" : undefined}
 						/>
 						<LedgerStat
 							label="Failed / fake"
@@ -537,6 +544,7 @@ export default function DashboardPage() {
 									? totalFailedTransactions.toLocaleString()
 									: null
 							}
+							hint={statsReady ? "In selected period" : undefined}
 						/>
 					</div>
 				</div>

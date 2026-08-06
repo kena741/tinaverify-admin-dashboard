@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { BanknoteIcon, CreditCardIcon, PercentIcon } from "lucide-react";
 
 import { useListTransactionsByBusinessQuery } from "@/services/transactions/transactionsApi";
 import type { VerifiedTransactionOutput } from "@/services/types";
@@ -13,7 +12,6 @@ import { isSuccessfulStatus } from "@/lib/analytics";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import {
 	Select,
 	SelectContent,
@@ -30,6 +28,7 @@ import {
 	TableRow,
 } from "@/components/ui/table";
 import { getDateRangeLabel, getStatusFilterLabel } from "@/lib/filter-labels";
+import { Field, FieldLabel } from "@/components/ui/field";
 
 function parseAmount(value: string): number {
 	const n = Number.parseFloat(value);
@@ -110,9 +109,9 @@ export function BusinessPaymentsTab({ businessId }: BusinessPaymentsTabProps) {
 
 	return (
 		<div className="flex flex-col gap-4">
-			<div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
-				<div className="flex min-w-40 flex-1 flex-col gap-2">
-					<span className="text-sm font-medium">Date range</span>
+			<div className="flex flex-col gap-4 rounded-xl border border-border bg-card p-4 shadow-xs sm:flex-row sm:flex-wrap sm:items-end">
+				<Field className="min-w-40 flex-1">
+					<FieldLabel>Date range</FieldLabel>
 					<Select
 						value={datePreset}
 						onValueChange={(v) => {
@@ -125,7 +124,7 @@ export function BusinessPaymentsTab({ businessId }: BusinessPaymentsTabProps) {
 							}
 						}}
 					>
-						<SelectTrigger className="h-10 w-full sm:max-w-xs">
+						<SelectTrigger className="h-9 w-full sm:max-w-xs">
 							<span className="flex flex-1 truncate text-left">
 								{getDateRangeLabel(datePreset)}
 							</span>
@@ -136,11 +135,14 @@ export function BusinessPaymentsTab({ businessId }: BusinessPaymentsTabProps) {
 							<SelectItem value="this_month">This month</SelectItem>
 						</SelectContent>
 					</Select>
-				</div>
-				<div className="flex min-w-40 flex-1 flex-col gap-2">
-					<span className="text-sm font-medium">Status</span>
-					<Select value={statusFilter} onValueChange={(v) => v && setStatusFilter(v)}>
-						<SelectTrigger className="h-10 w-full sm:max-w-xs">
+				</Field>
+				<Field className="min-w-40 flex-1">
+					<FieldLabel>Status</FieldLabel>
+					<Select
+						value={statusFilter}
+						onValueChange={(v) => v && setStatusFilter(v)}
+					>
+						<SelectTrigger className="h-9 w-full sm:max-w-xs">
 							<span className="flex flex-1 truncate text-left">
 								{getStatusFilterLabel(statusFilter)}
 							</span>
@@ -152,7 +154,7 @@ export function BusinessPaymentsTab({ businessId }: BusinessPaymentsTabProps) {
 							<SelectItem value="pending">Pending</SelectItem>
 						</SelectContent>
 					</Select>
-				</div>
+				</Field>
 			</div>
 
 			{error ? (
@@ -160,40 +162,73 @@ export function BusinessPaymentsTab({ businessId }: BusinessPaymentsTabProps) {
 					<AlertTitle>Failed to load payments</AlertTitle>
 					<AlertDescription className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
 						<span>{getErrorMessage(error, "Request failed.")}</span>
-						<Button type="button" variant="outline" size="sm" onClick={() => refetch()}>
+						<Button
+							type="button"
+							variant="outline"
+							size="sm"
+							onClick={() => refetch()}
+						>
 							Try again
 						</Button>
 					</AlertDescription>
 				</Alert>
 			) : null}
 
-			<div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-				<StatCard
-					label="Transactions"
-					value={listBusy ? null : stats.total.toLocaleString()}
-					icon={CreditCardIcon}
-					loading={listBusy}
-				/>
-				<StatCard
-					label="Total amount"
-					value={
-						listBusy
-							? null
-							: `${stats.currency} ${stats.volume.toLocaleString(undefined, { maximumFractionDigits: 0 })}`
-					}
-					icon={BanknoteIcon}
-					loading={listBusy}
-				/>
-				<StatCard
-					label="Success rate"
-					value={listBusy ? null : `${stats.successRate}%`}
-					icon={PercentIcon}
-					loading={listBusy}
-				/>
+			<div className="grid grid-cols-1 overflow-hidden rounded-xl border border-border bg-card shadow-xs sm:grid-cols-3">
+				<div className="flex flex-col gap-1 px-5 py-4">
+					<p className="text-xs font-medium text-muted-foreground">
+						Transactions
+					</p>
+					{listBusy ? (
+						<Skeleton className="mt-1 h-8 w-16" />
+					) : (
+						<p className="font-mono text-2xl font-semibold tabular-nums tracking-tight">
+							{stats.total.toLocaleString()}
+						</p>
+					)}
+				</div>
+				<div className="flex flex-col gap-1 border-border px-5 py-4 sm:border-l">
+					<p className="text-xs font-medium text-muted-foreground">
+						Total amount
+					</p>
+					{listBusy ? (
+						<Skeleton className="mt-1 h-8 w-28" />
+					) : (
+						<p className="font-mono text-2xl font-semibold tabular-nums tracking-tight">
+							{stats.currency}{" "}
+							{stats.volume.toLocaleString(undefined, {
+								maximumFractionDigits: 0,
+							})}
+						</p>
+					)}
+				</div>
+				<div className="flex flex-col gap-1 border-border px-5 py-4 sm:border-l">
+					<p className="text-xs font-medium text-muted-foreground">
+						Success rate
+					</p>
+					{listBusy ? (
+						<Skeleton className="mt-1 h-8 w-16" />
+					) : (
+						<p className="font-mono text-2xl font-semibold tabular-nums tracking-tight">
+							{stats.successRate}%
+						</p>
+					)}
+				</div>
 			</div>
 
-			<Card>
-				<CardContent className="pt-6">
+			<section className="overflow-hidden rounded-xl border border-border bg-card shadow-xs">
+				<div className="border-b border-border px-5 py-3">
+					<h2 className="text-base font-semibold tracking-tight">
+						Verified payments
+					</h2>
+					<p className="mt-0.5 text-sm text-muted-foreground">
+						{getDateRangeLabel(datePreset)}
+						{statusFilter !== "all"
+							? ` · ${getStatusFilterLabel(statusFilter)}`
+							: ""}
+					</p>
+				</div>
+				<div className="p-4 sm:p-5">
 					{listBusy ? (
 						<div className="flex flex-col gap-2">
 							{Array.from({ length: 5 }).map((_, i) => (
@@ -205,7 +240,7 @@ export function BusinessPaymentsTab({ businessId }: BusinessPaymentsTabProps) {
 							No verified payments found for this period.
 						</p>
 					) : (
-						<div className="overflow-x-auto rounded-lg border">
+						<div className="overflow-x-auto rounded-lg border border-border">
 							<Table>
 								<TableHeader>
 									<TableRow>
@@ -227,8 +262,8 @@ export function BusinessPaymentsTab({ businessId }: BusinessPaymentsTabProps) {
 							</Table>
 						</div>
 					)}
-				</CardContent>
-			</Card>
+				</div>
+			</section>
 		</div>
 	);
 }
@@ -237,7 +272,7 @@ function PaymentRow({ row }: { row: VerifiedTransactionOutput }) {
 	return (
 		<TableRow>
 			<TableCell className="font-mono text-sm">{row.reference_number}</TableCell>
-			<TableCell className="whitespace-nowrap tabular-nums">
+			<TableCell className="font-mono whitespace-nowrap tabular-nums">
 				{row.currency}{" "}
 				{Number.parseFloat(row.amount).toLocaleString(undefined, {
 					maximumFractionDigits: 0,
@@ -269,35 +304,5 @@ function PaymentRow({ row }: { row: VerifiedTransactionOutput }) {
 				)}
 			</TableCell>
 		</TableRow>
-	);
-}
-
-function StatCard({
-	label,
-	value,
-	icon: Icon,
-	loading,
-}: {
-	label: string;
-	value: string | null;
-	icon: React.ComponentType<{ className?: string }>;
-	loading: boolean;
-}) {
-	return (
-		<Card>
-			<CardContent className="flex flex-row items-center gap-4 pt-6">
-				<div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
-					<Icon className="size-5 text-primary" aria-hidden />
-				</div>
-				<div className="min-w-0 flex-1">
-					<p className="text-sm text-muted-foreground">{label}</p>
-					{loading ? (
-						<Skeleton className="mt-1 h-7 w-24" />
-					) : (
-						<p className="truncate text-2xl font-semibold tabular-nums">{value}</p>
-					)}
-				</div>
-			</CardContent>
-		</Card>
 	);
 }

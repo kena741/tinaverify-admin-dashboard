@@ -294,50 +294,36 @@ export default function BusinessDetailClient({
 
 	if (missingBusinessId) {
 		return (
-			<div className="flex flex-col gap-6">
+			<div className="mx-auto flex w-full max-w-6xl flex-col gap-6 pb-8">
 				<Alert variant="destructive">
-					<AlertTitle>Missing business id</AlertTitle>
-					<AlertDescription>
-						The route parameter is missing. Please go back and try again.
+					<AlertTitle>Missing business</AlertTitle>
+					<AlertDescription className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+						<span>Open an owner from the list, then pick a business.</span>
+						<Button
+							type="button"
+							variant="outline"
+							size="sm"
+							onClick={() => router.push("/admin/transactions")}
+						>
+							Back to owners
+						</Button>
 					</AlertDescription>
 				</Alert>
-				<div>
-					<button
-						type="button"
-						className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
-						onClick={() => router.push("/admin/transactions")}
-					>
-						Back
-					</button>
-				</div>
 			</div>
 		);
 	}
 
 	if (businessLoading) {
 		return (
-			<div className="flex flex-col gap-6">
-				<div className="flex items-center gap-2">
-					<button
-						type="button"
-						className={cn(buttonVariants({ variant: "ghost", size: "sm" }))}
-						disabled
-					>
-						<ArrowLeft data-icon="inline-start" />
-						Back
-					</button>
+			<div className="mx-auto flex w-full max-w-6xl flex-col gap-6 pb-8">
+				<Skeleton className="h-4 w-28" />
+				<div className="overflow-hidden rounded-2xl border border-primary/15 bg-primary p-8">
+					<Skeleton className="h-4 w-32 bg-primary-foreground/20" />
+					<Skeleton className="mt-4 h-10 w-64 bg-primary-foreground/20" />
+					<Skeleton className="mt-2 h-4 w-48 bg-primary-foreground/15" />
 				</div>
-				<Card>
-					<CardHeader className="flex flex-col gap-2">
-						<Skeleton className="h-6 w-64" />
-						<Skeleton className="h-4 w-40" />
-					</CardHeader>
-					<CardContent className="flex flex-col gap-3">
-						<Skeleton className="h-10 w-full" />
-						<Skeleton className="h-10 w-full" />
-						<Skeleton className="h-10 w-full" />
-					</CardContent>
-				</Card>
+				<Skeleton className="h-10 w-full" />
+				<Skeleton className="h-48 w-full" />
 			</div>
 		);
 	}
@@ -350,30 +336,30 @@ export default function BusinessDetailClient({
 			"status" in businessError;
 
 		return (
-			<div className="flex flex-col gap-6">
+			<div className="mx-auto flex w-full max-w-6xl flex-col gap-6 pb-8">
 				<Alert variant="destructive">
-					<AlertTitle>Failed to load business</AlertTitle>
+					<AlertTitle>Can’t load business</AlertTitle>
 					<AlertDescription className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
 						<span className="wrap-break-word">
 							{isRequestError ? "Request failed." : "Business not found."}
 						</span>
 						<div className="flex items-center gap-2">
-							<button
+							<Button
 								type="button"
-								className={cn(
-									buttonVariants({ variant: "outline", size: "sm" }),
-								)}
+								variant="outline"
+								size="sm"
 								onClick={() => router.push("/admin/transactions")}
 							>
-								Back
-							</button>
-							<button
+								Back to owners
+							</Button>
+							<Button
 								type="button"
-								className={cn(buttonVariants({ variant: "link", size: "sm" }))}
+								variant="outline"
+								size="sm"
 								onClick={() => refetchBusiness()}
 							>
 								Try again
-							</button>
+							</Button>
 						</div>
 					</AlertDescription>
 				</Alert>
@@ -381,35 +367,49 @@ export default function BusinessDetailClient({
 		);
 	}
 
-	return (
-		<div className="flex flex-col gap-5">
-			<header className="flex flex-col gap-3 border-b border-border pb-4">
-				<div className="flex flex-wrap items-start justify-between gap-3">
-					<div className="flex min-w-0 flex-1 flex-col gap-2">
-						<div className="flex min-w-0 items-center gap-2">
-							<button
-								type="button"
-								className={cn(buttonVariants({ variant: "ghost", size: "sm" }))}
-								onClick={() => router.push("/admin/transactions")}
-							>
-								<ArrowLeft data-icon="inline-start" />
-								Back to owners
-							</button>
-							{businessFetching ? (
-								<Badge variant="outline">Updating…</Badge>
-							) : null}
-						</div>
+	const ownerDisplay = user ? formatUserDisplayName(user) : "Owner loading…";
 
-						<div className="min-w-0">
-							<p className="text-xs text-muted-foreground">Owner</p>
-							<h1 className="truncate text-xl font-semibold tracking-tight">
-								{user ? formatUserDisplayName(user) : "No owner found"}
+	return (
+		<div className="mx-auto flex w-full max-w-6xl flex-col gap-6 pb-8">
+			<div className="flex flex-wrap items-center gap-2">
+				<Button
+					type="button"
+					variant="ghost"
+					size="sm"
+					onClick={() => router.push("/admin/transactions")}
+				>
+					<ArrowLeft data-icon="inline-start" />
+					Owners
+				</Button>
+				{businessFetching ? (
+					<Badge variant="outline">Updating…</Badge>
+				) : null}
+			</div>
+
+			{/* Signature: owner close-out strip */}
+			<section
+				aria-labelledby="owner-heading"
+				className="overflow-hidden rounded-2xl border border-primary/15 bg-primary text-primary-foreground shadow-md"
+			>
+				<div className="flex flex-col gap-6 p-6 sm:p-8 lg:flex-row lg:items-stretch lg:justify-between lg:gap-10">
+					<div className="flex min-w-0 flex-1 flex-col justify-between gap-4">
+						<div className="flex flex-col gap-2">
+							<p className="font-mono text-[11px] font-medium tracking-[0.16em] text-primary-foreground/70 uppercase">
+								Business owner
+							</p>
+							<h1
+								id="owner-heading"
+								className="truncate text-2xl font-semibold tracking-tight sm:text-[1.75rem]"
+							>
+								{ownerDisplay}
 							</h1>
-							<p className="mt-0.5 truncate text-sm text-muted-foreground">
+							<p className="text-sm text-primary-foreground/80">
 								{user?.phone_number ? (
-									<span className="tabular-nums">{user.phone_number}</span>
+									<span className="font-mono tabular-nums">
+										{user.phone_number}
+									</span>
 								) : (
-									<span>No phone</span>
+									<span>No phone on file</span>
 								)}
 								<span>
 									{" · "}
@@ -421,128 +421,134 @@ export default function BusinessDetailClient({
 						</div>
 					</div>
 
-					<div className="flex flex-wrap items-center gap-1.5">
-						<Button
-							type="button"
-							variant="outline"
-							size="sm"
-							disabled={!user?.phone_number}
-							onClick={() => setSendSmsOpen(true)}
-						>
-							<MessageSquare data-icon="inline-start" />
-							SMS
-						</Button>
+					<div className="hidden w-px shrink-0 bg-primary-foreground/15 lg:block" />
 
-						<AlertDialog>
-							<AlertDialogTrigger
-								className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
-								disabled={setBusinessActiveState.isLoading}
+					<div className="flex flex-1 flex-col justify-center gap-3">
+						<p className="font-mono text-[11px] font-medium tracking-wide text-primary-foreground/65 uppercase">
+							Managing
+						</p>
+						<p className="truncate text-lg font-semibold tracking-tight">
+							{business.name || "Untitled business"}
+						</p>
+						<p className="text-sm text-primary-foreground/75">
+							<span className="font-mono tabular-nums">
+								TIN {business.tin_number}
+							</span>
+							{" · "}
+							{business.is_active ? "Active" : "Inactive"}
+							{business.is_archived ? " · Archived" : ""}
+						</p>
+						<div className="flex flex-wrap gap-2 pt-1">
+							<Button
+								type="button"
+								variant="secondary"
+								size="sm"
+								className="bg-primary-foreground/15 text-primary-foreground hover:bg-primary-foreground/25"
+								disabled={!user?.phone_number}
+								onClick={() => setSendSmsOpen(true)}
 							>
-								<Power data-icon="inline-start" />
-								{business.is_active ? "Deactivate" : "Activate"}
-							</AlertDialogTrigger>
-							<AlertDialogContent>
-								<AlertDialogHeader>
-									<AlertDialogTitle>
-										{business.is_active
-											? "Deactivate this business?"
-											: "Activate this business?"}
-									</AlertDialogTitle>
-									<AlertDialogDescription>
-										Applies only to{" "}
-										<span className="font-medium text-foreground">
-											{business.name || "this business"}
-										</span>
-										, not the owner’s other businesses.
-									</AlertDialogDescription>
-								</AlertDialogHeader>
-								<AlertDialogFooter>
-									<AlertDialogCancel>Cancel</AlertDialogCancel>
-									<AlertDialogAction
-										onClick={async () => {
-											await setBusinessActive({
-												businessId,
-												body: { is_active: !business.is_active },
-											}).unwrap();
-										}}
-									>
-										Confirm
-									</AlertDialogAction>
-								</AlertDialogFooter>
-							</AlertDialogContent>
-						</AlertDialog>
-
-						<AlertDialog>
-							<AlertDialogTrigger
-								className={cn(
-									buttonVariants({ variant: "destructive", size: "sm" }),
-								)}
-								disabled={deleteBusinessState.isLoading}
-							>
-								<Trash2 data-icon="inline-start" />
-								Delete
-							</AlertDialogTrigger>
-							<AlertDialogContent>
-								<AlertDialogHeader>
-									<AlertDialogTitle>Delete this business?</AlertDialogTitle>
-									<AlertDialogDescription>
-										Deletes{" "}
-										<span className="font-medium text-foreground">
-											{business.name || "this business"}
-										</span>
-										. This cannot be undone.
-									</AlertDialogDescription>
-								</AlertDialogHeader>
-								<AlertDialogFooter>
-									<AlertDialogCancel>Cancel</AlertDialogCancel>
-									<AlertDialogAction
-										onClick={async () => {
-											await deleteBusiness({ businessId }).unwrap();
-											router.push("/admin/transactions");
-										}}
-									>
-										Delete
-									</AlertDialogAction>
-								</AlertDialogFooter>
-							</AlertDialogContent>
-						</AlertDialog>
+								<MessageSquare data-icon="inline-start" />
+								SMS
+							</Button>
+							<AlertDialog>
+								<AlertDialogTrigger
+									className={cn(
+										buttonVariants({ variant: "secondary", size: "sm" }),
+										"bg-primary-foreground/15 text-primary-foreground hover:bg-primary-foreground/25",
+									)}
+									disabled={setBusinessActiveState.isLoading}
+								>
+									<Power data-icon="inline-start" />
+									{business.is_active ? "Deactivate" : "Activate"}
+								</AlertDialogTrigger>
+								<AlertDialogContent>
+									<AlertDialogHeader>
+										<AlertDialogTitle>
+											{business.is_active
+												? "Deactivate this business?"
+												: "Activate this business?"}
+										</AlertDialogTitle>
+										<AlertDialogDescription>
+											Applies only to{" "}
+											<span className="font-medium text-foreground">
+												{business.name || "this business"}
+											</span>
+											, not the owner’s other businesses.
+										</AlertDialogDescription>
+									</AlertDialogHeader>
+									<AlertDialogFooter>
+										<AlertDialogCancel>Cancel</AlertDialogCancel>
+										<AlertDialogAction
+											onClick={async () => {
+												await setBusinessActive({
+													businessId,
+													body: { is_active: !business.is_active },
+												}).unwrap();
+											}}
+										>
+											Confirm
+										</AlertDialogAction>
+									</AlertDialogFooter>
+								</AlertDialogContent>
+							</AlertDialog>
+							<AlertDialog>
+								<AlertDialogTrigger
+									className={cn(
+										buttonVariants({ variant: "secondary", size: "sm" }),
+										"bg-destructive/20 text-primary-foreground hover:bg-destructive/30",
+									)}
+									disabled={deleteBusinessState.isLoading}
+								>
+									<Trash2 data-icon="inline-start" />
+									Delete
+								</AlertDialogTrigger>
+								<AlertDialogContent>
+									<AlertDialogHeader>
+										<AlertDialogTitle>Delete this business?</AlertDialogTitle>
+										<AlertDialogDescription>
+											Deletes{" "}
+											<span className="font-medium text-foreground">
+												{business.name || "this business"}
+											</span>
+											. This cannot be undone.
+										</AlertDialogDescription>
+									</AlertDialogHeader>
+									<AlertDialogFooter>
+										<AlertDialogCancel>Cancel</AlertDialogCancel>
+										<AlertDialogAction
+											onClick={async () => {
+												await deleteBusiness({ businessId }).unwrap();
+												router.push("/admin/transactions");
+											}}
+										>
+											Delete
+										</AlertDialogAction>
+									</AlertDialogFooter>
+								</AlertDialogContent>
+							</AlertDialog>
+						</div>
 					</div>
 				</div>
+			</section>
 
-				{/* Scope control: which business tabs operate on */}
-				<div className="flex flex-col gap-1.5">
+			{/* Business switcher */}
+			{ownerBusinesses.length > 1 ? (
+				<section className="flex flex-col gap-2" aria-label="Switch business">
 					<div className="flex flex-wrap items-baseline justify-between gap-2">
-						<p className="text-xs font-medium text-muted-foreground">
-							Managing business
+						<p className="text-sm font-semibold tracking-tight text-foreground">
+							Businesses
 						</p>
 						<p className="text-xs text-muted-foreground">
 							Tabs below apply only to the selected business
 						</p>
 					</div>
-
 					{allBusinessesLoading ? (
-						<Skeleton className="h-8 w-full max-w-md" />
-					) : ownerBusinesses.length === 0 ? (
-						<p className="text-sm text-muted-foreground">
-							No businesses for this owner.
-						</p>
-					) : ownerBusinesses.length === 1 ? (
-						<div className="flex flex-wrap items-center gap-2">
-							<span className="font-medium">{business.name || "—"}</span>
-							<span className="text-sm text-muted-foreground">
-								TIN {business.tin_number}
-							</span>
-							{business.is_active ? (
-								<Badge variant="secondary">Active</Badge>
-							) : (
-								<Badge variant="outline">Inactive</Badge>
-							)}
-						</div>
+						<Skeleton className="h-10 w-full max-w-lg" />
 					) : ownerBusinesses.length <= 6 ? (
 						<div
 							role="tablist"
 							aria-label="Select business to manage"
-							className="flex max-w-full flex-wrap gap-1.5"
+							className="flex max-w-full flex-wrap gap-1.5 rounded-xl border border-border bg-card p-1.5 shadow-xs"
 						>
 							{ownerBusinesses.map((b) => {
 								const isCurrent = b.id === businessId;
@@ -556,10 +562,10 @@ export default function BusinessDetailClient({
 											if (!isCurrent) goToBusiness(b.id);
 										}}
 										className={cn(
-											"h-8 max-w-44 truncate rounded-md border px-2.5 text-left text-sm transition-colors",
+											"h-9 max-w-48 truncate rounded-lg px-3 text-left text-sm motion-safe:transition-colors",
 											isCurrent
-												? "border-primary bg-primary font-medium text-primary-foreground"
-												: "border-border bg-background hover:bg-muted",
+												? "bg-primary font-medium text-primary-foreground"
+												: "text-foreground hover:bg-muted",
 										)}
 									>
 										{b.name || "Untitled"}
@@ -568,7 +574,7 @@ export default function BusinessDetailClient({
 							})}
 						</div>
 					) : (
-						<div className="flex flex-wrap items-center gap-2">
+						<div className="flex flex-wrap items-center gap-2 rounded-xl border border-border bg-card p-3 shadow-xs">
 							<label htmlFor="manage-business" className="sr-only">
 								Managing business
 							</label>
@@ -580,7 +586,7 @@ export default function BusinessDetailClient({
 							>
 								<SelectTrigger
 									id="manage-business"
-									className="h-8 max-w-sm min-w-48 border-border"
+									className="h-9 max-w-sm min-w-48"
 									aria-label="Managing business"
 								>
 									<span className="truncate font-medium">
@@ -600,21 +606,10 @@ export default function BusinessDetailClient({
 							) : (
 								<Badge variant="outline">Inactive</Badge>
 							)}
-							<span className="text-sm text-muted-foreground">
-								TIN {business.tin_number}
-							</span>
 						</div>
 					)}
-
-					{ownerBusinesses.length > 1 && ownerBusinesses.length <= 6 ? (
-						<p className="text-xs text-muted-foreground">
-							TIN {business.tin_number}
-							{business.is_active ? "" : " · Inactive"}
-							{business.is_archived ? " · Archived" : ""}
-						</p>
-					) : null}
-				</div>
-			</header>
+				</section>
+			) : null}
 
 			<SendBusinessSmsDialog
 				open={sendSmsOpen}
@@ -623,75 +618,88 @@ export default function BusinessDetailClient({
 				phoneNumber={user?.phone_number}
 			/>
 
-			<Tabs value={activeTab} onValueChange={onTabChange}>
-				<TabsList>
-					<TabsTrigger value="overview">Overview</TabsTrigger>
-					<TabsTrigger value="employees">Employees</TabsTrigger>
-					<TabsTrigger value="branches">Branches</TabsTrigger>
-					<TabsTrigger value="bank-accounts">Bank Accounts</TabsTrigger>
-					<TabsTrigger value="payments">Verified payments</TabsTrigger>
-					<TabsTrigger value="referrals">Referrals</TabsTrigger>
-					<TabsTrigger value="subscription">Subscription</TabsTrigger>
+			<Tabs value={activeTab} onValueChange={onTabChange} className="gap-4">
+				<TabsList className="h-auto w-full flex-wrap justify-start gap-1 rounded-xl border border-border p-1.5 shadow-xs">
+					<TabsTrigger value="overview" className="rounded-lg">
+						Overview
+					</TabsTrigger>
+					<TabsTrigger value="employees" className="rounded-lg">
+						Employees
+					</TabsTrigger>
+					<TabsTrigger value="branches" className="rounded-lg">
+						Branches
+					</TabsTrigger>
+					<TabsTrigger value="bank-accounts" className="rounded-lg">
+						Bank accounts
+					</TabsTrigger>
+					<TabsTrigger value="payments" className="rounded-lg">
+						Payments
+					</TabsTrigger>
+					<TabsTrigger value="referrals" className="rounded-lg">
+						Referrals
+					</TabsTrigger>
+					<TabsTrigger value="subscription" className="rounded-lg">
+						Subscription
+					</TabsTrigger>
 				</TabsList>
 
-				<TabsContent value="overview">
-					<Card>
-						<CardHeader>
-							<CardTitle className="text-base">
-								{business.name || "Business"}
-							</CardTitle>
-							<CardDescription>
-								Details for the business you are managing above.
-							</CardDescription>
-						</CardHeader>
-						<CardContent className="flex flex-col gap-4">
-							<div className="grid gap-4 sm:grid-cols-2">
-								<div className="flex flex-col gap-1">
-									<span className="text-sm text-muted-foreground">
-										Business name
-									</span>
-									<span className="font-medium">{business.name || "—"}</span>
-								</div>
-								<div className="flex flex-col gap-1">
-									<span className="text-sm text-muted-foreground">TIN</span>
-									<span className="font-medium">{business.tin_number}</span>
-								</div>
-								<div className="flex flex-col gap-1 min-w-0">
-									<span className="text-sm text-muted-foreground">Owner</span>
-									<span className="font-medium truncate">
-										{user ? formatUserDisplayName(user) : "No owner found"}
-									</span>
-								</div>
-								<div className="flex flex-col gap-1">
-									<span className="text-sm text-muted-foreground">
-										Businesses owned
-									</span>
-									<span className="font-medium tabular-nums">
-										{ownerBusinesses.length}
-									</span>
-								</div>
-								<div className="flex flex-col gap-1">
-									<span className="text-sm text-muted-foreground">Status</span>
-									<span className="font-medium">
-										{business.is_active ? "Active" : "Inactive"}
-									</span>
-								</div>
-								<div className="flex flex-col gap-1">
-									<span className="text-sm text-muted-foreground">
-										Owner phone
-									</span>
-									<span className="font-medium tabular-nums">
-										{user?.phone_number ?? "—"}
-									</span>
-								</div>
-							</div>
-						</CardContent>
-					</Card>
+				<TabsContent value="overview" className="mt-0">
+					<div className="grid grid-cols-1 overflow-hidden rounded-xl border border-border bg-card shadow-xs sm:grid-cols-2 lg:grid-cols-3">
+						<div className="flex flex-col gap-1 px-5 py-4">
+							<p className="text-xs font-medium text-muted-foreground">
+								Business name
+							</p>
+							<p className="text-base font-semibold tracking-tight">
+								{business.name || "—"}
+							</p>
+						</div>
+						<div className="flex flex-col gap-1 border-border px-5 py-4 sm:border-l">
+							<p className="text-xs font-medium text-muted-foreground">TIN</p>
+							<p className="font-mono text-base font-semibold tabular-nums tracking-tight">
+								{business.tin_number}
+							</p>
+						</div>
+						<div className="flex flex-col gap-1 border-border px-5 py-4 sm:border-t lg:border-t-0 lg:border-l">
+							<p className="text-xs font-medium text-muted-foreground">Status</p>
+							<p className="text-base font-semibold tracking-tight">
+								{business.is_active ? "Active" : "Inactive"}
+								{business.is_archived ? " · Archived" : ""}
+							</p>
+						</div>
+						<div className="flex flex-col gap-1 border-border px-5 py-4 sm:border-t">
+							<p className="text-xs font-medium text-muted-foreground">Owner</p>
+							<p className="truncate text-base font-semibold tracking-tight">
+								{user ? formatUserDisplayName(user) : "—"}
+							</p>
+						</div>
+						<div className="flex flex-col gap-1 border-border px-5 py-4 sm:border-t sm:border-l">
+							<p className="text-xs font-medium text-muted-foreground">
+								Owner phone
+							</p>
+							<p className="font-mono text-base font-semibold tabular-nums tracking-tight">
+								{user?.phone_number ?? "—"}
+							</p>
+						</div>
+						<div className="flex flex-col gap-1 border-border px-5 py-4 sm:border-t lg:border-l">
+							<p className="text-xs font-medium text-muted-foreground">
+								Businesses owned
+							</p>
+							<p className="font-mono text-base font-semibold tabular-nums tracking-tight">
+								{ownerBusinesses.length}
+							</p>
+						</div>
+					</div>
 				</TabsContent>
 
-				<TabsContent value="employees">
-					<Card>
-						<CardContent className="flex flex-col gap-4">
+				<TabsContent value="employees" className="mt-0">
+					<Card size="sm" className="shadow-xs">
+						<CardHeader className="border-b border-border pb-3">
+							<CardTitle className="text-base">Employees</CardTitle>
+							<CardDescription>
+								Roles and branch assignment for this business
+							</CardDescription>
+						</CardHeader>
+						<CardContent className="flex flex-col gap-4 pt-4">
 							{employeesError ? (
 								<Alert variant="destructive">
 									<AlertTitle>Failed to load employees</AlertTitle>
@@ -825,9 +833,15 @@ export default function BusinessDetailClient({
 					</Card>
 				</TabsContent>
 
-				<TabsContent value="branches">
-					<Card>
-						<CardContent className="flex flex-col gap-4">
+				<TabsContent value="branches" className="mt-0">
+					<Card size="sm" className="shadow-xs">
+						<CardHeader className="border-b border-border pb-3">
+							<CardTitle className="text-base">Branches</CardTitle>
+							<CardDescription>
+								Locations under this business
+							</CardDescription>
+						</CardHeader>
+						<CardContent className="flex flex-col gap-4 pt-4">
 							<Table>
 								<TableHeader>
 									<TableRow>
@@ -839,7 +853,7 @@ export default function BusinessDetailClient({
 								<TableBody>
 									{branchesLoading ? (
 										<TableRow>
-											<TableCell colSpan={1} className="py-10 text-center">
+											<TableCell colSpan={3} className="py-10 text-center">
 												<span className="text-sm text-muted-foreground">
 													Loading branches…
 												</span>
@@ -847,7 +861,7 @@ export default function BusinessDetailClient({
 										</TableRow>
 									) : branches?.length === 0 ? (
 										<TableRow>
-											<TableCell colSpan={1} className="py-10 text-center">
+											<TableCell colSpan={3} className="py-10 text-center">
 												<span className="text-sm text-muted-foreground">
 													No branches found.
 												</span>
@@ -870,9 +884,15 @@ export default function BusinessDetailClient({
 					</Card>
 				</TabsContent>
 
-				<TabsContent value="bank-accounts">
-					<Card>
-						<CardContent className="flex flex-col gap-4">
+				<TabsContent value="bank-accounts" className="mt-0">
+					<Card size="sm" className="shadow-xs">
+						<CardHeader className="border-b border-border pb-3">
+							<CardTitle className="text-base">Bank accounts</CardTitle>
+							<CardDescription>
+								Linked payout accounts for this business
+							</CardDescription>
+						</CardHeader>
+						<CardContent className="flex flex-col gap-4 pt-4">
 							{bankAccountsError ? (
 								<Alert variant="destructive">
 									<AlertTitle>Failed to load bank accounts</AlertTitle>
@@ -947,24 +967,27 @@ export default function BusinessDetailClient({
 					</Card>
 				</TabsContent>
 
-				<TabsContent value="payments">
+				<TabsContent value="payments" className="mt-0">
 					<BusinessPaymentsTab businessId={businessId} />
 				</TabsContent>
 
-				<TabsContent value="referrals">
+				<TabsContent value="referrals" className="mt-0">
 					<BusinessReferralsTab />
 				</TabsContent>
 
-				<TabsContent value="subscription">
+				<TabsContent value="subscription" className="mt-0">
 					<div className="flex flex-col gap-4">
-						<Card>
-							<CardHeader>
-								<CardTitle>Current subscription</CardTitle>
-								<CardDescription>
-									Active subscription, usage, and history for this business.
-								</CardDescription>
-							</CardHeader>
-							<CardContent className="flex flex-col gap-4">
+						{/* Active plan as dense signature-adjacent panel */}
+						<section className="overflow-hidden rounded-xl border border-border bg-card shadow-xs">
+							<div className="border-b border-border px-5 py-4">
+								<p className="font-mono text-[11px] font-medium tracking-[0.12em] text-muted-foreground uppercase">
+									Billing
+								</p>
+								<h2 className="mt-1 text-base font-semibold tracking-tight">
+									Current subscription
+								</h2>
+							</div>
+							<div className="flex flex-col gap-4 p-5">
 								{activeSubscriptionError ? (
 									<Alert variant="destructive">
 										<AlertTitle>Failed to load current subscription</AlertTitle>
@@ -975,25 +998,25 @@ export default function BusinessDetailClient({
 													"Request failed.",
 												)}
 											</span>
-											<button
+											<Button
 												type="button"
-												className={cn(
-													buttonVariants({ variant: "outline", size: "sm" }),
-												)}
+												variant="outline"
+												size="sm"
 												onClick={() => refetchActiveSubscription()}
 											>
 												Try again
-											</button>
+											</Button>
 										</AlertDescription>
 									</Alert>
-								) : null}
-
-								<div className="flex min-h-10 items-center gap-2 rounded-md border px-3">
-									{activeSubscriptionLoading || activeSubscriptionFetching ? (
-										<span className="text-muted-foreground">Loading…</span>
-									) : activeSubscription ? (
-										<div className="flex flex-wrap items-center gap-2">
-											<Badge variant="secondary">
+								) : activeSubscriptionLoading || activeSubscriptionFetching ? (
+									<Skeleton className="h-16 w-full" />
+								) : activeSubscription ? (
+									<div className="grid grid-cols-1 overflow-hidden rounded-lg border border-border sm:grid-cols-3">
+										<div className="flex flex-col gap-1 px-4 py-3">
+											<p className="text-xs font-medium text-muted-foreground">
+												Plan
+											</p>
+											<p className="text-base font-semibold tracking-tight">
 												{getSubscriptionPlanLabel(
 													null,
 													activeSubscription.plan_id
@@ -1002,17 +1025,33 @@ export default function BusinessDetailClient({
 															)?.name
 														: null,
 												)}
-											</Badge>
-											<span className="text-sm text-muted-foreground">
-												Status: {activeSubscription.status}
-											</span>
+											</p>
 										</div>
-									) : (
-										<Alert variant="destructive" className="border-none px-0">
-											<AlertTitle>No active subscription found</AlertTitle>
-										</Alert>
-									)}
-								</div>
+										<div className="flex flex-col gap-1 border-border px-4 py-3 sm:border-l">
+											<p className="text-xs font-medium text-muted-foreground">
+												Status
+											</p>
+											<p className="text-base font-semibold capitalize tracking-tight">
+												{activeSubscription.status}
+											</p>
+										</div>
+										<div className="flex flex-col gap-1 border-border px-4 py-3 sm:border-l">
+											<p className="text-xs font-medium text-muted-foreground">
+												Period
+											</p>
+											<p className="font-mono text-sm font-medium tabular-nums tracking-tight">
+												{formatDateTime(activeSubscription.started_at)}
+												{activeSubscription.ended_at
+													? ` → ${formatDateTime(activeSubscription.ended_at)}`
+													: ""}
+											</p>
+										</div>
+									</div>
+								) : (
+									<p className="text-sm text-muted-foreground">
+										No active subscription on this business.
+									</p>
+								)}
 
 								{subscriptionPlansError ? (
 									<Alert variant="destructive">
@@ -1024,115 +1063,110 @@ export default function BusinessDetailClient({
 													"Request failed.",
 												)}
 											</span>
-											<button
+											<Button
 												type="button"
-												className={cn(
-													buttonVariants({ variant: "outline", size: "sm" }),
-												)}
+												variant="outline"
+												size="sm"
 												onClick={() => refetchSubscriptionPlans()}
 											>
 												Try again
-											</button>
+											</Button>
 										</AlertDescription>
 									</Alert>
 								) : null}
 								{subscriptionPlansLoading || subscriptionPlansFetching ? (
 									<div className="flex flex-col gap-2">
-										{Array.from({ length: 3 }).map((_, i) => (
-											<Skeleton key={i} className="h-10 w-full" />
+										{Array.from({ length: 2 }).map((_, i) => (
+											<Skeleton key={i} className="h-8 w-full" />
 										))}
 									</div>
 								) : null}
-							</CardContent>
-						</Card>
+							</div>
+						</section>
 
-						<Card>
-							<CardHeader className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-								<div className="flex flex-col gap-1">
-									<CardTitle>Usage</CardTitle>
-									<CardDescription>
-										Credits used and remaining for the current billing period.
-									</CardDescription>
+						<section className="overflow-hidden rounded-xl border border-border bg-card shadow-xs">
+							<div className="flex flex-col gap-2 border-b border-border px-5 py-4 sm:flex-row sm:items-start sm:justify-between">
+								<div>
+									<h2 className="text-base font-semibold tracking-tight">
+										Usage
+									</h2>
+									<p className="mt-0.5 text-sm text-muted-foreground">
+										Credits for the current period
+									</p>
 								</div>
 								{subscriptionUsageError ? (
-									<button
+									<Button
 										type="button"
-										className={cn(
-											buttonVariants({ variant: "outline", size: "sm" }),
-										)}
+										variant="outline"
+										size="sm"
 										onClick={() => refetchSubscriptionUsage()}
 									>
 										Retry
-									</button>
+									</Button>
 								) : null}
-							</CardHeader>
-							<CardContent className="flex flex-col gap-4">
+							</div>
+							<div className="p-5">
 								{subscriptionUsageError ? (
 									<Alert variant="destructive">
 										<AlertTitle>Could not load usage</AlertTitle>
 									</Alert>
 								) : subscriptionUsage ? (
-									<div className="grid gap-4 sm:grid-cols-3">
-										<div className="flex flex-col gap-1 rounded-lg border bg-muted/40 px-4 py-3">
-											<span className="text-xs font-medium text-muted-foreground">
-												Credits used
-											</span>
-											<span className="text-2xl font-semibold tabular-nums">
+									<div className="grid grid-cols-1 overflow-hidden rounded-lg border border-border sm:grid-cols-3">
+										<div className="flex flex-col gap-1 px-4 py-4">
+											<p className="text-xs font-medium text-muted-foreground">
+												Used
+											</p>
+											<p className="font-mono text-2xl font-semibold tabular-nums tracking-tight">
 												{subscriptionUsage.credits_used}
-											</span>
+											</p>
 										</div>
-										<div className="flex flex-col gap-1 rounded-lg border bg-muted/40 px-4 py-3">
-											<span className="text-xs font-medium text-muted-foreground">
-												Credits remaining
-											</span>
-											<span className="text-2xl font-semibold tabular-nums">
+										<div className="flex flex-col gap-1 border-border px-4 py-4 sm:border-l">
+											<p className="text-xs font-medium text-muted-foreground">
+												Remaining
+											</p>
+											<p className="font-mono text-2xl font-semibold tabular-nums tracking-tight">
 												{subscriptionUsage.remaining_credits}
-											</span>
+											</p>
 										</div>
-										<div className="flex flex-col gap-1 rounded-lg border bg-muted/40 px-4 py-3">
-											<span className="text-xs font-medium text-muted-foreground">
-												Credits limit
-											</span>
-											<span className="text-2xl font-semibold tabular-nums">
+										<div className="flex flex-col gap-1 border-border px-4 py-4 sm:border-l">
+											<p className="text-xs font-medium text-muted-foreground">
+												Limit
+											</p>
+											<p className="font-mono text-2xl font-semibold tabular-nums tracking-tight">
 												{subscriptionUsage.credits_limit}
-											</span>
+											</p>
 										</div>
-										<p className="text-xs text-muted-foreground sm:col-span-3">
-											Subscription ID:{" "}
-											<code className="rounded bg-muted px-1 py-0.5 font-mono text-[0.8rem]">
-												{subscriptionUsage.subscription_id}
-											</code>
-										</p>
 									</div>
 								) : (
 									<p className="text-sm text-muted-foreground">
 										No active subscription — usage is empty for this business.
 									</p>
 								)}
-							</CardContent>
-						</Card>
+							</div>
+						</section>
 
-						<Card>
-							<CardHeader className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-								<div className="flex flex-col gap-1">
-									<CardTitle>History</CardTitle>
-									<CardDescription>
-										Past and current subscription records for this business.
-									</CardDescription>
+						<section className="overflow-hidden rounded-xl border border-border bg-card shadow-xs">
+							<div className="flex flex-col gap-2 border-b border-border px-5 py-4 sm:flex-row sm:items-start sm:justify-between">
+								<div>
+									<h2 className="text-base font-semibold tracking-tight">
+										History
+									</h2>
+									<p className="mt-0.5 text-sm text-muted-foreground">
+										Past and current subscription records
+									</p>
 								</div>
 								{subscriptionHistoryError ? (
-									<button
+									<Button
 										type="button"
-										className={cn(
-											buttonVariants({ variant: "outline", size: "sm" }),
-										)}
+										variant="outline"
+										size="sm"
 										onClick={() => refetchSubscriptionHistory()}
 									>
 										Retry
-									</button>
+									</Button>
 								) : null}
-							</CardHeader>
-							<CardContent>
+							</div>
+							<div className="p-5">
 								{subscriptionHistoryError ? (
 									<Alert variant="destructive">
 										<AlertTitle>Couldn’t load history</AlertTitle>
@@ -1150,7 +1184,7 @@ export default function BusinessDetailClient({
 										))}
 									</div>
 								) : (
-									<div className="overflow-x-auto rounded-md border">
+									<div className="overflow-x-auto rounded-lg border border-border">
 										<Table aria-label="Subscription history">
 											<TableHeader>
 												<TableRow>
@@ -1168,11 +1202,9 @@ export default function BusinessDetailClient({
 													<TableRow>
 														<TableCell
 															colSpan={5}
-															className="py-10 text-center text-muted-foreground"
+															className="py-10 text-center text-sm text-muted-foreground"
 														>
-															<Alert variant="destructive" className="border-none px-0 text-center">
-																<AlertTitle>No subscription history found</AlertTitle>
-															</Alert>
+															No subscription history for this business.
 														</TableCell>
 													</TableRow>
 												) : (
@@ -1183,17 +1215,18 @@ export default function BusinessDetailClient({
 																	{getSubscriptionPlanLabel(
 																		null,
 																		row.plan_id
-																			? subscriptionPlanById.get(row.plan_id)?.name
+																			? subscriptionPlanById.get(row.plan_id)
+																					?.name
 																			: null,
 																	)}
 																</TableCell>
 																<TableCell>
 																	<Badge variant="outline">{row.status}</Badge>
 																</TableCell>
-																<TableCell className="text-sm whitespace-nowrap">
+																<TableCell className="font-mono text-sm whitespace-nowrap tabular-nums">
 																	{formatDateTime(row.started_at)}
 																</TableCell>
-																<TableCell className="text-sm whitespace-nowrap">
+																<TableCell className="font-mono text-sm whitespace-nowrap tabular-nums">
 																	{formatDateTime(row.ended_at)}
 																</TableCell>
 																<TableCell className="hidden max-w-48 truncate font-mono text-xs lg:table-cell">
@@ -1207,8 +1240,8 @@ export default function BusinessDetailClient({
 										</Table>
 									</div>
 								)}
-							</CardContent>
-						</Card>
+							</div>
+						</section>
 					</div>
 				</TabsContent>
 			</Tabs>
