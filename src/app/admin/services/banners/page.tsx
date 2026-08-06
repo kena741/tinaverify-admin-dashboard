@@ -13,6 +13,7 @@ import {
 import { BannerImage } from "@/components/admin/banner-image";
 import { PageHeader } from "@/components/admin/page-header";
 import { useBannerImageSrc } from "@/hooks/use-banner-image-src";
+import { formatShortUrl } from "@/lib/banner";
 import {
 	useCreateBannerMutation,
 	useDeleteBannerMutation,
@@ -586,16 +587,18 @@ function BannerTableRow({
 					fallbackClassName="h-20 w-36"
 				/>
 			</TableCell>
-			<TableCell className="max-w-xs">
+			<TableCell className="max-w-[14rem]">
 				{banner.redirect_url ? (
 					<a
 						href={banner.redirect_url}
 						target="_blank"
 						rel="noopener noreferrer"
-						className="inline-flex items-center gap-1 truncate text-sm text-primary hover:underline"
+						className="inline-flex max-w-full items-center gap-1 text-sm text-primary hover:underline"
 						title={banner.redirect_url}
 					>
-						<span className="truncate">{banner.redirect_url}</span>
+						<span className="truncate">
+							{formatShortUrl(banner.redirect_url)}
+						</span>
 						<ExternalLinkIcon className="size-3.5 shrink-0" aria-hidden />
 					</a>
 				) : (

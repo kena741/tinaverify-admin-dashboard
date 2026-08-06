@@ -27,6 +27,30 @@ export function resolveBannerImageSrc(imageUrl: string): string {
 	return `${receiptsStorageBaseUrl}/${objectPath}`;
 }
 
+/** Compact URL for table cells; full value stays in `title` / `href`. */
+export function formatShortUrl(url: string, maxLength = 42): string {
+	const trimmed = url.trim();
+	if (!trimmed) return "";
+
+	try {
+		const parsed = new URL(trimmed);
+		const host = parsed.hostname.replace(/^www\./i, "");
+		const path =
+			parsed.pathname === "/" || parsed.pathname === ""
+				? ""
+				: parsed.pathname;
+		const query = parsed.search ? "…" : "";
+		let short = `${host}${path}${query}`;
+		if (short.length > maxLength) {
+			short = `${short.slice(0, Math.max(1, maxLength - 1))}…`;
+		}
+		return short;
+	} catch {
+		if (trimmed.length <= maxLength) return trimmed;
+		return `${trimmed.slice(0, maxLength - 1)}…`;
+	}
+}
+
 /** GCS object URL without a V4 signed query string (browser GET returns 403 on private buckets). */
 export function isUnsignedGcsUrl(url: string): boolean {
 	try {
