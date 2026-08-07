@@ -773,7 +773,7 @@ export default function DashboardPage() {
 					</CardHeader>
 					<CardContent className="pt-4">
 						{acquisitionBusy && acquisitionSeries.length === 0 ? (
-							<Skeleton className="h-[280px] w-full" />
+							<Skeleton className="h-70 w-full" />
 						) : !hasAcquisitionPlot ? (
 							<ChartEmpty
 								title="No signups in this period"
@@ -782,7 +782,7 @@ export default function DashboardPage() {
 						) : (
 							<ChartContainer
 								config={acquisitionChartConfig}
-								className="aspect-auto h-[280px] w-full"
+								className="aspect-auto h-70 w-full"
 							>
 								<AreaChart
 									accessibilityLayer
@@ -879,7 +879,7 @@ export default function DashboardPage() {
 						</CardHeader>
 						<CardContent className="pt-4">
 							{chartsLoading && periodRevenueSeries.length === 0 ? (
-								<Skeleton className="h-[260px] w-full" />
+								<Skeleton className="h-65 w-full" />
 							) : !hasRevenuePlot ? (
 								<ChartEmpty
 									title="Nothing to plot"
@@ -888,7 +888,7 @@ export default function DashboardPage() {
 							) : (
 								<ChartContainer
 									config={revenueChartConfig}
-									className="aspect-auto h-[280px] w-full"
+									className="aspect-auto h-70 w-full"
 								>
 									<AreaChart
 										accessibilityLayer
@@ -965,7 +965,7 @@ export default function DashboardPage() {
 						</CardHeader>
 						<CardContent className="pt-4">
 							{chartsLoading && !hasSummary ? (
-								<Skeleton className="h-[260px] w-full" />
+								<Skeleton className="h-65 w-full" />
 							) : !hasSharePlot ? (
 								<ChartEmpty
 									title="Nothing to plot"
@@ -974,7 +974,7 @@ export default function DashboardPage() {
 							) : (
 								<ChartContainer
 									config={shareChartConfig}
-									className="aspect-auto mx-auto h-[260px] w-full"
+									className="aspect-auto mx-auto h-65 w-full"
 								>
 									<PieChart>
 										<ChartTooltip
@@ -1056,7 +1056,7 @@ export default function DashboardPage() {
 					</CardHeader>
 					<CardContent className="pt-5">
 						{chartsLoading && monthlySeries.length === 0 ? (
-							<Skeleton className="h-[300px] w-full" />
+							<Skeleton className="h-75 w-full" />
 						) : monthlySeries.length === 0 ? (
 							<ChartEmpty
 								title="No monthly activity yet"
@@ -1065,7 +1065,7 @@ export default function DashboardPage() {
 						) : (
 							<ChartContainer
 								config={monthlyChartConfig}
-								className="aspect-auto h-[320px] w-full"
+								className="aspect-auto h-80 w-full"
 							>
 								<ComposedChart
 									accessibilityLayer
