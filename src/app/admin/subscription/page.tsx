@@ -155,10 +155,11 @@ export default function SubscriptionPage() {
 
 	const filteredBusinesses = useMemo(() => {
 		const q = businessSearch.trim().toLowerCase();
-		if (!q) return businesses;
-		return businesses.filter((b) => {
-			const name = b.name?.toLowerCase() ?? "";
-			const tin = b.tin_number?.toLowerCase() ?? "";
+		const rows = businesses.filter((b) => Boolean(b.id));
+		if (!q) return rows;
+		return rows.filter((b) => {
+			const name = (b.name ?? "").toLowerCase();
+			const tin = (b.tin_number ?? "").toLowerCase();
 			return name.includes(q) || tin.includes(q) || b.id.toLowerCase().includes(q);
 		});
 	}, [businessSearch, businesses]);
@@ -330,7 +331,7 @@ export default function SubscriptionPage() {
 									{businessesLoading ? (
 										<span className="text-muted-foreground">Loading…</span>
 									) : selectedBusiness ? (
-										selectedBusiness.name
+										selectedBusiness.name || "Untitled business"
 									) : (
 										<span className="text-muted-foreground">
 											Select a business…
@@ -358,7 +359,6 @@ export default function SubscriptionPage() {
 												<CommandItem
 													key={b.id}
 													value={b.id}
-													keywords={[b.name, b.tin_number]}
 													onSelect={() => {
 														setBusinessId(b.id);
 														setStandardPlanId("");
@@ -373,10 +373,10 @@ export default function SubscriptionPage() {
 												>
 													<span className="flex min-w-0 flex-1 flex-col gap-0.5 text-left">
 														<span className="truncate font-medium">
-															{b.name}
+															{b.name || "Untitled business"}
 														</span>
 														<span className="truncate text-xs text-muted-foreground">
-															TIN {b.tin_number}
+															TIN {b.tin_number || "—"}
 														</span>
 													</span>
 												</CommandItem>
