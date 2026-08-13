@@ -276,6 +276,13 @@ export default function BusinessDetailClient({
 	const [updateEmployeeRole, updateEmployeeRoleState] =
 		useUpdateEmployeeRoleMutation();
 
+	const [activeDialogOpen, setActiveDialogOpen] = useState(false);
+	const [statusBanner, setStatusBanner] = useState<{
+		variant: "default" | "destructive";
+		title: string;
+		message: string;
+	} | null>(null);
+
 	const [employeeRoleDraft, setEmployeeRoleDraft] = useState<
 		Record<string, string>
 	>({});
@@ -386,6 +393,13 @@ export default function BusinessDetailClient({
 				) : null}
 			</div>
 
+			{statusBanner ? (
+				<Alert variant={statusBanner.variant}>
+					<AlertTitle>{statusBanner.title}</AlertTitle>
+					<AlertDescription>{statusBanner.message}</AlertDescription>
+				</Alert>
+			) : null}
+
 			{/* Signature: owner close-out strip */}
 			<section
 				aria-labelledby="owner-heading"
@@ -450,7 +464,10 @@ export default function BusinessDetailClient({
 								<MessageSquare data-icon="inline-start" />
 								SMS
 							</Button>
-							<AlertDialog>
+							<AlertDialog
+								open={activeDialogOpen}
+								onOpenChange={setActiveDialogOpen}
+							>
 								<AlertDialogTrigger
 									className={cn(
 										buttonVariants({ variant: "secondary", size: "sm" }),
@@ -477,16 +494,43 @@ export default function BusinessDetailClient({
 										</AlertDialogDescription>
 									</AlertDialogHeader>
 									<AlertDialogFooter>
-										<AlertDialogCancel>Cancel</AlertDialogCancel>
+										<AlertDialogCancel disabled={setBusinessActiveState.isLoading}>
+											Cancel
+										</AlertDialogCancel>
 										<AlertDialogAction
-											onClick={async () => {
-												await setBusinessActive({
-													businessId,
-													body: { is_active: !business.is_active },
-												}).unwrap();
+											disabled={setBusinessActiveState.isLoading}
+											onClick={async (e) => {
+												e.preventDefault();
+												const nextActive = !business.is_active;
+												try {
+													await setBusinessActive({
+														businessId,
+														body: { is_active: nextActive },
+													}).unwrap();
+													setActiveDialogOpen(false);
+													setStatusBanner({
+														variant: "default",
+														title: nextActive
+															? "Business activated"
+															: "Business deactivated",
+														message: `${business.name || "Business"} is now ${
+															nextActive ? "active" : "inactive"
+														}.`,
+													});
+												} catch (err) {
+													setStatusBanner({
+														variant: "destructive",
+														title: nextActive
+															? "Could not activate"
+															: "Could not deactivate",
+														message: getErrorMessage(err, "Request failed."),
+													});
+												}
 											}}
 										>
-											Confirm
+											{setBusinessActiveState.isLoading
+												? "Working…"
+												: "Confirm"}
 										</AlertDialogAction>
 									</AlertDialogFooter>
 								</AlertDialogContent>

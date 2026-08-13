@@ -6,14 +6,12 @@ import { useEffect, useState } from "react";
 import {
 	BellIcon,
 	LogOutIcon,
-	SearchIcon,
 } from "lucide-react";
 
 import { AdminShellLoading } from "@/components/admin/admin-shell-loading";
 import { AppSidebar } from "@/components/admin/app-sidebar";
 import { ModeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import {
 	SidebarInset,
 	SidebarProvider,
@@ -95,18 +93,7 @@ export default function AdminLayout({
 			<SidebarInset className="bg-muted/30">
 				<header className="sticky top-0 z-10 flex h-14 shrink-0 items-center gap-3 border-b border-border/80 bg-background/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/80">
 					<SidebarTrigger className="-ml-1" />
-					<div className="relative max-w-md flex-1">
-						<SearchIcon
-							className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
-							aria-hidden
-						/>
-						<Input
-							type="search"
-							placeholder="Search…"
-							className="h-9 bg-muted/50 pl-9 text-sm"
-							aria-label="Search"
-						/>
-					</div>
+					<div className="flex-1" />
 					<div className="flex items-center gap-1">
 						<ModeToggle />
 						<div className="relative">

@@ -110,6 +110,7 @@ type ActionTab = "standard" | "custom" | "grant";
 
 export default function SubscriptionPage() {
 	const [businessPopoverOpen, setBusinessPopoverOpen] = useState(false);
+	const [businessSearch, setBusinessSearch] = useState("");
 	const [businessId, setBusinessId] = useState("");
 	/** List-price checkout (`POST …/checkout`) — plan only */
 	const [standardPlanId, setStandardPlanId] = useState("");
@@ -151,6 +152,16 @@ export default function SubscriptionPage() {
 		() => businesses.find((b) => b.id === businessId) ?? null,
 		[businessId, businesses],
 	);
+
+	const filteredBusinesses = useMemo(() => {
+		const q = businessSearch.trim().toLowerCase();
+		if (!q) return businesses;
+		return businesses.filter((b) => {
+			const name = b.name?.toLowerCase() ?? "";
+			const tin = b.tin_number?.toLowerCase() ?? "";
+			return name.includes(q) || tin.includes(q) || b.id.toLowerCase().includes(q);
+		});
+	}, [businessSearch, businesses]);
 
 	const plansById = useMemo(() => {
 		const m = new Map<string, (typeof plans)[number]>();
@@ -299,7 +310,10 @@ export default function SubscriptionPage() {
 						<FieldLabel id="subscription-business-label">Business</FieldLabel>
 						<Popover
 							open={businessPopoverOpen}
-							onOpenChange={setBusinessPopoverOpen}
+							onOpenChange={(open) => {
+								setBusinessPopoverOpen(open);
+								if (!open) setBusinessSearch("");
+							}}
 						>
 							<PopoverTrigger
 								render={
@@ -329,18 +343,22 @@ export default function SubscriptionPage() {
 								className="w-(--anchor-width) min-w-72 p-0"
 								align="start"
 							>
-								<Command>
+								{/* ponytail: explicit filter — cmdk auto-filter is flaky with nested item labels */}
+								<Command shouldFilter={false}>
 									<CommandInput
 										placeholder="Search by name or TIN…"
 										aria-label="Search businesses"
+										value={businessSearch}
+										onValueChange={setBusinessSearch}
 									/>
 									<CommandList>
 										<CommandEmpty>No business found.</CommandEmpty>
 										<CommandGroup heading="Businesses">
-											{businesses.map((b: BusinessOutput) => (
+											{filteredBusinesses.map((b: BusinessOutput) => (
 												<CommandItem
 													key={b.id}
-													value={`${b.name} ${b.tin_number} ${b.id}`}
+													value={b.id}
+													keywords={[b.name, b.tin_number]}
 													onSelect={() => {
 														setBusinessId(b.id);
 														setStandardPlanId("");
@@ -349,6 +367,7 @@ export default function SubscriptionPage() {
 														setActionError(null);
 														setGrantSuccess(null);
 														setBusinessPopoverOpen(false);
+														setBusinessSearch("");
 													}}
 													className="[&>svg:last-child]:hidden"
 												>
