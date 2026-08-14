@@ -23,6 +23,8 @@ import {
 	formatDateInputValue,
 	formatRevenueAmount,
 	parseAnalyticsCount,
+	paidSubscriptionAmount,
+	sumPaidSubscriptionRevenueInRange,
 	type DashboardAnalyticsPreset,
 } from "@/lib/analytics";
 import { getDateRangeLabel } from "@/lib/filter-labels";
@@ -254,7 +256,6 @@ export default function DashboardPage() {
 
 	const {
 		summary,
-		periodRevenue,
 		totalVerifiedAmount,
 		totalVerifiedTransactions,
 		totalFailedTransactions,
@@ -294,10 +295,12 @@ export default function DashboardPage() {
 	const chartsLoading = isLoading || subsLoading || businessesLoading;
 	const acquisitionBusy = acquisitionLoading || acquisitionFetching;
 
-	const { periodRevenueSeries, revenueBucketLabel } = useMemo(() => {
+	const { periodRevenueSeries, revenueBucketLabel, collectedPeriodRevenue } =
+		useMemo(() => {
 		const empty = {
 			periodRevenueSeries: [] as PeriodRevenuePoint[],
 			revenueBucketLabel: "day",
+			collectedPeriodRevenue: 0,
 		};
 		if (!startDate || !endDate) return empty;
 
@@ -309,6 +312,12 @@ export default function DashboardPage() {
 		) {
 			return empty;
 		}
+
+		const collectedPeriodRevenue = sumPaidSubscriptionRevenueInRange(
+			subscriptionRows ?? [],
+			rangeStart,
+			rangeEnd,
+		);
 
 		const spanDays = Math.max(
 			1,
@@ -324,17 +333,11 @@ export default function DashboardPage() {
 			if (Number.isNaN(t.getTime()) || t < rangeStart || t > rangeEnd) {
 				continue;
 			}
-			if (
-				row.amount == null ||
-				!Number.isFinite(row.amount) ||
-				row.amount <= 0
-			) {
-				continue;
-			}
-			if (String(row.status ?? "").toLowerCase() === "pending") continue;
+			const paid = paidSubscriptionAmount(row);
+			if (paid <= 0) continue;
 
 			const key = bucketKey(t, granularity);
-			byKey.set(key, (byKey.get(key) ?? 0) + row.amount);
+			byKey.set(key, (byKey.get(key) ?? 0) + paid);
 		}
 
 		const cursor = bucketStart(rangeStart, granularity);
@@ -379,6 +382,7 @@ export default function DashboardPage() {
 					: granularity === "week"
 						? "week"
 						: "month",
+			collectedPeriodRevenue,
 		};
 	}, [subscriptionRows, startDate, endDate]);
 
@@ -402,26 +406,28 @@ export default function DashboardPage() {
 	}, [statsReady, summary?.total_businesses, summary?.total_paying_businesses]);
 
 	const monthlySeries = useMemo((): MonthPoint[] => {
+		const rangeStart = startDate ? new Date(startDate) : null;
+		const rangeEnd = endDate ? new Date(endDate) : null;
 		const ownerByBiz = new Map<string, string>();
 		for (const b of businesses ?? []) {
 			if (b.owner_id) ownerByBiz.set(b.id, b.owner_id);
 		}
 		const byMonth = new Map<string, { revenue: number; owners: Set<string> }>();
 		for (const row of subscriptionRows ?? []) {
-			const key = monthKey(row.started_at ?? row.created_at);
+			const ts = row.started_at ?? row.created_at;
+			const key = monthKey(ts);
 			if (!key) continue;
+			if (rangeStart && rangeEnd) {
+				const t = new Date(ts ?? "");
+				if (Number.isNaN(t.getTime()) || t < rangeStart || t > rangeEnd) {
+					continue;
+				}
+			}
 			const bucket = byMonth.get(key) ?? {
 				revenue: 0,
 				owners: new Set<string>(),
 			};
-			if (
-				row.amount != null &&
-				Number.isFinite(row.amount) &&
-				row.amount > 0 &&
-				String(row.status ?? "").toLowerCase() !== "pending"
-			) {
-				bucket.revenue += row.amount;
-			}
+			bucket.revenue += paidSubscriptionAmount(row);
 			bucket.owners.add(ownerByBiz.get(row.business_id) ?? row.business_id);
 			byMonth.set(key, bucket);
 		}
@@ -443,7 +449,7 @@ export default function DashboardPage() {
 			})
 			.toSorted((a, b) => a.month.localeCompare(b.month))
 			.slice(-6);
-	}, [subscriptionRows, businesses]);
+	}, [subscriptionRows, businesses, startDate, endDate]);
 
 	const acquisitionSeries = useMemo((): AcquisitionPoint[] => {
 		if (!acquisition?.buckets?.length) return [];
@@ -602,7 +608,7 @@ export default function DashboardPage() {
 								{periodLabelText}
 							</p>
 						</div>
-						{isLoading ? (
+						{isLoading || subsLoading ? (
 							<div className="flex flex-col gap-2">
 								<Skeleton className="h-12 w-48 bg-primary-foreground/20" />
 								<Skeleton className="h-4 w-32 bg-primary-foreground/15" />
@@ -610,7 +616,7 @@ export default function DashboardPage() {
 						) : statsReady ? (
 							<div className="flex flex-col gap-1">
 								<p className="font-mono text-[clamp(2rem,5vw,2.75rem)] leading-none font-semibold tracking-tight tabular-nums">
-									{formatRevenueAmount(periodRevenue)}
+									{formatRevenueAmount(collectedPeriodRevenue)}
 								</p>
 								<p className="text-sm text-primary-foreground/75">
 									Collected subscription payments in the selected window
@@ -637,7 +643,7 @@ export default function DashboardPage() {
 							value={
 								statsReady ? formatRevenueAmount(totalVerifiedAmount) : null
 							}
-							hint={statsReady ? "In selected period" : undefined}
+							hint={statsReady ? "Receipt volume, not subscriptions" : undefined}
 						/>
 						<LedgerStat
 							label="Success rate"
@@ -872,9 +878,9 @@ export default function DashboardPage() {
 							<CardDescription>
 								Paid subscriptions in {periodLabelText}, by{" "}
 								{revenueBucketLabel}. Total for this range:{" "}
-								{statsReady
-									? formatRevenueAmount(periodRevenue)
-									: "—"}
+								{subsLoading
+									? "—"
+									: formatRevenueAmount(collectedPeriodRevenue)}
 							</CardDescription>
 						</CardHeader>
 						<CardContent className="pt-4">
@@ -1049,8 +1055,9 @@ export default function DashboardPage() {
 						<div className="flex flex-col gap-1">
 							<CardTitle>Owners and revenue by month</CardTitle>
 							<CardDescription>
-								Bars are paid subscription revenue; the line is unique active
-								owners. Last six months with activity.
+								Bars are paid subscription revenue (same amounts as period
+								revenue); the line is unique owners. Last six months with
+								activity in this period.
 							</CardDescription>
 						</div>
 					</CardHeader>
@@ -1119,7 +1126,7 @@ export default function DashboardPage() {
 									/>
 									<Line
 										yAxisId="owners"
-										type="monotone"
+										type="linear"
 										dataKey="owners"
 										stroke="var(--color-owners)"
 										strokeWidth={2}

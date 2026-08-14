@@ -49,6 +49,37 @@ export function parseRevenueAmount(
 	return Number.isFinite(n) ? n : 0;
 }
 
+export type PaidSubscriptionRow = {
+	amount?: number | string | null;
+	status?: string | null;
+	started_at?: string | null;
+	created_at?: string | null;
+};
+
+/** Paid ETB on a subscription row; pending and non-positive amounts are 0. */
+export function paidSubscriptionAmount(row: PaidSubscriptionRow): number {
+	if (String(row.status ?? "").toLowerCase() === "pending") return 0;
+	const amount = parseRevenueAmount(row.amount);
+	return amount > 0 ? amount : 0;
+}
+
+/** Sum of paid subscription amounts whose started/created time falls in [rangeStart, rangeEnd]. */
+export function sumPaidSubscriptionRevenueInRange(
+	rows: PaidSubscriptionRow[],
+	rangeStart: Date,
+	rangeEnd: Date,
+): number {
+	let sum = 0;
+	for (const row of rows) {
+		const ts = row.started_at ?? row.created_at;
+		if (!ts) continue;
+		const t = new Date(ts);
+		if (Number.isNaN(t.getTime()) || t < rangeStart || t > rangeEnd) continue;
+		sum += paidSubscriptionAmount(row);
+	}
+	return sum;
+}
+
 /** Coerce analytics count fields (API may return number or string). */
 export function parseAnalyticsCount(
 	value: number | string | null | undefined,
