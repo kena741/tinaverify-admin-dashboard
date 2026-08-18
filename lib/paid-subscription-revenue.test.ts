@@ -6,25 +6,34 @@ import {
 	sumPaidSubscriptionRevenueInRange,
 } from "./analytics.ts";
 
+const REF = "TX-12345";
+
+test("rows without chapa reference are not revenue", () => {
+	assert.equal(paidSubscriptionAmount({ amount: 500, status: "active" }), 0);
+	assert.equal(paidSubscriptionAmount({ amount: 500, status: "active", chapa_transaction_reference: null }), 0);
+	assert.equal(paidSubscriptionAmount({ amount: 500, status: "active", chapa_transaction_reference: "" }), 0);
+});
+
 test("pending and empty amounts are not revenue", () => {
-	assert.equal(paidSubscriptionAmount({ amount: 500, status: "pending" }), 0);
-	assert.equal(paidSubscriptionAmount({ amount: 0, status: "active" }), 0);
-	assert.equal(paidSubscriptionAmount({ amount: null, status: "active" }), 0);
+	assert.equal(paidSubscriptionAmount({ amount: 500, status: "pending", chapa_transaction_reference: REF }), 0);
+	assert.equal(paidSubscriptionAmount({ amount: 0, status: "active", chapa_transaction_reference: REF }), 0);
+	assert.equal(paidSubscriptionAmount({ amount: null, status: "active", chapa_transaction_reference: REF }), 0);
 });
 
-test("active rows count numeric and string amounts", () => {
-	assert.equal(paidSubscriptionAmount({ amount: 525039.42, status: "active" }), 525039.42);
-	assert.equal(paidSubscriptionAmount({ amount: "77936.7", status: "expired" }), 77936.7);
+test("paid rows with chapa ref count numeric and string amounts", () => {
+	assert.equal(paidSubscriptionAmount({ amount: 525039.42, status: "active", chapa_transaction_reference: REF }), 525039.42);
+	assert.equal(paidSubscriptionAmount({ amount: "77936.7", status: "expired", chapa_transaction_reference: REF }), 77936.7);
 });
 
-test("period total matches the sum of paid monthly bars (user regression)", () => {
+test("period total only sums rows with chapa reference", () => {
 	const rows = [
-		{ amount: 320, status: "active", started_at: "2026-05-10T12:00:00.000Z" },
-		{ amount: 1143582.85, status: "active", started_at: "2026-06-15T12:00:00.000Z" },
-		{ amount: 525039.42, status: "expired", started_at: "2026-07-20T12:00:00.000Z" },
-		{ amount: 77936.7, status: "active", started_at: "2026-08-02T12:00:00.000Z" },
-		{ amount: 99999, status: "pending", started_at: "2026-08-03T12:00:00.000Z" },
-		{ amount: 50, status: "active", started_at: "2025-01-01T12:00:00.000Z" },
+		{ amount: 320, status: "active", started_at: "2026-05-10T12:00:00.000Z", chapa_transaction_reference: REF },
+		{ amount: 1143582.85, status: "active", started_at: "2026-06-15T12:00:00.000Z", chapa_transaction_reference: REF },
+		{ amount: 525039.42, status: "expired", started_at: "2026-07-20T12:00:00.000Z", chapa_transaction_reference: REF },
+		{ amount: 77936.7, status: "active", started_at: "2026-08-02T12:00:00.000Z", chapa_transaction_reference: REF },
+		{ amount: 99999, status: "pending", started_at: "2026-08-03T12:00:00.000Z", chapa_transaction_reference: REF },
+		{ amount: 50, status: "active", started_at: "2025-01-01T12:00:00.000Z", chapa_transaction_reference: REF },
+		{ amount: 9999, status: "active", started_at: "2026-07-01T12:00:00.000Z" },
 	];
 	const chartMonths = sumPaidSubscriptionRevenueInRange(
 		rows,

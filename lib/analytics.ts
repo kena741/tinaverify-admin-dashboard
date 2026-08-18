@@ -54,10 +54,12 @@ export type PaidSubscriptionRow = {
 	status?: string | null;
 	started_at?: string | null;
 	created_at?: string | null;
+	chapa_transaction_reference?: string | null;
 };
 
-/** Paid ETB on a subscription row; pending and non-positive amounts are 0. */
+/** Collected ETB on a subscription row: only rows with a Chapa payment reference count. */
 export function paidSubscriptionAmount(row: PaidSubscriptionRow): number {
+	if (!row.chapa_transaction_reference) return 0;
 	if (String(row.status ?? "").toLowerCase() === "pending") return 0;
 	const amount = parseRevenueAmount(row.amount);
 	return amount > 0 ? amount : 0;
