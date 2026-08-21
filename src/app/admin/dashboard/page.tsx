@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { format, parseISO } from "date-fns";
 import {
 	Area,
@@ -77,6 +78,13 @@ const PRESET_OPTIONS: DashboardAnalyticsPreset[] = [
 	"this_month",
 	"custom",
 ];
+
+const CREDIT_USAGE_LIMIT_OPTIONS = [5, 10, 20, 50, 100] as const;
+type CreditUsageLimit = (typeof CREDIT_USAGE_LIMIT_OPTIONS)[number];
+
+function isCreditUsageLimit(v: string): v is `${CreditUsageLimit}` {
+	return CREDIT_USAGE_LIMIT_OPTIONS.some((n) => String(n) === v);
+}
 
 const shareChartConfig = {
 	paying: {
@@ -172,10 +180,12 @@ function formatVolumeBucketLabel(iso: string): string {
 }
 
 export default function DashboardPage() {
+	const router = useRouter();
 	const [defaultCustom] = useState(defaultCustomDateRange);
 	const [preset, setPreset] = useState<DashboardAnalyticsPreset>("all");
 	const [customStart, setCustomStart] = useState(defaultCustom.start);
 	const [customEnd, setCustomEnd] = useState(defaultCustom.end);
+	const [creditLimit, setCreditLimit] = useState<CreditUsageLimit>(10);
 	const todayMax = formatDateInputValue(new Date());
 
 	const {
@@ -228,7 +238,10 @@ export default function DashboardPage() {
 		data: creditUsage,
 		isLoading: creditLoading,
 		isFetching: creditFetching,
-	} = useGetCreditUsageQuery({ limit: 10 }, { skip: !isSystemAdmin });
+	} = useGetCreditUsageQuery(
+		{ limit: creditLimit },
+		{ skip: !isSystemAdmin },
+	);
 
 	const periodLabelText = periodLabel(preset, customStart, customEnd);
 	const hasSummary = Boolean(summary) && !error;
@@ -856,11 +869,50 @@ export default function DashboardPage() {
 
 				<Card size="sm">
 					<CardHeader className="border-b">
-						<div className="flex flex-col gap-1">
-							<CardTitle>Top credit usage</CardTitle>
-							<CardDescription>
-								Active subscriptions ordered by highest credit usage percentage.
-							</CardDescription>
+						<div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+							<div className="flex flex-col gap-1">
+								<CardTitle>Top credit usage</CardTitle>
+								<CardDescription>
+									Active subscriptions ordered by highest credit usage
+									percentage.
+								</CardDescription>
+							</div>
+							{isSystemAdmin ? (
+								<Field className="w-28 gap-1">
+									<FieldLabel
+										htmlFor="credit-usage-limit"
+										className="text-[11px] text-muted-foreground"
+									>
+										Show top
+									</FieldLabel>
+									<Select
+										value={String(creditLimit)}
+										onValueChange={(v) => {
+											if (v != null && isCreditUsageLimit(v)) {
+												setCreditLimit(Number(v) as CreditUsageLimit);
+											}
+										}}
+									>
+										<SelectTrigger
+											id="credit-usage-limit"
+											className="h-9 bg-background"
+										>
+											<span className="flex flex-1 truncate text-left text-sm">
+												{creditLimit}
+											</span>
+										</SelectTrigger>
+										<SelectContent>
+											<SelectGroup>
+												{CREDIT_USAGE_LIMIT_OPTIONS.map((n) => (
+													<SelectItem key={n} value={String(n)}>
+														{n}
+													</SelectItem>
+												))}
+											</SelectGroup>
+										</SelectContent>
+									</Select>
+								</Field>
+							) : null}
 						</div>
 					</CardHeader>
 					<CardContent className="pt-4">
@@ -889,7 +941,13 @@ export default function DashboardPage() {
 									</TableHeader>
 									<TableBody>
 										{creditRows.map((row) => (
-											<TableRow key={row.business_id}>
+											<TableRow
+												key={row.business_id}
+												className="cursor-pointer"
+												onClick={() =>
+													router.push(`/admin/business/${row.business_id}`)
+												}
+											>
 												<TableCell className="font-medium">
 													{row.business_name || row.business_id}
 												</TableCell>

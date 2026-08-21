@@ -17,6 +17,31 @@ function bearerHeaders(accessToken?: string | null) {
 	return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
+/** Backend may return a bare array or a wrapped `{ items | transactions | results }` object. */
+function normalizeTransactionList(data: unknown): VerifiedTransactionOutput[] {
+	if (Array.isArray(data)) return data as VerifiedTransactionOutput[];
+	if (data && typeof data === "object") {
+		const o = data as Record<string, unknown>;
+		if (Array.isArray(o.items)) return o.items as VerifiedTransactionOutput[];
+		if (Array.isArray(o.transactions))
+			return o.transactions as VerifiedTransactionOutput[];
+		if (Array.isArray(o.results)) return o.results as VerifiedTransactionOutput[];
+		if (Array.isArray(o.data)) return o.data as VerifiedTransactionOutput[];
+	}
+	return [];
+}
+
+function transactionListTags(result: VerifiedTransactionOutput[] | undefined) {
+	const list = Array.isArray(result) ? result : [];
+	return [
+		{ type: "Transaction" as const, id: "LIST" },
+		...list.map((t) => ({
+			type: "Transaction" as const,
+			id: t.id,
+		})),
+	];
+}
+
 export const transactionsApi = createApi({
 	reducerPath: "transactionsApi",
 	baseQuery: backendBaseQuery,
@@ -80,16 +105,9 @@ export const transactionsApi = createApi({
 				},
 				headers: bearerHeaders(),
 			}),
-			providesTags: (result) =>
-				result
-					? [
-							{ type: "Transaction" as const, id: "LIST" },
-							...result.map((t) => ({
-								type: "Transaction" as const,
-								id: t.id,
-							})),
-						]
-					: [{ type: "Transaction" as const, id: "LIST" }],
+			transformResponse: (response: unknown) =>
+				normalizeTransactionList(response),
+			providesTags: (result) => transactionListTags(result),
 		}),
 
 		/** `GET /api/v1/transactions/branch/{branch_id}` */
@@ -111,16 +129,9 @@ export const transactionsApi = createApi({
 				},
 				headers: bearerHeaders(),
 			}),
-			providesTags: (result) =>
-				result
-					? [
-							{ type: "Transaction" as const, id: "LIST" },
-							...result.map((t) => ({
-								type: "Transaction" as const,
-								id: t.id,
-							})),
-						]
-					: [{ type: "Transaction" as const, id: "LIST" }],
+			transformResponse: (response: unknown) =>
+				normalizeTransactionList(response),
+			providesTags: (result) => transactionListTags(result),
 		}),
 
 		/** `GET /api/v1/transactions/me` */
@@ -141,16 +152,9 @@ export const transactionsApi = createApi({
 				},
 				headers: bearerHeaders(),
 			}),
-			providesTags: (result) =>
-				result
-					? [
-							{ type: "Transaction" as const, id: "LIST" },
-							...result.map((t) => ({
-								type: "Transaction" as const,
-								id: t.id,
-							})),
-						]
-					: [{ type: "Transaction" as const, id: "LIST" }],
+			transformResponse: (response: unknown) =>
+				normalizeTransactionList(response),
+			providesTags: (result) => transactionListTags(result),
 		}),
 	}),
 });
