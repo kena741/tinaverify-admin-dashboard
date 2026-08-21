@@ -2,14 +2,14 @@
 
 import { useRouter } from "next/navigation";
 import { format } from "date-fns";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
 	ArrowDownIcon,
 	ArrowUpIcon,
 	ArrowUpDownIcon,
 } from "lucide-react";
 
-import { useLazyGetUserByIdQuery } from "@/services/auth/authApi";
+import { useListAllUsersQuery } from "@/services/auth/authApi";
 import { useListAllBusinessesQuery } from "@/services/branch-management/branchManagementApi";
 import { useListAdminSubscriptionTransactionsQuery } from "@/services/subscription/subscriptionApi";
 import { useListSubscriptionPlansQuery } from "@/services/subscription-plan/subscriptionPlanApi";
@@ -61,8 +61,6 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/components/ui/table";
-
-const OWNER_FETCH_CONCURRENCY = 3;
 
 const BIZ_COUNT_FILTER_ALL = "all";
 type BizCountFilter = typeof BIZ_COUNT_FILTER_ALL | "1" | "2" | "3+";
@@ -170,75 +168,6 @@ function compareOwnerRows(
 	);
 }
 
-function usePageOwnerUsers(ownerIds: string[]) {
-	const [trigger] = useLazyGetUserByIdQuery();
-	const [usersById, setUsersById] = useState<
-		Record<string, UserOutput | null>
-	>({});
-	const cacheRef = useRef(usersById);
-	cacheRef.current = usersById;
-
-	const orderedKey = ownerIds.join(",");
-
-	useEffect(() => {
-		const ids = orderedKey.length > 0 ? orderedKey.split(",") : [];
-		if (ids.length === 0) return;
-		let cancelled = false;
-
-		const missing = ids.filter((id) => !(id in cacheRef.current));
-		if (missing.length === 0) return;
-
-		async function loadOne(id: string) {
-			try {
-				const user = await trigger({ userId: id }, true).unwrap();
-				if (!cancelled) {
-					setUsersById((prev) =>
-						id in prev ? prev : { ...prev, [id]: user },
-					);
-				}
-			} catch {
-				if (cancelled) return;
-				try {
-					await new Promise((r) => window.setTimeout(r, 250));
-					const user = await trigger({ userId: id }, false).unwrap();
-					if (!cancelled) {
-						setUsersById((prev) =>
-							id in prev ? prev : { ...prev, [id]: user },
-						);
-					}
-				} catch {
-					if (!cancelled) {
-						setUsersById((prev) =>
-							id in prev ? prev : { ...prev, [id]: null },
-						);
-					}
-				}
-			}
-		}
-
-		async function run() {
-			let cursor = 0;
-			async function worker() {
-				while (cursor < missing.length && !cancelled) {
-					const id = missing[cursor];
-					cursor += 1;
-					if (id) await loadOne(id);
-				}
-			}
-			await Promise.all(
-				Array.from({ length: OWNER_FETCH_CONCURRENCY }, () => worker()),
-			);
-		}
-
-		void run();
-		return () => {
-			cancelled = true;
-		};
-	}, [orderedKey, trigger]);
-
-	return usersById;
-}
-
 function getErrorMessage(error: unknown, fallback: string): string {
 	if (
 		typeof error === "object" &&
@@ -306,6 +235,7 @@ export default function TransactionsPage() {
 
 	const { data: businesses, isLoading: businessesLoading } =
 		useListAllBusinessesQuery();
+	const { data: allUsers, isLoading: usersLoading } = useListAllUsersQuery();
 	const { data: plans } = useListSubscriptionPlansQuery();
 
 	const {
@@ -315,6 +245,14 @@ export default function TransactionsPage() {
 		error,
 		refetch,
 	} = useListAdminSubscriptionTransactionsQuery();
+
+	const usersById = useMemo(() => {
+		const map: Record<string, UserOutput> = {};
+		for (const user of allUsers ?? []) {
+			map[user.id] = user;
+		}
+		return map;
+	}, [allUsers]);
 
 	const ownerIdByBusinessId = useMemo(() => {
 		const map = new Map<string, string>();
@@ -378,6 +316,7 @@ export default function TransactionsPage() {
 		if (q) {
 			businessRows = businessRows.filter((row) => {
 				const ownerId = ownerIdByBusinessId.get(row.business_id);
+				const owner = ownerId ? usersById[ownerId] : undefined;
 				const ownerBizNames = ownerId
 					? (businessesByOwnerId.get(ownerId) ?? [])
 							.map((b) => b.name)
@@ -391,6 +330,10 @@ export default function TransactionsPage() {
 					row.chapa_transaction_reference,
 					row.business_id,
 					ownerBizNames,
+					owner ? formatUserDisplayName(owner) : "",
+					owner?.email,
+					owner?.phone_number,
+					owner?.username,
 				]
 					.filter(Boolean)
 					.join(" ")
@@ -459,6 +402,7 @@ export default function TransactionsPage() {
 		searchTerm,
 		ownerIdByBusinessId,
 		businessesByOwnerId,
+		usersById,
 		bizCountFilter,
 		minAmount,
 		dateFrom,
@@ -472,21 +416,6 @@ export default function TransactionsPage() {
 	const currentPage = Math.min(page, totalPages);
 	const pageStart = (currentPage - 1) * pageSize;
 	const pageRows = filteredRows.slice(pageStart, pageStart + pageSize);
-
-	const pageOwnerIds = useMemo(() => {
-		const ids: string[] = [];
-		const seen = new Set<string>();
-		for (const row of pageRows) {
-			const ownerId = ownerIdByBusinessId.get(row.business_id);
-			if (ownerId && !seen.has(ownerId)) {
-				seen.add(ownerId);
-				ids.push(ownerId);
-			}
-		}
-		return ids;
-	}, [pageRows, ownerIdByBusinessId]);
-
-	const usersById = usePageOwnerUsers(pageOwnerIds);
 
 	const filtersActive =
 		planId !== PLAN_FILTER_ALL ||
@@ -564,8 +493,8 @@ export default function TransactionsPage() {
 
 	const listBusy =
 		statusFilter === "unsubscribed"
-			? businessesLoading || statsLoading
-			: statsLoading || isFetching || businessesLoading;
+			? businessesLoading || statsLoading || usersLoading
+			: statsLoading || isFetching || businessesLoading || usersLoading;
 
 	return (
 		<div className="mx-auto flex w-full max-w-6xl flex-col gap-6 pb-8">
@@ -988,11 +917,11 @@ export default function TransactionsPage() {
 										const ownerLoadState: "loading" | "ready" | "missing" =
 											!ownerId
 												? "missing"
-												: ownerId in usersById
-													? ownerUser
+												: usersLoading && !allUsers
+													? "loading"
+													: ownerUser
 														? "ready"
-														: "missing"
-													: "loading";
+														: "missing";
 										return (
 											<OwnerRow
 												key={ownerId ?? row.id}

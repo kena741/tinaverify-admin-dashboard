@@ -63,6 +63,16 @@ export type UserOutput = {
 	user_information?: UserInformationOutput | null;
 };
 
+/** OpenAPI `PaginatedUserResponse` — `GET /api/v1/users/all` */
+export type PaginatedUserResponse = {
+	items: UserOutput[];
+	total_count: number;
+	page_number: number;
+	returned_count: number;
+	offset: number;
+	limit: number;
+};
+
 /** OpenAPI `UserAuthResponse` — `token_type` defaults to `"bearer"` on the server */
 export type UserAuthResponse = {
 	access_token: string;
@@ -564,6 +574,32 @@ export type PaymentGatewaysOutput = {
 export type PaymentGatewaysUpdateRequest = {
 	chapa?: PaymentGatewayState;
 	telebirr?: PaymentGatewayState;
+};
+
+// -----------------------------
+// Global settings
+// -----------------------------
+
+/** OpenAPI global setting — `policies` / `general_use` are free-form objects */
+export type GlobalSettingOutput = {
+	id: UUID;
+	email: string | null;
+	phone: string | null;
+	website: string | null;
+	office_address: string | null;
+	business_hours: string | null;
+	policies: Record<string, unknown> | null;
+	general_use: Record<string, unknown> | null;
+};
+
+export type GlobalSettingWriteRequest = {
+	email?: string | null;
+	phone?: string | null;
+	website?: string | null;
+	office_address?: string | null;
+	business_hours?: string | null;
+	policies?: Record<string, unknown> | null;
+	general_use?: Record<string, unknown> | null;
 };
 
 // -----------------------------

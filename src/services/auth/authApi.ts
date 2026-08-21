@@ -1,10 +1,12 @@
 import { createApi } from "@reduxjs/toolkit/query/react";
+import type { FetchBaseQueryError } from "@reduxjs/toolkit/query";
 import { backendBaseQuery } from "../baseQuery";
 import { getStoredAccessToken } from "../authTokens";
 import type {
 	BranchOutput,
 	BusinessOutput,
 	LoginRequest,
+	PaginatedUserResponse,
 	RegisterUserRequest,
 	UserPasswordUpdateRequest,
 	UserAuthResponse,
@@ -86,6 +88,51 @@ export const authApi = createApi({
 			providesTags: [{ type: "MyBranch" as const, id: "ME" }],
 		}),
 
+		/**
+		 * `GET /api/v1/users/all` — pages until all users are loaded.
+		 * Used for admin owner lists (join onto business.owner_id).
+		 */
+		listAllUsers: builder.query<UserOutput[], void>({
+			async queryFn(_arg, _api, _extraOptions, baseQuery) {
+				const pageSize = 100;
+				let offset = 0;
+				const items: UserOutput[] = [];
+				for (;;) {
+					const res = await baseQuery({
+						url: "/api/v1/users/all",
+						method: "GET",
+						params: { offset, limit: pageSize },
+						headers: bearerHeaders(),
+					});
+					if (res.error) {
+						return { error: res.error as FetchBaseQueryError };
+					}
+					const page = res.data as PaginatedUserResponse;
+					const batch = Array.isArray(page?.items) ? page.items : [];
+					items.push(...batch);
+					const total = Number(page?.total_count);
+					if (
+						batch.length < pageSize ||
+						(Number.isFinite(total) && items.length >= total)
+					) {
+						break;
+					}
+					offset += pageSize;
+				}
+				return { data: items };
+			},
+			providesTags: (result) =>
+				result
+					? [
+							{ type: "User" as const, id: "LIST" },
+							...result.map((u) => ({
+								type: "User" as const,
+								id: u.id,
+							})),
+						]
+					: [{ type: "User" as const, id: "LIST" }],
+		}),
+
 		/** `GET /api/v1/users/{user_id}` */
 		getUserById: builder.query<UserOutput, { userId: string }>({
 			query: ({ userId }) => ({
@@ -109,6 +156,7 @@ export const authApi = createApi({
 			}),
 			invalidatesTags: (_r, _e, { userId }) => [
 				{ type: "User" as const, id: userId },
+				{ type: "User" as const, id: "LIST" },
 				{ type: "Me" as const, id: "ME" },
 			],
 		}),
@@ -120,7 +168,10 @@ export const authApi = createApi({
 				method: "DELETE",
 				headers: bearerHeaders(),
 			}),
-			invalidatesTags: (_r, _e, { userId }) => [{ type: "User" as const, id: userId }],
+			invalidatesTags: (_r, _e, { userId }) => [
+				{ type: "User" as const, id: userId },
+				{ type: "User" as const, id: "LIST" },
+			],
 		}),
 
 		/** `PATCH /api/v1/users/me/password?user_id=...` */
@@ -147,6 +198,7 @@ export const {
 	useRefreshTokenMutation,
 	useListMyBusinessesQuery,
 	useGetMyBranchQuery,
+	useListAllUsersQuery,
 	useGetUserByIdQuery,
 	useLazyGetUserByIdQuery,
 	useUpdateUserMutation,
