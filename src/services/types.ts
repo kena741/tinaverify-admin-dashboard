@@ -558,6 +558,40 @@ export type UserAcquisitionOutput = {
 	buckets: UserAcquisitionBucketOutput[];
 };
 
+/** `GET /api/v1/analytics/payment-volume-30d` */
+export type PaymentVolumeBucketOutput = {
+	period_start: string;
+	period_end: string;
+	volume: string | number;
+};
+
+export type PaymentVolume30dOutput = {
+	total_volume: string | number;
+	buckets: PaymentVolumeBucketOutput[];
+};
+
+/** `GET /api/v1/analytics/paying-share` */
+export type PayingShareOutput = {
+	total_paying_businesses: number | string;
+	total_not_paying_businesses: number | string;
+	total_businesses: number | string;
+	paying_percentage: number | string;
+};
+
+/** `GET /api/v1/analytics/credit-usage` */
+export type CreditUsageBusinessOutput = {
+	business_id: string;
+	business_name: string;
+	credits_limit: number;
+	credits_used: number;
+	available_credits: number;
+	usage_percentage: number;
+};
+
+export type CreditUsageOutput = {
+	businesses: CreditUsageBusinessOutput[];
+};
+
 // -----------------------------
 // Payments / gateways
 // -----------------------------
@@ -600,6 +634,28 @@ export type GlobalSettingWriteRequest = {
 	business_hours?: string | null;
 	policies?: Record<string, unknown> | null;
 	general_use?: Record<string, unknown> | null;
+};
+
+// -----------------------------
+// Contact messages
+// -----------------------------
+
+export type ContactMessageStatus = "pending" | "resolved";
+
+export type ContactMessageOutput = {
+	id: UUID;
+	name: string;
+	phone: string | null;
+	email: string | null;
+	subject: string;
+	message: string;
+	status: ContactMessageStatus | string;
+	created_at: string;
+	resolved_at: string | null;
+};
+
+export type ContactMessageStatusUpdateRequest = {
+	status: ContactMessageStatus;
 };
 
 // -----------------------------

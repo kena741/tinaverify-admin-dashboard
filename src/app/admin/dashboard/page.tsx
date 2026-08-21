@@ -5,6 +5,8 @@ import { format, parseISO } from "date-fns";
 import {
 	Area,
 	AreaChart,
+	Bar,
+	BarChart,
 	CartesianGrid,
 	Cell,
 	Label,
@@ -20,11 +22,17 @@ import {
 	formatDateInputValue,
 	formatRevenueAmount,
 	parseAnalyticsCount,
+	parseRevenueAmount,
 	type DashboardAnalyticsPreset,
 } from "@/lib/analytics";
 import { getDateRangeLabel } from "@/lib/filter-labels";
 import { cn } from "@/lib/utils";
-import { useGetUserAcquisitionQuery } from "@/services/analytics/analyticsApi";
+import {
+	useGetCreditUsageQuery,
+	useGetPayingShareQuery,
+	useGetPaymentVolume30dQuery,
+	useGetUserAcquisitionQuery,
+} from "@/services/analytics/analyticsApi";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
@@ -52,6 +60,15 @@ import {
 	SelectTrigger,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+	Table,
+	TableBody,
+	TableCell,
+	TableHead,
+	TableHeader,
+	TableRow,
+} from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
 
 const PRESET_OPTIONS: DashboardAnalyticsPreset[] = [
 	"all",
@@ -76,6 +93,13 @@ const acquisitionChartConfig = {
 	newUsers: {
 		label: "New users",
 		color: "var(--chart-2)",
+	},
+} satisfies ChartConfig;
+
+const volumeChartConfig = {
+	volume: {
+		label: "Volume",
+		color: "var(--chart-1)",
 	},
 } satisfies ChartConfig;
 
@@ -124,6 +148,12 @@ type AcquisitionPoint = {
 	newUsers: number;
 };
 
+type VolumePoint = {
+	key: string;
+	label: string;
+	volume: number;
+};
+
 function formatAcquisitionLabel(
 	iso: string,
 	granularity: "day" | "week" | "month",
@@ -133,6 +163,12 @@ function formatAcquisitionLabel(
 	if (granularity === "day") return format(d, "MMM d");
 	if (granularity === "week") return `W/c ${format(d, "MMM d")}`;
 	return format(d, "MMM yy");
+}
+
+function formatVolumeBucketLabel(iso: string): string {
+	const d = new Date(iso);
+	if (Number.isNaN(d.getTime())) return iso;
+	return format(d, "MMM d");
 }
 
 export default function DashboardPage() {
@@ -162,26 +198,52 @@ export default function DashboardPage() {
 		customEnd: preset === "custom" ? customEnd : undefined,
 	});
 
+	const rangeReady = isSystemAdmin && customRangeValid && !!startDate && !!endDate;
+
 	const {
 		data: acquisition,
 		isLoading: acquisitionLoading,
 		isFetching: acquisitionFetching,
 	} = useGetUserAcquisitionQuery(
 		{ startDate, endDate },
-		{ skip: !isSystemAdmin || !customRangeValid || !startDate || !endDate },
+		{ skip: !rangeReady },
 	);
+
+	const {
+		data: paymentVolume,
+		isLoading: volumeLoading,
+		isFetching: volumeFetching,
+	} = useGetPaymentVolume30dQuery(
+		{ startDate, endDate },
+		{ skip: !rangeReady },
+	);
+
+	const {
+		data: payingShare,
+		isLoading: shareLoading,
+		isFetching: shareFetching,
+	} = useGetPayingShareQuery(undefined, { skip: !isSystemAdmin });
+
+	const {
+		data: creditUsage,
+		isLoading: creditLoading,
+		isFetching: creditFetching,
+	} = useGetCreditUsageQuery({ limit: 10 }, { skip: !isSystemAdmin });
 
 	const periodLabelText = periodLabel(preset, customStart, customEnd);
 	const hasSummary = Boolean(summary) && !error;
 	const statsReady = hasSummary && !isLoading;
-	const chartsLoading = isLoading;
 	const acquisitionBusy = acquisitionLoading || acquisitionFetching;
+	const volumeBusy = volumeLoading || volumeFetching;
+	const shareBusy = shareLoading || shareFetching;
+	const creditBusy = creditLoading || creditFetching;
 
 	const shareChartData = useMemo((): ShareSlice[] => {
-		if (!statsReady) return [];
-		const registered = parseAnalyticsCount(summary?.total_businesses);
-		const paying = parseAnalyticsCount(summary?.total_paying_businesses);
-		const notPaying = Math.max(0, registered - paying);
+		if (!payingShare) return [];
+		const paying = parseAnalyticsCount(payingShare.total_paying_businesses);
+		const notPaying = parseAnalyticsCount(
+			payingShare.total_not_paying_businesses,
+		);
 		return [
 			{
 				segment: "paying",
@@ -194,7 +256,7 @@ export default function DashboardPage() {
 				fill: "var(--color-notPaying)",
 			},
 		];
-	}, [statsReady, summary?.total_businesses, summary?.total_paying_businesses]);
+	}, [payingShare]);
 
 	const acquisitionSeries = useMemo((): AcquisitionPoint[] => {
 		if (!acquisition?.buckets?.length) return [];
@@ -206,11 +268,23 @@ export default function DashboardPage() {
 		}));
 	}, [acquisition]);
 
+	const volumeSeries = useMemo((): VolumePoint[] => {
+		if (!paymentVolume?.buckets?.length) return [];
+		return paymentVolume.buckets.map((b) => ({
+			key: b.period_start,
+			label: formatVolumeBucketLabel(b.period_start),
+			volume: parseRevenueAmount(b.volume),
+		}));
+	}, [paymentVolume]);
+
 	const acquisitionTotal = acquisition?.total_new_users ?? 0;
 	const hasAcquisitionPlot = acquisitionSeries.some((p) => p.newUsers > 0);
+	const hasVolumePlot = volumeSeries.some((p) => p.volume > 0);
+	const volumeTotal = parseRevenueAmount(paymentVolume?.total_volume);
 
-	const payShare =
-		statsReady && parseAnalyticsCount(summary?.total_businesses) > 0
+	const payShare = payingShare
+		? Math.round(parseRevenueAmount(payingShare.paying_percentage))
+		: statsReady && parseAnalyticsCount(summary?.total_businesses) > 0
 			? Math.round(
 					(parseAnalyticsCount(summary?.total_paying_businesses) /
 						parseAnalyticsCount(summary?.total_businesses)) *
@@ -219,6 +293,7 @@ export default function DashboardPage() {
 			: null;
 
 	const hasSharePlot = shareChartData.some((s) => s.count > 0);
+	const creditRows = creditUsage?.businesses ?? [];
 
 	return (
 		<div className="mx-auto flex w-full max-w-6xl flex-col gap-6 pb-8">
@@ -608,21 +683,86 @@ export default function DashboardPage() {
 						Compare
 					</h2>
 					<p className="text-sm text-muted-foreground">
-						Subscription activity in the selected period, paying mix, and
-						owners by month.
+						Payment volume, paying mix, and businesses closest to their credit
+						limit.
 					</p>
 				</div>
 
 				<div className="grid grid-cols-1 gap-4 lg:grid-cols-5">
 					<Card size="sm" className="lg:col-span-3">
 						<CardHeader className="border-b">
-							<CardTitle>Revenue over time</CardTitle>
-							<CardDescription>
-								Revenue breakdown by time period.
-							</CardDescription>
+							<div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
+								<div className="flex flex-col gap-1">
+									<CardTitle>Payment volume</CardTitle>
+									<CardDescription>
+										Volume in ~5-day buckets for the selected window (defaults to
+										the last 30 days on the API).
+									</CardDescription>
+								</div>
+								{!volumeBusy && hasVolumePlot ? (
+									<p className="font-mono text-sm font-semibold tabular-nums text-foreground">
+										{formatRevenueAmount(volumeTotal)}
+									</p>
+								) : null}
+							</div>
 						</CardHeader>
-						<CardContent className="flex h-65 items-center justify-center">
-							<p className="text-sm text-muted-foreground">Coming soon</p>
+						<CardContent className="pt-4">
+							{volumeBusy && volumeSeries.length === 0 ? (
+								<Skeleton className="h-65 w-full" />
+							) : !hasVolumePlot ? (
+								<ChartEmpty
+									title="No payment volume"
+									body="Successful payments in this window will show here."
+								/>
+							) : (
+								<ChartContainer
+									config={volumeChartConfig}
+									className="aspect-auto h-65 w-full"
+								>
+									<BarChart
+										accessibilityLayer
+										data={volumeSeries}
+										margin={{ top: 8, right: 8, left: 4, bottom: 0 }}
+									>
+										<CartesianGrid vertical={false} />
+										<XAxis
+											dataKey="label"
+											tickLine={false}
+											axisLine={false}
+											tickMargin={10}
+											minTickGap={16}
+											tick={{ fontSize: 11 }}
+										/>
+										<YAxis
+											tickLine={false}
+											axisLine={false}
+											width={48}
+											tick={{ fontSize: 11 }}
+											tickFormatter={(v) =>
+												Number(v).toLocaleString(undefined, {
+													notation: "compact",
+													maximumFractionDigits: 1,
+												})
+											}
+										/>
+										<ChartTooltip
+											content={
+												<ChartTooltipContent
+													labelKey="label"
+													formatter={(value) =>
+														formatRevenueAmount(Number(value ?? 0))
+													}
+												/>
+											}
+										/>
+										<Bar
+											dataKey="volume"
+											fill="var(--color-volume)"
+											radius={[4, 4, 0, 0]}
+										/>
+									</BarChart>
+								</ChartContainer>
+							)}
 						</CardContent>
 					</Card>
 
@@ -634,12 +774,12 @@ export default function DashboardPage() {
 							</CardDescription>
 						</CardHeader>
 						<CardContent className="pt-4">
-							{chartsLoading && !hasSummary ? (
+							{shareBusy && !payingShare ? (
 								<Skeleton className="h-65 w-full" />
 							) : !hasSharePlot ? (
 								<ChartEmpty
 									title="Nothing to plot"
-									body="Business counts appear when analytics loads."
+									body="Business counts appear when paying-share analytics loads."
 								/>
 							) : (
 								<ChartContainer
@@ -717,14 +857,70 @@ export default function DashboardPage() {
 				<Card size="sm">
 					<CardHeader className="border-b">
 						<div className="flex flex-col gap-1">
-							<CardTitle>Owners and revenue by month</CardTitle>
+							<CardTitle>Top credit usage</CardTitle>
 							<CardDescription>
-								Monthly revenue breakdown with unique owners.
+								Active subscriptions ordered by highest credit usage percentage.
 							</CardDescription>
 						</div>
 					</CardHeader>
-					<CardContent className="flex h-75 items-center justify-center">
-						<p className="text-sm text-muted-foreground">Coming soon</p>
+					<CardContent className="pt-4">
+						{creditBusy && creditRows.length === 0 ? (
+							<div className="flex flex-col gap-2">
+								<Skeleton className="h-10 w-full" />
+								<Skeleton className="h-10 w-full" />
+								<Skeleton className="h-10 w-full" />
+							</div>
+						) : creditRows.length === 0 ? (
+							<ChartEmpty
+								title="No credit usage yet"
+								body="Businesses with active subscriptions and credit usage will list here."
+							/>
+						) : (
+							<div className="overflow-x-auto rounded-md border border-border">
+								<Table>
+									<TableHeader>
+										<TableRow>
+											<TableHead>Business</TableHead>
+											<TableHead className="text-right">Used</TableHead>
+											<TableHead className="text-right">Limit</TableHead>
+											<TableHead className="text-right">Available</TableHead>
+											<TableHead className="text-right">Usage</TableHead>
+										</TableRow>
+									</TableHeader>
+									<TableBody>
+										{creditRows.map((row) => (
+											<TableRow key={row.business_id}>
+												<TableCell className="font-medium">
+													{row.business_name || row.business_id}
+												</TableCell>
+												<TableCell className="text-right tabular-nums">
+													{row.credits_used.toLocaleString()}
+												</TableCell>
+												<TableCell className="text-right tabular-nums">
+													{row.credits_limit.toLocaleString()}
+												</TableCell>
+												<TableCell className="text-right tabular-nums">
+													{row.available_credits.toLocaleString()}
+												</TableCell>
+												<TableCell className="text-right">
+													<Badge
+														variant={
+															row.usage_percentage >= 90
+																? "destructive"
+																: row.usage_percentage >= 70
+																	? "secondary"
+																	: "outline"
+														}
+													>
+														{Math.round(row.usage_percentage)}%
+													</Badge>
+												</TableCell>
+											</TableRow>
+										))}
+									</TableBody>
+								</Table>
+							</div>
+						)}
 					</CardContent>
 				</Card>
 			</section>
