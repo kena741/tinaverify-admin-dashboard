@@ -53,11 +53,12 @@ export default function LoginPage() {
 		<div className="flex min-h-svh flex-col items-center justify-center bg-background px-4 py-10 sm:px-8">
 			<div className="mb-8 flex max-w-md flex-col items-center gap-3 text-center">
 				<BrandLogo
+					mark="splash"
 					size="lg"
+					showLabel={false}
 					priority
 					className="items-center"
 					imageClassName="object-center"
-					labelClassName="text-center"
 				/>
 			</div>
 

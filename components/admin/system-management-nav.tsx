@@ -14,6 +14,10 @@ import {
 	normalizeAdminPath,
 } from "@/lib/admin-sidebar-path";
 import {
+	adminNavButtonClass,
+	adminNavGroupLabelClass,
+} from "@/lib/admin-sidebar-nav";
+import {
 	SidebarGroup,
 	SidebarGroupContent,
 	SidebarGroupLabel,
@@ -42,14 +46,6 @@ const systemFlatLinks = [
 	},
 ] as const;
 
-const navButtonClass = (isActive: boolean) =>
-	cn(
-		"h-10 gap-3 text-primary [&_svg]:text-primary",
-		isActive &&
-			"bg-sidebar-primary font-medium text-sidebar-primary-foreground shadow-sm hover:bg-sidebar-primary hover:text-sidebar-primary-foreground data-active:bg-sidebar-primary data-active:text-sidebar-primary-foreground [&_svg]:text-sidebar-primary-foreground",
-		!isActive && "hover:text-primary",
-	);
-
 function isGlobalSettingsActive(pathname: string) {
 	const path = normalizeAdminPath(pathname);
 	return path === "/admin/settings";
@@ -67,32 +63,32 @@ export function SystemManagementNav({ pathname }: { pathname: string }) {
 	}, [financeActive]);
 
 	return (
-		<SidebarGroup className="group-data-[collapsible=icon]:p-0">
-			<SidebarGroupLabel className="text-xs font-semibold tracking-wider text-primary uppercase">
+		<SidebarGroup className="p-0 group-data-[collapsible=icon]:p-0">
+			<SidebarGroupLabel className={adminNavGroupLabelClass()}>
 				System Management
 			</SidebarGroupLabel>
 			<SidebarGroupContent>
-				<SidebarMenu className="gap-1">
+				<SidebarMenu className="gap-0.5">
 					<SidebarMenuItem>
 						<SidebarMenuButton
 							type="button"
 							isActive={financeActive}
 							tooltip="Finance"
-							className={navButtonClass(financeActive)}
+							className={adminNavButtonClass(financeActive)}
 							onClick={() => setFinanceOpen((open) => !open)}
 						>
-							<CircleDollarSignIcon className="size-5!" />
+							<CircleDollarSignIcon />
 							<span>Finance</span>
 							<ChevronRightIcon
 								className={cn(
-									"ml-auto size-4! transition-transform",
+									"ml-auto size-4! opacity-50 transition-transform",
 									financeOpen && "rotate-90",
 								)}
 								aria-hidden
 							/>
 						</SidebarMenuButton>
 						{financeOpen ? (
-							<SidebarMenuSub>
+							<SidebarMenuSub className="ml-3.5 border-l border-sidebar-border pl-2.5">
 								{financeLinks.map((item) => {
 									const isActive = adminPathMatches(pathname, item.href);
 									return (
@@ -100,7 +96,9 @@ export function SystemManagementNav({ pathname }: { pathname: string }) {
 											<SidebarMenuSubButton
 												isActive={isActive}
 												className={cn(
-													isActive && "font-medium text-primary",
+													"h-8 rounded-md text-sidebar-foreground/75 hover:bg-primary/10 hover:text-sidebar-foreground",
+													isActive &&
+														"bg-primary/15 font-medium text-brand-ink",
 												)}
 												render={
 													<Link
@@ -134,7 +132,10 @@ export function SystemManagementNav({ pathname }: { pathname: string }) {
 								<SidebarMenuButton
 									isActive={isActive}
 									tooltip={item.name}
-									className={navButtonClass(isActive)}
+									className={cn(
+										adminNavButtonClass(isActive),
+										"group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:size-9! group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-0!",
+									)}
 									render={
 										<Link
 											href={item.href}
@@ -144,7 +145,7 @@ export function SystemManagementNav({ pathname }: { pathname: string }) {
 										/>
 									}
 								>
-									<Icon className="size-5!" />
+									<Icon />
 									<span>{item.name}</span>
 								</SidebarMenuButton>
 							</SidebarMenuItem>

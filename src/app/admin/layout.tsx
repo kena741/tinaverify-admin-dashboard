@@ -155,7 +155,7 @@ export default function AdminLayout({
 									<div className="border-t px-4 py-3 text-center">
 										<Link
 											href="/admin/notifications"
-											className="text-sm font-medium text-primary hover:underline"
+											className="text-sm font-medium text-brand-ink hover:underline"
 										>
 											View all notifications
 										</Link>

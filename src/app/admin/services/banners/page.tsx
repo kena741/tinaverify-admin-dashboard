@@ -593,7 +593,7 @@ function BannerTableRow({
 						href={banner.redirect_url}
 						target="_blank"
 						rel="noopener noreferrer"
-						className="inline-flex max-w-full items-center gap-1 text-sm text-primary hover:underline"
+						className="inline-flex max-w-full items-center gap-1 text-sm text-brand-ink hover:underline"
 						title={banner.redirect_url}
 					>
 						<span className="truncate">

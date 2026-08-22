@@ -312,9 +312,7 @@ export default function DashboardPage() {
 		<div className="mx-auto flex w-full max-w-6xl flex-col gap-6 pb-8">
 			<header className="flex flex-col gap-4">
 				<div className="flex flex-col gap-1">
-					<p className="font-mono text-[11px] font-medium tracking-[0.14em] text-primary uppercase">
-						Platform close-out
-					</p>
+					<p className="admin-eyebrow">Platform close-out</p>
 					<div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
 						<div className="min-w-0">
 							<h1 className="text-2xl font-semibold tracking-tight text-foreground sm:text-[1.75rem]">
@@ -423,32 +421,27 @@ export default function DashboardPage() {
 
 			<section
 				aria-labelledby="closeout-heading"
-				className="overflow-hidden rounded-2xl border border-primary/15 bg-primary text-primary-foreground shadow-md"
+				className="admin-brand-band"
 			>
 				<div className="flex flex-col gap-6 p-6 sm:p-8 lg:flex-row lg:items-stretch lg:justify-between lg:gap-10">
 					<div className="flex min-w-0 flex-1 flex-col justify-between gap-4">
 						<div className="flex flex-col gap-2">
-							<p
-								id="closeout-heading"
-								className="font-mono text-[11px] font-medium tracking-[0.16em] text-primary-foreground/70 uppercase"
-							>
+							<p id="closeout-heading" className="admin-brand-band-label">
 								Period revenue
 							</p>
-							<p className="text-sm text-primary-foreground/80">
-								{periodLabelText}
-							</p>
+							<p className="admin-brand-band-muted">{periodLabelText}</p>
 						</div>
 						{isLoading ? (
 							<div className="flex flex-col gap-2">
-								<Skeleton className="h-12 w-48 bg-primary-foreground/20" />
-								<Skeleton className="h-4 w-32 bg-primary-foreground/15" />
+								<Skeleton className="admin-brand-band-skeleton h-12 w-48" />
+								<Skeleton className="admin-brand-band-skeleton h-4 w-32" />
 							</div>
 						) : statsReady ? (
 							<div className="flex flex-col gap-1">
 								<p className="font-mono text-[clamp(2rem,5vw,2.75rem)] leading-none font-semibold tracking-tight tabular-nums">
 									{formatRevenueAmount(periodRevenue)}
 								</p>
-								<p className="text-sm text-primary-foreground/75">
+								<p className="admin-brand-band-muted">
 									Collected subscription payments in the selected window
 								</p>
 							</div>
@@ -457,14 +450,12 @@ export default function DashboardPage() {
 								<p className="font-mono text-3xl font-semibold tracking-tight">
 									—
 								</p>
-								<p className="text-sm text-primary-foreground/75">
-									Waiting for analytics
-								</p>
+								<p className="admin-brand-band-muted">Waiting for analytics</p>
 							</div>
 						)}
 					</div>
 
-					<div className="hidden w-px shrink-0 bg-primary-foreground/15 lg:block" />
+					<div className="admin-brand-band-divider" />
 
 					<div className="grid flex-1 grid-cols-2 gap-x-6 gap-y-5">
 						<LedgerStat
@@ -999,18 +990,16 @@ function LedgerStat({
 }) {
 	return (
 		<div className="flex flex-col gap-1">
-			<p className="text-[11px] font-medium tracking-wide text-primary-foreground/65 uppercase">
-				{label}
-			</p>
+			<p className="admin-brand-band-label">{label}</p>
 			{loading ? (
-				<Skeleton className="h-7 w-24 bg-primary-foreground/20" />
+				<Skeleton className="admin-brand-band-skeleton h-7 w-24" />
 			) : (
 				<p className="font-mono text-lg leading-snug font-semibold tracking-tight tabular-nums">
 					{value ?? "—"}
 				</p>
 			)}
 			{hint && !loading ? (
-				<p className="text-xs text-primary-foreground/60">{hint}</p>
+				<p className="admin-brand-band-hint">{hint}</p>
 			) : null}
 		</div>
 	);

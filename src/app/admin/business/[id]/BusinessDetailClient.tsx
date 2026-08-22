@@ -373,10 +373,10 @@ export default function BusinessDetailClient({
 		return (
 			<div className="mx-auto flex w-full max-w-6xl flex-col gap-6 pb-8">
 				<Skeleton className="h-4 w-28" />
-				<div className="overflow-hidden rounded-2xl border border-primary/15 bg-primary p-8">
-					<Skeleton className="h-4 w-32 bg-primary-foreground/20" />
-					<Skeleton className="mt-4 h-10 w-64 bg-primary-foreground/20" />
-					<Skeleton className="mt-2 h-4 w-48 bg-primary-foreground/15" />
+				<div className="admin-brand-band p-8">
+					<Skeleton className="admin-brand-band-skeleton h-4 w-32" />
+					<Skeleton className="admin-brand-band-skeleton mt-4 h-10 w-64" />
+					<Skeleton className="admin-brand-band-skeleton mt-2 h-4 w-48" />
 				</div>
 				<Skeleton className="h-10 w-full" />
 				<Skeleton className="h-48 w-full" />
@@ -452,21 +452,19 @@ export default function BusinessDetailClient({
 			{/* Signature: owner close-out strip */}
 			<section
 				aria-labelledby="owner-heading"
-				className="overflow-hidden rounded-2xl border border-primary/15 bg-primary text-primary-foreground shadow-md"
+				className="admin-brand-band"
 			>
 				<div className="flex flex-col gap-6 p-6 sm:p-8 lg:flex-row lg:items-stretch lg:justify-between lg:gap-10">
 					<div className="flex min-w-0 flex-1 flex-col justify-between gap-4">
 						<div className="flex flex-col gap-2">
-							<p className="font-mono text-[11px] font-medium tracking-[0.16em] text-primary-foreground/70 uppercase">
-								Business owner
-							</p>
+							<p className="admin-brand-band-label">Business owner</p>
 							<h1
 								id="owner-heading"
 								className="truncate text-2xl font-semibold tracking-tight sm:text-[1.75rem]"
 							>
 								{ownerDisplay}
 							</h1>
-							<p className="text-sm text-primary-foreground/80">
+							<p className="admin-brand-band-muted">
 								{user?.phone_number ? (
 									<span className="font-mono tabular-nums">
 										{user.phone_number}
@@ -484,16 +482,14 @@ export default function BusinessDetailClient({
 						</div>
 					</div>
 
-					<div className="hidden w-px shrink-0 bg-primary-foreground/15 lg:block" />
+					<div className="admin-brand-band-divider" />
 
 					<div className="flex flex-1 flex-col justify-center gap-3">
-						<p className="font-mono text-[11px] font-medium tracking-wide text-primary-foreground/65 uppercase">
-							Managing
-						</p>
+						<p className="admin-brand-band-label">Managing</p>
 						<p className="truncate text-lg font-semibold tracking-tight">
 							{business.name || "Untitled business"}
 						</p>
-						<p className="text-sm text-primary-foreground/75">
+						<p className="admin-brand-band-muted">
 							<span className="font-mono tabular-nums">
 								TIN {business.tin_number}
 							</span>

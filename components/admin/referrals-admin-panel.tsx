@@ -208,7 +208,7 @@ export function ReferralsAdminPanel({ embedded = false }: ReferralsAdminPanelPro
 			<Card className="shadow-sm">
 				<CardHeader className="flex flex-row items-center justify-between gap-4 space-y-0">
 					<div className="flex items-center gap-3">
-						<div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+						<div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-brand-ink">
 							<PercentIcon className="size-5" aria-hidden />
 						</div>
 						<div>

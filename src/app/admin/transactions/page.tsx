@@ -500,9 +500,7 @@ export default function TransactionsPage() {
 		<div className="mx-auto flex w-full max-w-6xl flex-col gap-6 pb-8">
 			<header className="flex flex-col gap-4">
 				<div className="flex flex-col gap-1">
-					<p className="font-mono text-[11px] font-medium tracking-[0.14em] text-primary uppercase">
-						Operator roster
-					</p>
+					<p className="admin-eyebrow">Operator roster</p>
 					<div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
 						<div className="min-w-0">
 							<h1 className="text-2xl font-semibold tracking-tight text-foreground sm:text-[1.75rem]">
@@ -543,25 +541,25 @@ export default function TransactionsPage() {
 			{/* Signature strip: owners thesis + business status mix */}
 			<section
 				aria-labelledby="owners-closeout-heading"
-				className="overflow-hidden rounded-2xl border border-primary/15 bg-primary text-primary-foreground shadow-md"
+				className="admin-brand-band"
 			>
 				<div className="flex flex-col gap-6 p-6 sm:p-8 lg:flex-row lg:items-stretch lg:justify-between lg:gap-10">
 					<div className="flex min-w-0 flex-1 flex-col justify-between gap-4">
 						<div className="flex flex-col gap-2">
 							<p
 								id="owners-closeout-heading"
-								className="font-mono text-[11px] font-medium tracking-[0.16em] text-primary-foreground/70 uppercase"
+								className="admin-brand-band-label"
 							>
 								Platform owners
 							</p>
-							<p className="text-sm text-primary-foreground/80">
+							<p className="admin-brand-band-muted">
 								People who operate businesses on Zulu Dine
 							</p>
 						</div>
 						{summaryBusy ? (
 							<div className="flex flex-col gap-2">
-								<Skeleton className="h-12 w-28 bg-primary-foreground/20" />
-								<Skeleton className="h-4 w-40 bg-primary-foreground/15" />
+								<Skeleton className="admin-brand-band-skeleton h-12 w-28" />
+								<Skeleton className="admin-brand-band-skeleton h-4 w-40" />
 							</div>
 						) : (
 							<div className="flex flex-col gap-1">
@@ -570,7 +568,7 @@ export default function TransactionsPage() {
 										? summarySnapshot.totalOwners.toLocaleString()
 										: "—"}
 								</p>
-								<p className="text-sm text-primary-foreground/75">
+								<p className="admin-brand-band-muted">
 									{summarySnapshot?.totalBusinesses != null
 										? `${summarySnapshot.totalBusinesses.toLocaleString()} businesses across the roster`
 										: "Business counts load with the roster"}
@@ -579,7 +577,7 @@ export default function TransactionsPage() {
 						)}
 					</div>
 
-					<div className="hidden w-px shrink-0 bg-primary-foreground/15 lg:block" />
+					<div className="admin-brand-band-divider" />
 
 					<div className="grid flex-1 grid-cols-2 gap-x-6 gap-y-5 sm:grid-cols-2">
 						<OwnersLedgerStat
@@ -1126,11 +1124,9 @@ function OwnersLedgerStat({
 }) {
 	return (
 		<div className="flex flex-col gap-1">
-			<p className="text-[11px] font-medium tracking-wide text-primary-foreground/65 uppercase">
-				{label}
-			</p>
+			<p className="admin-brand-band-label">{label}</p>
 			{loading ? (
-				<Skeleton className="h-7 w-16 bg-primary-foreground/20" />
+				<Skeleton className="admin-brand-band-skeleton h-7 w-16" />
 			) : (
 				<p className="font-mono text-lg leading-snug font-semibold tracking-tight tabular-nums">
 					{value ?? "—"}

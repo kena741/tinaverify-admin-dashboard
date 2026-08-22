@@ -104,7 +104,7 @@ function NotificationIcon({ type }: { type: string }) {
 		return <WifiIcon className="size-5 text-chart-3" aria-hidden />;
 	}
 	if (type === "staff_login" || type === "staff_logout") {
-		return <UserIcon className="size-5 text-primary" aria-hidden />;
+		return <UserIcon className="size-5 text-brand-ink" aria-hidden />;
 	}
 	return <BellIcon className="size-5 text-muted-foreground" aria-hidden />;
 }

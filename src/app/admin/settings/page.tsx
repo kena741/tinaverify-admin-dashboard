@@ -406,38 +406,23 @@ export default function GlobalSettingsPage() {
 					variant="line"
 					className="h-auto w-full flex-wrap justify-start gap-6 rounded-none border-b border-border bg-transparent p-0"
 				>
-					<TabsTrigger
-						value="general"
-						className="gap-2 rounded-none px-0 pb-3 text-primary/70 data-active:text-primary after:bg-primary"
-					>
+					<TabsTrigger value="general" className="admin-tabs-line">
 						<GlobeIcon className="size-4" aria-hidden />
 						General
 					</TabsTrigger>
-					<TabsTrigger
-						value="policies"
-						className="gap-2 rounded-none px-0 pb-3 text-primary/70 data-active:text-primary after:bg-primary"
-					>
+					<TabsTrigger value="policies" className="admin-tabs-line">
 						<ShieldIcon className="size-4" aria-hidden />
 						Policies
 					</TabsTrigger>
-					<TabsTrigger
-						value="contact"
-						className="gap-2 rounded-none px-0 pb-3 text-primary/70 data-active:text-primary after:bg-primary"
-					>
+					<TabsTrigger value="contact" className="admin-tabs-line">
 						<MailIcon className="size-4" aria-hidden />
 						Contact
 					</TabsTrigger>
-					<TabsTrigger
-						value="plans"
-						className="gap-2 rounded-none px-0 pb-3 text-primary/70 data-active:text-primary after:bg-primary"
-					>
+					<TabsTrigger value="plans" className="admin-tabs-line">
 						<CreditCardIcon className="size-4" aria-hidden />
 						Plans
 					</TabsTrigger>
-					<TabsTrigger
-						value="roles"
-						className="gap-2 rounded-none px-0 pb-3 text-primary/70 data-active:text-primary after:bg-primary"
-					>
+					<TabsTrigger value="roles" className="admin-tabs-line">
 						<KeyRoundIcon className="size-4" aria-hidden />
 						Roles
 					</TabsTrigger>

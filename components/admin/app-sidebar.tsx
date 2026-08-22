@@ -6,19 +6,23 @@ import type { LucideIcon } from "lucide-react";
 import {
 	BadgeCheck,
 	Bell,
-	Building2,
 	ClipboardList,
 	Landmark,
 	LayoutDashboard,
 	MapPin,
 	TableProperties,
-	UtensilsCrossed,
+	UserRound,
 	Users,
+	UtensilsCrossed,
 } from "lucide-react";
 
 import { BrandLogo } from "@/components/brand-logo";
 import { ServiceManagementNav } from "@/components/admin/service-management-nav";
 import { SystemManagementNav } from "@/components/admin/system-management-nav";
+import {
+	adminNavButtonClass,
+	adminNavGroupLabelClass,
+} from "@/lib/admin-sidebar-nav";
 import {
 	Sidebar,
 	SidebarContent,
@@ -51,7 +55,7 @@ const systemAdminMainNav: NavItem[] = [
 ];
 
 const systemAdminUsersNav: NavItem[] = [
-	{ name: "Business", href: "/admin/transactions", icon: Building2 },
+	{ name: "Owners", href: "/admin/transactions", icon: Users },
 ];
 
 const branchAdminMainNav: NavItem[] = [
@@ -64,8 +68,8 @@ const branchAdminMainNav: NavItem[] = [
 ];
 
 const branchAdminUsersNav: NavItem[] = [
-	{ name: "Business", href: "/admin/transactions", icon: Building2 },
-	{ name: "Staff", href: "/admin/staff", icon: Users },
+	{ name: "Owners", href: "/admin/transactions", icon: Users },
+	{ name: "Staff", href: "/admin/staff", icon: UserRound },
 	{ name: "Subscription", href: "/admin/subscription", icon: BadgeCheck },
 	{ name: "Notifications", href: "/admin/notifications", icon: Bell },
 ];
@@ -109,10 +113,8 @@ export function AppSidebar({
 						size="default"
 						tooltip={item.name}
 						className={cn(
-							"h-10 gap-3 transition-colors duration-150",
+							adminNavButtonClass(isActive),
 							"group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:size-9! group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-0!",
-							isActive &&
-								"bg-sidebar-primary font-medium text-sidebar-primary-foreground shadow-sm hover:bg-sidebar-primary hover:text-sidebar-primary-foreground data-active:bg-sidebar-primary data-active:text-sidebar-primary-foreground",
 						)}
 						render={
 							<Link
@@ -140,8 +142,8 @@ export function AppSidebar({
 			.toUpperCase() || "U";
 
 	return (
-		<Sidebar collapsible="icon" className="border-r-0">
-			<SidebarHeader className="border-b border-sidebar-border px-4 py-5 group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-2 group-data-[collapsible=icon]:py-4 group-data-[collapsible=icon]:pr-3">
+		<Sidebar collapsible="icon" className="border-r border-sidebar-border">
+			<SidebarHeader className="border-b border-sidebar-border px-4 py-4 group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-2 group-data-[collapsible=icon]:py-4 group-data-[collapsible=icon]:pr-3">
 				<BrandLogo
 					size="sm"
 					className="group-data-[collapsible=icon]:items-center"
@@ -149,20 +151,20 @@ export function AppSidebar({
 					labelClassName="group-data-[collapsible=icon]:hidden"
 				/>
 			</SidebarHeader>
-			<SidebarContent className="px-2 py-3 group-data-[collapsible=icon]:px-2 group-data-[collapsible=icon]:pr-3">
-				<SidebarGroup className="group-data-[collapsible=icon]:p-0">
+			<SidebarContent className="gap-4 px-2 py-4 group-data-[collapsible=icon]:px-2 group-data-[collapsible=icon]:pr-3">
+				<SidebarGroup className="p-0 group-data-[collapsible=icon]:p-0">
 					<SidebarGroupContent className="group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:flex-col group-data-[collapsible=icon]:items-center">
-						<SidebarMenu className="gap-1 group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:gap-1.5">
+						<SidebarMenu className="gap-0.5 group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:gap-1.5">
 							{renderNavItems(mainNav)}
 						</SidebarMenu>
 					</SidebarGroupContent>
 				</SidebarGroup>
-				<SidebarGroup className="group-data-[collapsible=icon]:p-0">
-					<SidebarGroupLabel className="text-xs font-semibold tracking-wider text-primary uppercase">
+				<SidebarGroup className="p-0 group-data-[collapsible=icon]:p-0">
+					<SidebarGroupLabel className={adminNavGroupLabelClass()}>
 						Users
 					</SidebarGroupLabel>
 					<SidebarGroupContent className="group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:flex-col group-data-[collapsible=icon]:items-center">
-						<SidebarMenu className="gap-1 group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:gap-1.5">
+						<SidebarMenu className="gap-0.5 group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:gap-1.5">
 							{renderNavItems(usersNav)}
 						</SidebarMenu>
 					</SidebarGroupContent>
@@ -180,11 +182,11 @@ export function AppSidebar({
 					onClick={() => {
 						if (isMobile) setOpenMobile(false);
 					}}
-					className="flex items-center gap-3 rounded-lg bg-sidebar-accent/60 p-2.5 transition-colors hover:bg-sidebar-accent group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-2"
+					className="flex items-center gap-3 rounded-lg border border-transparent p-2 transition-colors hover:border-sidebar-border hover:bg-primary/10 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-2"
 					title="View profile"
 				>
 					<div
-						className="flex size-9 shrink-0 items-center justify-center rounded-full bg-sidebar-primary text-xs font-semibold text-sidebar-primary-foreground"
+						className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground"
 						aria-hidden
 					>
 						{initials}
@@ -193,7 +195,7 @@ export function AppSidebar({
 						<p className="truncate text-sm font-medium text-sidebar-foreground">
 							{userName}
 						</p>
-						<p className="truncate text-xs text-sidebar-foreground/65">
+						<p className="truncate text-xs text-muted-foreground">
 							{userEmail || roleLabel}
 						</p>
 					</div>

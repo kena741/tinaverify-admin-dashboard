@@ -25,7 +25,7 @@ export function StatCard({
 		<Card className={cn("shadow-sm", className)}>
 			<CardContent className="flex flex-row items-start gap-4 pt-6">
 				<div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
-					<Icon className="size-5 text-primary" aria-hidden />
+					<Icon className="size-5 text-brand-ink" aria-hidden />
 				</div>
 				<div className="min-w-0 flex-1">
 					<p className="text-sm leading-snug text-muted-foreground">{label}</p>

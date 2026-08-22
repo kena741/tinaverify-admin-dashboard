@@ -1,3 +1,3 @@
-export const BRAND_NAME = "Zulu Verify";
+export const BRAND_NAME = "Tina Verify";
 
 export const BRAND_TAGLINE = "Payment receipt verification";

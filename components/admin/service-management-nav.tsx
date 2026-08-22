@@ -6,6 +6,10 @@ import { ImageIcon, Share2Icon, TicketIcon } from "lucide-react";
 
 import { adminPathMatches } from "@/lib/admin-sidebar-path";
 import {
+	adminNavButtonClass,
+	adminNavGroupLabelClass,
+} from "@/lib/admin-sidebar-nav";
+import {
 	SidebarGroup,
 	SidebarGroupContent,
 	SidebarGroupLabel,
@@ -30,12 +34,12 @@ export function ServiceManagementNav({ pathname }: { pathname: string }) {
 	const { isMobile, setOpenMobile } = useSidebar();
 
 	return (
-		<SidebarGroup className="group-data-[collapsible=icon]:p-0">
-			<SidebarGroupLabel className="text-xs font-semibold tracking-wider text-primary uppercase">
+		<SidebarGroup className="p-0 group-data-[collapsible=icon]:p-0">
+			<SidebarGroupLabel className={adminNavGroupLabelClass()}>
 				Service Management
 			</SidebarGroupLabel>
 			<SidebarGroupContent>
-				<SidebarMenu className="gap-1">
+				<SidebarMenu className="gap-0.5">
 					{serviceLinks.map((item) => {
 						const isActive = adminPathMatches(pathname, item.href);
 						const Icon = item.icon;
@@ -48,10 +52,8 @@ export function ServiceManagementNav({ pathname }: { pathname: string }) {
 									isActive={isActive}
 									tooltip={item.name}
 									className={cn(
-										"h-10 gap-3 text-primary [&_svg]:text-primary",
-										isActive &&
-											"bg-sidebar-primary font-medium text-sidebar-primary-foreground shadow-sm hover:bg-sidebar-primary hover:text-sidebar-primary-foreground data-active:bg-sidebar-primary data-active:text-sidebar-primary-foreground [&_svg]:text-sidebar-primary-foreground",
-										!isActive && "hover:text-primary",
+										adminNavButtonClass(isActive),
+										"group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:size-9! group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-0!",
 									)}
 									render={
 										<Link
@@ -62,7 +64,7 @@ export function ServiceManagementNav({ pathname }: { pathname: string }) {
 										/>
 									}
 								>
-									<Icon className="size-5!" />
+									<Icon />
 									<span>{item.name}</span>
 								</SidebarMenuButton>
 							</SidebarMenuItem>

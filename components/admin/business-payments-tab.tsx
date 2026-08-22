@@ -295,7 +295,7 @@ function PaymentRow({ row }: { row: VerifiedTransactionOutput }) {
 						href={row.receipt_url}
 						target="_blank"
 						rel="noopener noreferrer"
-						className="text-sm font-medium text-primary hover:underline"
+						className="text-sm font-medium text-brand-ink hover:underline"
 					>
 						Open receipt
 					</a>
