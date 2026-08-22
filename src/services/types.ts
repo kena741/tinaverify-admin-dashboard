@@ -284,6 +284,69 @@ export type AssignPermissionRequest = {
 };
 
 // -----------------------------
+// Platform roles / permissions / staff
+// -----------------------------
+
+/** OpenAPI `PlatformRoleCreateSchema` — `POST /api/v1/platform/roles` */
+export type PlatformRoleCreateRequest = {
+	name: string;
+	description?: string | null;
+};
+
+/** OpenAPI `PlatformRoleUpdateSchema` — `PATCH /api/v1/platform/roles/{role_id}` */
+export type PlatformRoleUpdateRequest = {
+	name?: string | null;
+	description?: string | null;
+	is_active?: boolean | null;
+};
+
+/** OpenAPI `PlatformRoleResponseSchema` */
+export type PlatformRoleOutput = {
+	id: UUID;
+	name: string;
+	description: string | null;
+	is_active: boolean;
+};
+
+/** OpenAPI `PlatformPermissionCreateSchema` — `POST /api/v1/platform/permissions` */
+export type PlatformPermissionCreateRequest = {
+	action: string;
+	description?: string | null;
+};
+
+/** OpenAPI `PlatformPermissionResponseSchema` */
+export type PlatformPermissionOutput = {
+	id: UUID;
+	action: string;
+	description: string | null;
+};
+
+/** OpenAPI `PlatformAssignPermissionsSchema` */
+export type PlatformAssignPermissionsRequest = {
+	permission_ids: UUID[];
+};
+
+/** OpenAPI `PlatformStaffCreateSchema` — `POST /api/v1/platform/staff` */
+export type PlatformStaffCreateRequest = {
+	user_id: UUID;
+	platform_role_id: UUID;
+};
+
+/** OpenAPI `PlatformStaffUpdateSchema` — `PATCH /api/v1/platform/staff/{staff_id}` */
+export type PlatformStaffUpdateRequest = {
+	platform_role_id?: UUID | null;
+	is_active?: boolean | null;
+};
+
+/** OpenAPI `PlatformStaffResponseSchema` */
+export type PlatformStaffOutput = {
+	id: UUID;
+	user_id: UUID;
+	platform_role_id: UUID;
+	is_active: boolean;
+};
+
+// -----------------------------
 // Subscriptions
 // -----------------------------
 

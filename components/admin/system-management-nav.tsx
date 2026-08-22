@@ -7,6 +7,7 @@ import {
 	CircleDollarSignIcon,
 	MessageSquareIcon,
 	SettingsIcon,
+	UserCogIcon,
 } from "lucide-react";
 
 import {
@@ -38,6 +39,11 @@ const financeLinks = [
 ] as const;
 
 const systemFlatLinks = [
+	{
+		name: "Staff management",
+		href: "/admin/platform-staff",
+		icon: UserCogIcon,
+	},
 	{ name: "Global settings", href: "/admin/settings", icon: SettingsIcon },
 	{
 		name: "Contact messages",

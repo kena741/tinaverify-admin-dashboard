@@ -15,6 +15,7 @@ import { analyticsApi } from "../services/analytics/analyticsApi";
 import { paymentsApi } from "../services/payments/paymentsApi";
 import { globalSettingsApi } from "../services/global-settings/globalSettingsApi";
 import { contactMessagesApi } from "../services/contact-messages/contactMessagesApi";
+import { platformApi } from "../services/platform/platformApi";
 
 // Combine all reducers
 const appReducer = combineReducers({
@@ -23,6 +24,7 @@ const appReducer = combineReducers({
 	[bankAccountsApi.reducerPath]: bankAccountsApi.reducer,
 	[branchManagementApi.reducerPath]: branchManagementApi.reducer,
 	[roleApi.reducerPath]: roleApi.reducer,
+	[platformApi.reducerPath]: platformApi.reducer,
 	[subscriptionApi.reducerPath]: subscriptionApi.reducer,
 	[subscriptionPlanApi.reducerPath]: subscriptionPlanApi.reducer,
 	[referralsApi.reducerPath]: referralsApi.reducer,
@@ -60,6 +62,7 @@ export const store = configureStore({
 			bankAccountsApi.middleware,
 			branchManagementApi.middleware,
 			roleApi.middleware,
+			platformApi.middleware,
 			subscriptionApi.middleware,
 			subscriptionPlanApi.middleware,
 			referralsApi.middleware,
