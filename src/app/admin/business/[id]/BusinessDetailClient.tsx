@@ -4,6 +4,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useMemo, useState } from "react";
 import {
 	ArrowLeft,
+	Loader2Icon,
 	MessageSquare,
 	Power,
 	Trash2,
@@ -20,6 +21,8 @@ import {
 	CardHeader,
 	CardTitle,
 } from "@/components/ui/card";
+import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -62,6 +65,7 @@ import { useListBankAccountsQuery } from "../../../../services/bank-accounts/ban
 import {
 	useGetActiveSubscriptionQuery,
 	useGetSubscriptionUsageQuery,
+	useGrantSubscriptionCreditsMutation,
 	useListSubscriptionHistoryQuery,
 } from "../../../../services/subscription/subscriptionApi";
 import { useListSubscriptionPlansQuery } from "../../../../services/subscription-plan/subscriptionPlanApi";
@@ -275,9 +279,17 @@ export default function BusinessDetailClient({
 	const [deleteBusiness, deleteBusinessState] = useDeleteBusinessMutation();
 	const [updateEmployeeRole, updateEmployeeRoleState] =
 		useUpdateEmployeeRoleMutation();
+	const [grantSubscriptionCredits, { isLoading: grantingCredits }] =
+		useGrantSubscriptionCreditsMutation();
 
 	const [activeDialogOpen, setActiveDialogOpen] = useState(false);
 	const [statusBanner, setStatusBanner] = useState<{
+		variant: "default" | "destructive";
+		title: string;
+		message: string;
+	} | null>(null);
+	const [grantCreditsInput, setGrantCreditsInput] = useState("");
+	const [grantBanner, setGrantBanner] = useState<{
 		variant: "default" | "destructive";
 		title: string;
 		message: string;
@@ -298,6 +310,43 @@ export default function BusinessDetailClient({
 	}, [subscriptionPlans]);
 
 	const employeeRows = employees ?? [];
+
+	const grantCreditsParsed = Number.parseInt(grantCreditsInput.trim(), 10);
+	const canGrantCredits =
+		!missingBusinessId &&
+		Number.isFinite(grantCreditsParsed) &&
+		grantCreditsParsed >= 1 &&
+		!grantingCredits;
+
+	async function onGrantCredits() {
+		setGrantBanner(null);
+		if (!canGrantCredits) {
+			setGrantBanner({
+				variant: "destructive",
+				title: "Invalid credits",
+				message: "Enter a whole number of credits (at least 1).",
+			});
+			return;
+		}
+		try {
+			const out = await grantSubscriptionCredits({
+				businessId,
+				body: { credits: grantCreditsParsed },
+			}).unwrap();
+			setGrantCreditsInput("");
+			setGrantBanner({
+				variant: "default",
+				title: "Credits granted",
+				message: `Subscription ${out.id} is now ${out.status}. Usage will refresh automatically.`,
+			});
+		} catch (err) {
+			setGrantBanner({
+				variant: "destructive",
+				title: "Grant failed",
+				message: getErrorMessage(err, "Could not grant credits."),
+			});
+		}
+	}
 
 	if (missingBusinessId) {
 		return (
@@ -1186,6 +1235,72 @@ export default function BusinessDetailClient({
 										No active subscription — usage is empty for this business.
 									</p>
 								)}
+							</div>
+						</section>
+
+						<section className="overflow-hidden rounded-xl border border-border bg-card shadow-xs">
+							<div className="border-b border-border px-5 py-4">
+								<h2 className="text-base font-semibold tracking-tight">
+									Grant credits
+								</h2>
+								<p className="mt-0.5 text-sm text-muted-foreground">
+									Add credits to this business without checkout.
+								</p>
+							</div>
+							<div className="flex flex-col gap-4 p-5">
+								{grantBanner ? (
+									<Alert
+										variant={
+											grantBanner.variant === "destructive"
+												? "destructive"
+												: "default"
+										}
+									>
+										<AlertTitle>{grantBanner.title}</AlertTitle>
+										<AlertDescription>{grantBanner.message}</AlertDescription>
+									</Alert>
+								) : null}
+								<form
+									className="flex flex-col gap-4 sm:flex-row sm:items-end"
+									onSubmit={(e) => {
+										e.preventDefault();
+										void onGrantCredits();
+									}}
+								>
+									<FieldGroup className="flex-1">
+										<Field>
+											<FieldLabel htmlFor="business-grant-credits">
+												Credits to grant
+											</FieldLabel>
+											<Input
+												id="business-grant-credits"
+												name="credits"
+												type="text"
+												inputMode="numeric"
+												autoComplete="off"
+												placeholder="e.g. 500"
+												value={grantCreditsInput}
+												onChange={(e) => {
+													setGrantCreditsInput(e.target.value);
+													setGrantBanner(null);
+												}}
+											/>
+											<FieldDescription>
+												Whole number, minimum 1.
+											</FieldDescription>
+										</Field>
+									</FieldGroup>
+									<Button type="submit" disabled={!canGrantCredits}>
+										{grantingCredits ? (
+											<Loader2Icon
+												data-icon="inline-start"
+												className="animate-spin"
+												aria-hidden
+											/>
+										) : null}
+										{grantingCredits ? "Granting…" : "Grant credits"}
+									</Button>
+								</form>
 							</div>
 						</section>
 

@@ -6,9 +6,13 @@ import type {
 	AdminGrantCreditsRequest,
 	AdminSubscriptionOutput,
 	CustomCheckoutRequest,
+	ExchangeRateOutput,
+	ExchangeRateUpdateRequest,
 	SubscriptionCheckoutResponse,
 	SubscriptionOutput,
 	SubscriptionStatus,
+	TransactionLogOutput,
+	TransactionLogStatus,
 	UsageOutput,
 } from "../types";
 
@@ -30,6 +34,8 @@ export const subscriptionApi = createApi({
 		"SubscriptionHistory",
 		"SubscriptionUsage",
 		"SubscriptionTransactions",
+		"ExchangeRate",
+		"TransactionLogs",
 	],
 	endpoints: (builder) => ({
 		/** `GET /api/v1/subscriptions/me` */
@@ -198,8 +204,59 @@ export const subscriptionApi = createApi({
 			}),
 			invalidatesTags: (_result, _err, { businessId }) => [
 				{ type: "Subscription" as const, id: businessId },
+				{ type: "SubscriptionHistory" as const, id: businessId },
 				{ type: "SubscriptionUsage" as const, id: businessId },
+				{ type: "SubscriptionTransactions" as const, id: "LIST" },
 			],
+		}),
+
+		/** `GET /api/v1/subscriptions/exchange-rate` */
+		getExchangeRate: builder.query<ExchangeRateOutput, void>({
+			query: () => ({
+				url: "/api/v1/subscriptions/exchange-rate",
+				headers: bearerHeaders(),
+			}),
+			providesTags: [{ type: "ExchangeRate" as const, id: "CURRENT" }],
+		}),
+
+		/** `PUT /api/v1/subscriptions/exchange-rate` */
+		updateExchangeRate: builder.mutation<
+			ExchangeRateOutput,
+			ExchangeRateUpdateRequest
+		>({
+			query: (body) => ({
+				url: "/api/v1/subscriptions/exchange-rate",
+				method: "PUT",
+				body,
+				headers: {
+					"Content-Type": "application/json",
+					...bearerHeaders(),
+				},
+			}),
+			invalidatesTags: [{ type: "ExchangeRate" as const, id: "CURRENT" }],
+		}),
+
+		/** `GET /api/v1/subscriptions/transaction-logs` — Chapa payment logs (admin) */
+		listSubscriptionTransactionLogs: builder.query<
+			TransactionLogOutput[],
+			{
+				status?: TransactionLogStatus | null;
+				limit?: number;
+				offset?: number;
+			} | void
+		>({
+			query: (arg) => {
+				const params: Record<string, string | number> = {};
+				if (arg?.status) params.status = arg.status;
+				if (arg?.limit != null) params.limit = arg.limit;
+				if (arg?.offset != null) params.offset = arg.offset;
+				return {
+					url: "/api/v1/subscriptions/transaction-logs",
+					params: Object.keys(params).length > 0 ? params : undefined,
+					headers: bearerHeaders(),
+				};
+			},
+			providesTags: [{ type: "TransactionLogs" as const, id: "LIST" }],
 		}),
 	}),
 });
@@ -214,4 +271,7 @@ export const {
 	useCheckoutSubscriptionMutation,
 	useCheckoutSubscriptionCustomMutation,
 	useGrantSubscriptionCreditsMutation,
+	useGetExchangeRateQuery,
+	useUpdateExchangeRateMutation,
+	useListSubscriptionTransactionLogsQuery,
 } = subscriptionApi;

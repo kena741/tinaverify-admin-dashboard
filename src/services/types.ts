@@ -395,6 +395,28 @@ export type ExchangeRateUpdateRequest = {
 	credits_per_etb: number;
 };
 
+/** OpenAPI `TransactionLogStatus` */
+export type TransactionLogStatus =
+	| "success"
+	| "failed"
+	| "pending"
+	| "canceled";
+
+/** OpenAPI `TransactionLogOutputSchema` — Chapa payment logs */
+export type TransactionLogOutput = {
+	id: UUID;
+	tx_ref: string;
+	name: string | null;
+	amount: number | string;
+	reference: string | null;
+	status: string;
+	payment_method: string | null;
+	phone_number: string | null;
+	currency: string | null;
+	created_at: string;
+	updated_at: string;
+};
+
 // -----------------------------
 // Transactions / verification
 // -----------------------------
