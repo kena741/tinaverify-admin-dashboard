@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { EyeIcon, EyeOffIcon, Loader2Icon } from "lucide-react";
 
 import appIcon from "@/assets/images/app_icon.png";
@@ -21,13 +21,17 @@ import {
 
 export default function LoginPage() {
 	const router = useRouter();
-	const { login, loading: authLoading, error: authError } = useAuth();
+	const { login, loading: authLoading, error: authError, user } = useAuth();
 	const [emailOrPhone, setEmailOrPhone] = useState("");
 	const [password, setPassword] = useState("");
 	const [showPassword, setShowPassword] = useState(false);
 	const [error, setError] = useState("");
 
 	const uiError = error || authError || "";
+
+	useEffect(() => {
+		if (user) router.replace("/admin");
+	}, [user, router]);
 
 	async function handleLogin(e: React.FormEvent) {
 		e.preventDefault();

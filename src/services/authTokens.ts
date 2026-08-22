@@ -25,6 +25,22 @@ export function clearStoredTokens(): void {
 	localStorage.removeItem(AUTH_REFRESH_TOKEN_KEY);
 }
 
+/** Decode JWT `exp` without verifying signature — only used to refresh early. */
+export function isAccessTokenExpiredOrMissing(skewMs = 60_000): boolean {
+	const token = getStoredAccessToken();
+	if (!token) return true;
+	try {
+		const segment = token.split(".")[1];
+		if (!segment) return true;
+		const json = atob(segment.replace(/-/g, "+").replace(/_/g, "/"));
+		const payload = JSON.parse(json) as { exp?: unknown };
+		if (typeof payload.exp !== "number") return true;
+		return payload.exp * 1000 <= Date.now() + skewMs;
+	} catch {
+		return true;
+	}
+}
+
 let refreshInFlight: Promise<boolean> | null = null;
 
 /**

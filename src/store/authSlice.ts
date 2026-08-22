@@ -9,6 +9,7 @@ import {
 	clearStoredTokens,
 	getStoredAccessToken,
 	getStoredRefreshToken,
+	isAccessTokenExpiredOrMissing,
 	setStoredTokens,
 	refreshAccessToken,
 } from "../services/authTokens";
@@ -92,13 +93,18 @@ export const initializeAuthSession = createAsyncThunk<
 >("auth/initializeSession", async (_, { dispatch, rejectWithValue }) => {
 	if (typeof window === "undefined") return null;
 
-	const hasAccess = Boolean(getStoredAccessToken());
 	const hasRefresh = Boolean(getStoredRefreshToken());
-	if (!hasAccess && !hasRefresh) return null;
+	if (!getStoredAccessToken() && !hasRefresh) return null;
 
-	if (!hasAccess && hasRefresh) {
+	// Access JWT lasts ~2h; idle past that still has a valid refresh (~14d).
+	// Refresh before /me so we don't depend on a 401 round-trip after sleep.
+	if (hasRefresh && isAccessTokenExpiredOrMissing()) {
 		const ok = await refreshAccessToken();
-		if (!ok) return rejectWithValue(null);
+		if (!ok) {
+			// 4xx already cleared tokens; network blip keeps them — don't wipe.
+			if (!getStoredRefreshToken()) return rejectWithValue(null);
+			return rejectWithValue("transient");
+		}
 	}
 
 	const result = await dispatch(
@@ -107,8 +113,6 @@ export const initializeAuthSession = createAsyncThunk<
 
 	if ("data" in result && result.data) return result.data;
 
-	// Expired access while refresh still valid: baseQuery may already have
-	// tried once; try an explicit refresh + /me again before forcing logout.
 	if (getStoredRefreshToken()) {
 		const ok = await refreshAccessToken();
 		if (ok) {
@@ -116,7 +120,12 @@ export const initializeAuthSession = createAsyncThunk<
 				authApi.endpoints.readMe.initiate(undefined, { forceRefetch: true }),
 			);
 			if ("data" in retry && retry.data) return retry.data;
+			// Refreshed but /me still failed — session is unusable.
+			clearStoredTokens();
+			return rejectWithValue(null);
 		}
+		if (!getStoredRefreshToken()) return rejectWithValue(null);
+		return rejectWithValue("transient");
 	}
 
 	clearStoredTokens();
