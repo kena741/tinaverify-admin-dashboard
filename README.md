@@ -46,4 +46,4 @@ If email confirmation is enabled:
 - Users must click the confirmation link in their email before they can log in
 - The confirmation email is sent automatically after signup
 - Users will see a helpful error message if they try to login before confirming
-# zulu-verify
+# tinaverify-admin

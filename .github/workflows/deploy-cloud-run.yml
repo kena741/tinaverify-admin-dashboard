@@ -20,11 +20,12 @@ jobs:
     runs-on: ubuntu-latest
     environment: ${{ github.ref_name }}
     env:
-      SERVICE_NAME: ${{ github.ref_name == 'production' && 'tinaverify-fe-production' || 'tinaverify-fe-staging' }}
+      SERVICE_NAME: ${{ github.ref_name == 'production' && 'tinaverify-admin' || 'tinaverify-admin-staging' }}
       GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
       GCP_REGION: ${{ vars.GCP_REGION }}
+      CLOUD_RUN_REGION: europe-west4
       ARTIFACT_REGISTRY_REPO: ${{ vars.ARTIFACT_REGISTRY_REPO }}
-      IMAGE_NAME: tinaverify-fe
+      IMAGE_NAME: tinaverify-admin
       NEXT_PUBLIC_BACKEND_BASE_URL: ${{ secrets.NEXT_PUBLIC_BACKEND_BASE_URL }}
       DOCKER_DEFAULT_PLATFORM: linux/amd64
     steps:
@@ -62,7 +63,7 @@ jobs:
         run: |
           gcloud run deploy "${SERVICE_NAME}" \
             --image "${CLOUD_RUN_IMAGE}" \
-            --region "${GCP_REGION}" \
+            --region "${CLOUD_RUN_REGION}" \
             --platform managed \
             --allow-unauthenticated \
             --quiet
