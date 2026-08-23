@@ -6,22 +6,14 @@ import {
 	ArrowLeft,
 	Loader2Icon,
 	MessageSquare,
-	Power,
-	Trash2,
+	MoreHorizontal,
 } from "lucide-react";
 import { format } from "date-fns";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
-import {
-	Card,
-	CardContent,
-	CardDescription,
-	CardHeader,
-	CardTitle,
-} from "@/components/ui/card";
-import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { Field, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -42,7 +34,6 @@ import {
 	AlertDialogFooter,
 	AlertDialogHeader,
 	AlertDialogTitle,
-	AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import {
 	Select,
@@ -51,6 +42,14 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@/components/ui/select";
+import {
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuGroup,
+	DropdownMenuItem,
+	DropdownMenuSeparator,
+	DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 import {
 	useDeleteBusinessMutation,
@@ -81,10 +80,12 @@ import type {
 import { useListRolesQuery } from "../../../../services/role/roleApi";
 import { useGetUserByIdQuery } from "../../../../services/auth/authApi";
 import { BusinessPaymentsTab } from "@/components/admin/business-payments-tab";
-import { BusinessReferralsTab } from "@/components/admin/business-referrals-tab";
 import { SendBusinessSmsDialog } from "@/components/admin/send-business-sms-dialog";
 import { cn } from "@/lib/utils";
-import { getSubscriptionPlanLabel } from "@/lib/subscription-filters";
+import {
+	getSubscriptionPlanLabel,
+	getSubscriptionStatusLabel,
+} from "@/lib/subscription-filters";
 import { formatUserDisplayName } from "@/lib/userDisplay";
 
 
@@ -128,17 +129,30 @@ function getErrorMessage(error: unknown, fallback: string): string {
 	return fallback;
 }
 
-const DETAIL_TABS = [
-	"overview",
-	"employees",
-	"branches",
-	"bank-accounts",
-	"payments",
-	"referrals",
-	"subscription",
-] as const;
+function subscriptionBadgeVariant(
+	status: string | undefined,
+): "default" | "secondary" | "destructive" | "outline" {
+	const s = (status ?? "").toLowerCase();
+	if (s === "active") return "default";
+	if (s === "pending") return "secondary";
+	if (s === "expired" || s === "cancelled" || s === "insufficient_credits")
+		return "destructive";
+	return "outline";
+}
+
+const DETAIL_TABS = ["business", "people", "money"] as const;
 
 type DetailTab = (typeof DETAIL_TABS)[number];
+
+const LEGACY_TAB_MAP: Record<string, DetailTab> = {
+	overview: "business",
+	employees: "people",
+	branches: "business",
+	"bank-accounts": "money",
+	payments: "money",
+	subscription: "money",
+	referrals: "money",
+};
 
 function isDetailTab(value: string | null | undefined): value is DetailTab {
 	return (
@@ -147,8 +161,14 @@ function isDetailTab(value: string | null | undefined): value is DetailTab {
 	);
 }
 
+function resolveDetailTab(value: string | null | undefined): DetailTab {
+	if (isDetailTab(value)) return value;
+	if (value && value in LEGACY_TAB_MAP) return LEGACY_TAB_MAP[value];
+	return "business";
+}
+
 function businessDetailPath(businessId: string, tab: DetailTab): string {
-	if (tab === "overview") return `/admin/business/${businessId}`;
+	if (tab === "business") return `/admin/business/${businessId}`;
 	return `/admin/business/${businessId}?tab=${tab}`;
 }
 
@@ -164,7 +184,7 @@ export default function BusinessDetailClient({
 	const [sendSmsOpen, setSendSmsOpen] = useState(false);
 
 	const tabParam = searchParams.get("tab");
-	const activeTab: DetailTab = isDetailTab(tabParam) ? tabParam : "overview";
+	const activeTab: DetailTab = resolveDetailTab(tabParam);
 
 	function goToBusiness(nextBusinessId: string) {
 		router.push(businessDetailPath(nextBusinessId, activeTab), {
@@ -238,18 +258,13 @@ export default function BusinessDetailClient({
 		},
 	);
 
-	const {
-		data: subscriptionPlans,
-		isLoading: subscriptionPlansLoading,
-		isFetching: subscriptionPlansFetching,
-		error: subscriptionPlansError,
-		refetch: refetchSubscriptionPlans,
-	} = useListSubscriptionPlansQuery(undefined, { skip: missingBusinessId });
+	const { data: subscriptionPlans } = useListSubscriptionPlansQuery(
+		undefined,
+		{ skip: missingBusinessId },
+	);
 
 	const {
 		data: activeSubscription,
-		isLoading: activeSubscriptionLoading,
-		isFetching: activeSubscriptionFetching,
 		error: activeSubscriptionError,
 		refetch: refetchActiveSubscription,
 	} = useGetActiveSubscriptionQuery({ businessId }, { skip: missingBusinessId });
@@ -286,6 +301,10 @@ export default function BusinessDetailClient({
 		useAdminAssignSubscriptionMutation();
 
 	const [activeDialogOpen, setActiveDialogOpen] = useState(false);
+	const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+	const [billingPane, setBillingPane] = useState<
+		"history" | "payments" | "banks"
+	>("history");
 	const [statusBanner, setStatusBanner] = useState<{
 		variant: "default" | "destructive";
 		title: string;
@@ -466,21 +485,33 @@ export default function BusinessDetailClient({
 	}
 
 	const ownerDisplay = user ? formatUserDisplayName(user) : "Owner loading…";
+	const planName = activeSubscription?.plan_id
+		? getSubscriptionPlanLabel(
+				null,
+				subscriptionPlanById.get(activeSubscription.plan_id)?.name,
+			)
+		: null;
+	const planPrice = activeSubscription?.plan_id
+		? (subscriptionPlanById.get(activeSubscription.plan_id)?.price ?? null)
+		: null;
 
 	return (
-		<div className="mx-auto flex w-full max-w-6xl flex-col gap-6 pb-8">
+		<div className="mx-auto flex w-full max-w-6xl flex-col gap-5 pb-10">
 			<div className="flex flex-wrap items-center gap-2">
 				<Button
 					type="button"
 					variant="ghost"
 					size="sm"
+					className="-ml-2 text-muted-foreground"
 					onClick={() => router.push("/admin/owners")}
 				>
 					<ArrowLeft data-icon="inline-start" />
 					Owners
 				</Button>
 				{businessFetching ? (
-					<Badge variant="outline">Updating…</Badge>
+					<Badge variant="outline" className="font-normal">
+						Updating…
+					</Badge>
 				) : null}
 			</div>
 
@@ -491,195 +522,111 @@ export default function BusinessDetailClient({
 				</Alert>
 			) : null}
 
-			{/* Signature: owner close-out strip */}
-			<section
-				aria-labelledby="owner-heading"
-				className="admin-brand-band"
-			>
-				<div className="flex flex-col gap-6 p-6 sm:p-8 lg:flex-row lg:items-stretch lg:justify-between lg:gap-10">
-					<div className="flex min-w-0 flex-1 flex-col justify-between gap-4">
-						<div className="flex flex-col gap-2">
-							<p className="admin-brand-band-label">Business owner</p>
+			<header className="flex flex-col gap-4">
+				<div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+					<div className="min-w-0 flex flex-col gap-1">
+						<div className="flex flex-wrap items-center gap-2">
 							<h1
 								id="owner-heading"
-								className="truncate text-2xl font-semibold tracking-tight sm:text-[1.75rem]"
+								className="truncate text-[1.625rem] font-semibold tracking-tight text-foreground"
 							>
 								{ownerDisplay}
 							</h1>
-							<p className="admin-brand-band-muted">
-								{user?.phone_number ? (
-									<span className="font-mono tabular-nums">
-										{user.phone_number}
-									</span>
-								) : (
-									<span>No phone on file</span>
-								)}
-								<span>
-									{" · "}
-									{ownerBusinesses.length === 1
-										? "1 business"
-										: `${ownerBusinesses.length || 0} businesses`}
+							{business.is_active ? (
+								<Badge variant="secondary" className="font-normal">
+									Business active
+								</Badge>
+							) : (
+								<Badge variant="outline" className="font-normal">
+									Business inactive
+								</Badge>
+							)}
+						</div>
+						<p className="text-sm text-muted-foreground">
+							{user?.phone_number ? (
+								<span className="font-mono tabular-nums text-foreground/80">
+									{user.phone_number}
 								</span>
-							</p>
-						</div>
-					</div>
-
-					<div className="admin-brand-band-divider" />
-
-					<div className="flex flex-1 flex-col justify-center gap-3">
-						<p className="admin-brand-band-label">Managing</p>
-						<p className="truncate text-lg font-semibold tracking-tight">
-							{business.name || "Untitled business"}
-						</p>
-						<p className="admin-brand-band-muted">
-							<span className="font-mono tabular-nums">
-								TIN {business.tin_number}
+							) : (
+								<span>No phone on file</span>
+							)}
+							<span className="text-muted-foreground/80">
+								{" · "}
+								{ownerBusinesses.length === 1
+									? "1 business"
+									: `${ownerBusinesses.length || 0} businesses`}
 							</span>
-							{" · "}
-							{business.is_active ? "Active" : "Inactive"}
-							{business.is_archived ? " · Archived" : ""}
 						</p>
-						<div className="flex flex-wrap gap-2 pt-1">
-							<Button
-								type="button"
-								variant="secondary"
-								size="sm"
-								className="bg-primary-foreground/15 text-primary-foreground hover:bg-primary-foreground/25"
-								disabled={!user?.phone_number}
-								onClick={() => setSendSmsOpen(true)}
+					</div>
+					<div className="flex shrink-0 flex-wrap items-center gap-2">
+						<Button
+							type="button"
+							variant="outline"
+							size="sm"
+							disabled={!user?.phone_number}
+							onClick={() => setSendSmsOpen(true)}
+						>
+							<MessageSquare data-icon="inline-start" />
+							SMS
+						</Button>
+						<DropdownMenu>
+							<DropdownMenuTrigger
+								render={
+									<Button
+										type="button"
+										variant="ghost"
+										size="icon-sm"
+										aria-label="More actions"
+									/>
+								}
 							>
-								<MessageSquare data-icon="inline-start" />
-								SMS
-							</Button>
-							<AlertDialog
-								open={activeDialogOpen}
-								onOpenChange={setActiveDialogOpen}
-							>
-								<AlertDialogTrigger
-									className={cn(
-										buttonVariants({ variant: "secondary", size: "sm" }),
-										"bg-primary-foreground/15 text-primary-foreground hover:bg-primary-foreground/25",
-									)}
-									disabled={setBusinessActiveState.isLoading}
-								>
-									<Power data-icon="inline-start" />
-									{business.is_active ? "Deactivate" : "Activate"}
-								</AlertDialogTrigger>
-								<AlertDialogContent>
-									<AlertDialogHeader>
-										<AlertDialogTitle>
-											{business.is_active
-												? "Deactivate this business?"
-												: "Activate this business?"}
-										</AlertDialogTitle>
-										<AlertDialogDescription>
-											Applies only to{" "}
-											<span className="font-medium text-foreground">
-												{business.name || "this business"}
-											</span>
-											, not the owner’s other businesses.
-										</AlertDialogDescription>
-									</AlertDialogHeader>
-									<AlertDialogFooter>
-										<AlertDialogCancel disabled={setBusinessActiveState.isLoading}>
-											Cancel
-										</AlertDialogCancel>
-										<AlertDialogAction
-											disabled={setBusinessActiveState.isLoading}
-											onClick={async (e) => {
-												e.preventDefault();
-												const nextActive = !business.is_active;
-												try {
-													await setBusinessActive({
-														businessId,
-														body: { is_active: nextActive },
-													}).unwrap();
-													setActiveDialogOpen(false);
-													setStatusBanner({
-														variant: "default",
-														title: nextActive
-															? "Business activated"
-															: "Business deactivated",
-														message: `${business.name || "Business"} is now ${
-															nextActive ? "active" : "inactive"
-														}.`,
-													});
-												} catch (err) {
-													setStatusBanner({
-														variant: "destructive",
-														title: nextActive
-															? "Could not activate"
-															: "Could not deactivate",
-														message: getErrorMessage(err, "Request failed."),
-													});
-												}
-											}}
-										>
-											{setBusinessActiveState.isLoading
-												? "Working…"
-												: "Confirm"}
-										</AlertDialogAction>
-									</AlertDialogFooter>
-								</AlertDialogContent>
-							</AlertDialog>
-							<AlertDialog>
-								<AlertDialogTrigger
-									className={cn(
-										buttonVariants({ variant: "secondary", size: "sm" }),
-										"bg-destructive/20 text-primary-foreground hover:bg-destructive/30",
-									)}
-									disabled={deleteBusinessState.isLoading}
-								>
-									<Trash2 data-icon="inline-start" />
-									Delete
-								</AlertDialogTrigger>
-								<AlertDialogContent>
-									<AlertDialogHeader>
-										<AlertDialogTitle>Delete this business?</AlertDialogTitle>
-										<AlertDialogDescription>
-											Deletes{" "}
-											<span className="font-medium text-foreground">
-												{business.name || "this business"}
-											</span>
-											. This cannot be undone.
-										</AlertDialogDescription>
-									</AlertDialogHeader>
-									<AlertDialogFooter>
-										<AlertDialogCancel>Cancel</AlertDialogCancel>
-										<AlertDialogAction
-											onClick={async () => {
-												await deleteBusiness({ businessId }).unwrap();
-												router.push("/admin/owners");
-											}}
-										>
-											Delete
-										</AlertDialogAction>
-									</AlertDialogFooter>
-								</AlertDialogContent>
-							</AlertDialog>
-						</div>
+								<MoreHorizontal aria-hidden="true" />
+							</DropdownMenuTrigger>
+							<DropdownMenuContent align="end" className="w-48">
+								<DropdownMenuGroup>
+									<DropdownMenuItem
+										disabled={!user?.phone_number}
+										onClick={() => {
+											if (user?.phone_number) {
+												void navigator.clipboard.writeText(user.phone_number);
+											}
+										}}
+									>
+										Copy phone
+									</DropdownMenuItem>
+									<DropdownMenuItem onClick={() => setActiveDialogOpen(true)}>
+										{business.is_active
+											? "Deactivate business"
+											: "Activate business"}
+									</DropdownMenuItem>
+									<DropdownMenuSeparator />
+									<DropdownMenuItem
+										variant="destructive"
+										onClick={() => setDeleteDialogOpen(true)}
+									>
+										Delete business…
+									</DropdownMenuItem>
+								</DropdownMenuGroup>
+							</DropdownMenuContent>
+						</DropdownMenu>
 					</div>
 				</div>
-			</section>
 
-			{/* Business switcher */}
-			{ownerBusinesses.length > 1 ? (
-				<section className="flex flex-col gap-2" aria-label="Switch business">
-					<div className="flex flex-wrap items-baseline justify-between gap-2">
-						<p className="text-sm font-semibold tracking-tight text-foreground">
-							Businesses
-						</p>
-						<p className="text-xs text-muted-foreground">
-							Tabs below apply only to the selected business
-						</p>
-					</div>
+				<div className="flex flex-wrap items-center gap-2" aria-label="Businesses">
 					{allBusinessesLoading ? (
-						<Skeleton className="h-10 w-full max-w-lg" />
+						<Skeleton className="h-8 w-40" />
+					) : ownerBusinesses.length <= 1 ? (
+						<span className="inline-flex h-8 items-center gap-2 rounded-md border border-border bg-card px-2.5 text-sm">
+							<span className="font-medium">{business.name || "Untitled"}</span>
+							<span className="font-mono text-xs text-muted-foreground">
+								{business.tin_number}
+							</span>
+						</span>
 					) : ownerBusinesses.length <= 6 ? (
 						<div
 							role="tablist"
-							aria-label="Select business to manage"
-							className="flex max-w-full flex-wrap gap-1.5 rounded-xl border border-border bg-card p-1.5 shadow-xs"
+							aria-label="Select business"
+							className="flex max-w-full flex-wrap gap-1 rounded-lg border border-border bg-muted/40 p-1"
 						>
 							{ownerBusinesses.map((b) => {
 								const isCurrent = b.id === businessId;
@@ -693,10 +640,10 @@ export default function BusinessDetailClient({
 											if (!isCurrent) goToBusiness(b.id);
 										}}
 										className={cn(
-											"h-9 max-w-48 truncate rounded-lg px-3 text-left text-sm motion-safe:transition-colors",
+											"h-7 max-w-44 truncate rounded-md px-2.5 text-sm motion-safe:transition-colors",
 											isCurrent
-												? "bg-primary font-medium text-primary-foreground"
-												: "text-foreground hover:bg-muted",
+												? "bg-background font-medium text-foreground shadow-xs"
+												: "text-muted-foreground hover:text-foreground",
 										)}
 									>
 										{b.name || "Untitled"}
@@ -705,42 +652,341 @@ export default function BusinessDetailClient({
 							})}
 						</div>
 					) : (
-						<div className="flex flex-wrap items-center gap-2 rounded-xl border border-border bg-card p-3 shadow-xs">
-							<label htmlFor="manage-business" className="sr-only">
-								Managing business
-							</label>
-							<Select
-								value={businessId}
-								onValueChange={(id) => {
-									if (id && id !== businessId) goToBusiness(id);
-								}}
+						<Select
+							value={businessId}
+							onValueChange={(id) => {
+								if (id && id !== businessId) goToBusiness(id);
+							}}
+						>
+							<SelectTrigger
+								className="h-8 max-w-sm min-w-48"
+								aria-label="Managing business"
 							>
-								<SelectTrigger
-									id="manage-business"
-									className="h-9 max-w-sm min-w-48"
-									aria-label="Managing business"
+								<span className="truncate text-sm font-medium">
+									{business.name || "Select business"}
+								</span>
+							</SelectTrigger>
+							<SelectContent align="start">
+								{ownerBusinesses.map((b) => (
+									<SelectItem key={b.id} value={b.id}>
+										{b.name || "Untitled"} · TIN {b.tin_number}
+									</SelectItem>
+								))}
+							</SelectContent>
+						</Select>
+					)}
+				</div>
+			</header>
+
+			<AlertDialog open={activeDialogOpen} onOpenChange={setActiveDialogOpen}>
+				<AlertDialogContent>
+					<AlertDialogHeader>
+						<AlertDialogTitle>
+							{business.is_active
+								? "Deactivate this business?"
+								: "Activate this business?"}
+						</AlertDialogTitle>
+						<AlertDialogDescription>
+							Applies only to{" "}
+							<span className="font-medium text-foreground">
+								{business.name || "this business"}
+							</span>
+							, not the owner’s other businesses.
+						</AlertDialogDescription>
+					</AlertDialogHeader>
+					<AlertDialogFooter>
+						<AlertDialogCancel disabled={setBusinessActiveState.isLoading}>
+							Cancel
+						</AlertDialogCancel>
+						<AlertDialogAction
+							disabled={setBusinessActiveState.isLoading}
+							onClick={async (e) => {
+								e.preventDefault();
+								const nextActive = !business.is_active;
+								try {
+									await setBusinessActive({
+										businessId,
+										body: { is_active: nextActive },
+									}).unwrap();
+									setActiveDialogOpen(false);
+									setStatusBanner({
+										variant: "default",
+										title: nextActive
+											? "Business activated"
+											: "Business deactivated",
+										message: `${business.name || "Business"} is now ${
+											nextActive ? "active" : "inactive"
+										}.`,
+									});
+								} catch (err) {
+									setStatusBanner({
+										variant: "destructive",
+										title: nextActive
+											? "Could not activate"
+											: "Could not deactivate",
+										message: getErrorMessage(err, "Request failed."),
+									});
+								}
+							}}
+						>
+							{setBusinessActiveState.isLoading ? "Working…" : "Confirm"}
+						</AlertDialogAction>
+					</AlertDialogFooter>
+				</AlertDialogContent>
+			</AlertDialog>
+
+			<AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+				<AlertDialogContent>
+					<AlertDialogHeader>
+						<AlertDialogTitle>Delete this business?</AlertDialogTitle>
+						<AlertDialogDescription>
+							Deletes{" "}
+							<span className="font-medium text-foreground">
+								{business.name || "this business"}
+							</span>
+							. This cannot be undone.
+						</AlertDialogDescription>
+					</AlertDialogHeader>
+					<AlertDialogFooter>
+						<AlertDialogCancel disabled={deleteBusinessState.isLoading}>
+							Cancel
+						</AlertDialogCancel>
+						<AlertDialogAction
+							disabled={deleteBusinessState.isLoading}
+							onClick={async (e) => {
+								e.preventDefault();
+								await deleteBusiness({ businessId }).unwrap();
+								router.push("/admin/owners");
+							}}
+						>
+							Delete
+						</AlertDialogAction>
+					</AlertDialogFooter>
+				</AlertDialogContent>
+			</AlertDialog>
+
+			<section
+				aria-label="Live account context"
+				className="sticky top-0 z-10 flex flex-col gap-3 rounded-xl border border-border bg-card/95 p-4 shadow-xs backdrop-blur-sm supports-backdrop-filter:bg-card/90"
+			>
+				<div className="grid grid-cols-2 divide-x divide-y divide-border overflow-hidden rounded-lg border border-border sm:grid-cols-5 sm:divide-y-0">
+					<div className="flex flex-col gap-1.5 px-3 py-3">
+						<p className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
+							Status
+						</p>
+						<div>
+							{activeSubscription ? (
+								<Badge
+									variant={subscriptionBadgeVariant(activeSubscription.status)}
+									className="font-normal capitalize"
 								>
-									<span className="truncate font-medium">
-										{business.name || "Select business"}
-									</span>
-								</SelectTrigger>
-								<SelectContent align="start">
-									{ownerBusinesses.map((b) => (
-										<SelectItem key={b.id} value={b.id}>
-											{b.name || "Untitled"} · TIN {b.tin_number}
-										</SelectItem>
-									))}
-								</SelectContent>
-							</Select>
-							{business.is_active ? (
-								<Badge variant="secondary">Active</Badge>
+									{getSubscriptionStatusLabel(activeSubscription.status)}
+								</Badge>
 							) : (
-								<Badge variant="outline">Inactive</Badge>
+								<Badge variant="outline" className="font-normal">
+									None
+								</Badge>
 							)}
 						</div>
-					)}
-				</section>
-			) : null}
+					</div>
+					<div className="flex flex-col gap-1.5 px-3 py-3">
+						<p className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
+							Plan
+						</p>
+						<p className="truncate text-sm font-medium tracking-tight">
+							{planName ?? "—"}
+						</p>
+					</div>
+					<div className="flex flex-col gap-1.5 px-3 py-3">
+						<p className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
+							Price
+						</p>
+						<p className="font-mono text-sm font-medium tabular-nums">
+							{planPrice ?? "—"}
+						</p>
+					</div>
+					<div className="flex flex-col gap-1.5 px-3 py-3">
+						<p className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
+							Credits
+						</p>
+						<p className="font-mono text-sm font-medium tabular-nums">
+							{subscriptionUsage
+								? `${subscriptionUsage.remaining_credits.toLocaleString()} / ${subscriptionUsage.credits_limit.toLocaleString()}`
+								: "—"}
+						</p>
+					</div>
+					<div className="col-span-2 flex flex-col gap-1.5 px-3 py-3 sm:col-span-1">
+						<p className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
+							TIN
+						</p>
+						<p className="font-mono text-sm font-medium tabular-nums">
+							{business.tin_number}
+						</p>
+					</div>
+				</div>
+
+				{(activeSubscriptionError || subscriptionUsageError) ? (
+					<div className="flex flex-col gap-2">
+						{activeSubscriptionError ? (
+							<Alert variant="destructive">
+								<AlertTitle>Subscription</AlertTitle>
+								<AlertDescription className="flex flex-wrap items-center gap-2">
+									<span className="wrap-break-word">
+										{getErrorMessage(activeSubscriptionError, "Request failed.")}
+									</span>
+									<Button
+										type="button"
+										variant="outline"
+										size="sm"
+										onClick={() => refetchActiveSubscription()}
+									>
+										Retry
+									</Button>
+								</AlertDescription>
+							</Alert>
+						) : null}
+						{subscriptionUsageError ? (
+							<Alert variant="destructive">
+								<AlertTitle>Credits</AlertTitle>
+								<AlertDescription className="flex flex-wrap items-center gap-2">
+									<span>Could not load usage.</span>
+									<Button
+										type="button"
+										variant="outline"
+										size="sm"
+										onClick={() => refetchSubscriptionUsage()}
+									>
+										Retry
+									</Button>
+								</AlertDescription>
+							</Alert>
+						) : null}
+					</div>
+				) : null}
+
+				{(manualBanner || grantBanner) ? (
+					<div className="flex flex-col gap-2">
+						{manualBanner ? (
+							<Alert
+								variant={
+									manualBanner.variant === "destructive"
+										? "destructive"
+										: "default"
+								}
+							>
+								<AlertTitle>{manualBanner.title}</AlertTitle>
+								<AlertDescription>{manualBanner.message}</AlertDescription>
+							</Alert>
+						) : null}
+						{grantBanner ? (
+							<Alert
+								variant={
+									grantBanner.variant === "destructive"
+										? "destructive"
+										: "default"
+								}
+							>
+								<AlertTitle>{grantBanner.title}</AlertTitle>
+								<AlertDescription>{grantBanner.message}</AlertDescription>
+							</Alert>
+						) : null}
+					</div>
+				) : null}
+
+				<div className="grid gap-2 border-t border-border pt-3 sm:grid-cols-2">
+					<form
+						className="flex flex-wrap items-end gap-2"
+						onSubmit={(e) => {
+							e.preventDefault();
+							void onManualAssign();
+						}}
+					>
+						<Field className="min-w-[10rem] flex-1">
+							<FieldLabel
+								htmlFor="quick-assign-plan"
+								className="text-xs text-muted-foreground"
+							>
+								Assign plan
+							</FieldLabel>
+							<Select
+								value={manualPlanId}
+								onValueChange={(value) => {
+									setManualPlanId(value ?? "");
+									setManualBanner(null);
+								}}
+							>
+								<SelectTrigger id="quick-assign-plan" className="h-9 w-full bg-background">
+									<SelectValue placeholder="Select plan…">
+										{manualPlanId
+											? subscriptionPlanById.get(manualPlanId)?.name
+											: undefined}
+									</SelectValue>
+								</SelectTrigger>
+								<SelectContent>
+									{(subscriptionPlans ?? [])
+										.filter((p) => !p.is_archived)
+										.map((p) => (
+											<SelectItem key={p.id} value={p.id}>
+												{p.name}
+											</SelectItem>
+										))}
+								</SelectContent>
+							</Select>
+						</Field>
+						<Button type="submit" size="sm" disabled={!canManualAssign}>
+							{assigningSubscription ? (
+								<Loader2Icon
+									data-icon="inline-start"
+									className="animate-spin"
+									aria-hidden
+								/>
+							) : null}
+							{assigningSubscription ? "…" : "Assign"}
+						</Button>
+					</form>
+
+					<form
+						className="flex flex-wrap items-end gap-2"
+						onSubmit={(e) => {
+							e.preventDefault();
+							void onGrantCredits();
+						}}
+					>
+						<Field className="min-w-[10rem] flex-1">
+							<FieldLabel
+								htmlFor="quick-grant-credits"
+								className="text-xs text-muted-foreground"
+							>
+								Grant credits
+							</FieldLabel>
+							<Input
+								id="quick-grant-credits"
+								name="credits"
+								type="text"
+								inputMode="numeric"
+								autoComplete="off"
+								placeholder="e.g. 500"
+								className="h-9 bg-background"
+								value={grantCreditsInput}
+								onChange={(e) => {
+									setGrantCreditsInput(e.target.value);
+									setGrantBanner(null);
+								}}
+							/>
+						</Field>
+						<Button type="submit" size="sm" disabled={!canGrantCredits}>
+							{grantingCredits ? (
+								<Loader2Icon
+									data-icon="inline-start"
+									className="animate-spin"
+									aria-hidden
+								/>
+							) : null}
+							{grantingCredits ? "…" : "Grant"}
+						</Button>
+					</form>
+				</div>
+			</section>
 
 			<SendBusinessSmsDialog
 				open={sendSmsOpen}
@@ -749,230 +995,56 @@ export default function BusinessDetailClient({
 				phoneNumber={user?.phone_number}
 			/>
 
-			<Tabs value={activeTab} onValueChange={onTabChange} className="gap-4">
-				<TabsList className="h-auto w-full flex-wrap justify-start gap-1 rounded-xl border border-border p-1.5 shadow-xs">
-					<TabsTrigger value="overview" className="rounded-lg">
-						Overview
+			<Tabs value={activeTab} onValueChange={onTabChange} className="gap-3">
+				<TabsList className="h-auto w-full flex-wrap justify-start gap-1 rounded-lg border border-border bg-muted/40 p-1">
+					<TabsTrigger value="business" className="rounded-md">
+						Business
 					</TabsTrigger>
-					<TabsTrigger value="employees" className="rounded-lg">
-						Employees
+					<TabsTrigger value="people" className="rounded-md">
+						Staff
 					</TabsTrigger>
-					<TabsTrigger value="branches" className="rounded-lg">
-						Branches
-					</TabsTrigger>
-					<TabsTrigger value="bank-accounts" className="rounded-lg">
-						Bank accounts
-					</TabsTrigger>
-					<TabsTrigger value="payments" className="rounded-lg">
-						Payments
-					</TabsTrigger>
-					<TabsTrigger value="referrals" className="rounded-lg">
-						Referrals
-					</TabsTrigger>
-					<TabsTrigger value="subscription" className="rounded-lg">
-						Subscription
+					<TabsTrigger value="money" className="rounded-md">
+						Billing
 					</TabsTrigger>
 				</TabsList>
 
-				<TabsContent value="overview" className="mt-0">
-					<div className="grid grid-cols-1 overflow-hidden rounded-xl border border-border bg-card shadow-xs sm:grid-cols-2 lg:grid-cols-3">
-						<div className="flex flex-col gap-1 px-5 py-4">
-							<p className="text-xs font-medium text-muted-foreground">
-								Business name
+				<TabsContent value="business" className="mt-0 flex flex-col gap-4">
+					<div className="grid grid-cols-1 overflow-hidden rounded-xl border border-border sm:grid-cols-3">
+						<div className="flex flex-col gap-1 px-4 py-3.5">
+							<p className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
+								Name
 							</p>
-							<p className="text-base font-semibold tracking-tight">
+							<p className="text-sm font-medium tracking-tight">
 								{business.name || "—"}
 							</p>
 						</div>
-						<div className="flex flex-col gap-1 border-border px-5 py-4 sm:border-l">
-							<p className="text-xs font-medium text-muted-foreground">TIN</p>
-							<p className="font-mono text-base font-semibold tabular-nums tracking-tight">
+						<div className="flex flex-col gap-1 border-border px-4 py-3.5 sm:border-l">
+							<p className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
+								TIN
+							</p>
+							<p className="font-mono text-sm font-medium tabular-nums">
 								{business.tin_number}
 							</p>
 						</div>
-						<div className="flex flex-col gap-1 border-border px-5 py-4 sm:border-t lg:border-t-0 lg:border-l">
-							<p className="text-xs font-medium text-muted-foreground">Status</p>
-							<p className="text-base font-semibold tracking-tight">
+						<div className="flex flex-col gap-1 border-border px-4 py-3.5 sm:border-l">
+							<p className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
+								Status
+							</p>
+							<p className="text-sm font-medium tracking-tight">
 								{business.is_active ? "Active" : "Inactive"}
 								{business.is_archived ? " · Archived" : ""}
 							</p>
 						</div>
-						<div className="flex flex-col gap-1 border-border px-5 py-4 sm:border-t">
-							<p className="text-xs font-medium text-muted-foreground">Owner</p>
-							<p className="truncate text-base font-semibold tracking-tight">
-								{user ? formatUserDisplayName(user) : "—"}
-							</p>
-						</div>
-						<div className="flex flex-col gap-1 border-border px-5 py-4 sm:border-t sm:border-l">
-							<p className="text-xs font-medium text-muted-foreground">
-								Owner phone
-							</p>
-							<p className="font-mono text-base font-semibold tabular-nums tracking-tight">
-								{user?.phone_number ?? "—"}
-							</p>
-						</div>
-						<div className="flex flex-col gap-1 border-border px-5 py-4 sm:border-t lg:border-l">
-							<p className="text-xs font-medium text-muted-foreground">
-								Businesses owned
-							</p>
-							<p className="font-mono text-base font-semibold tabular-nums tracking-tight">
-								{ownerBusinesses.length}
-							</p>
-						</div>
 					</div>
-				</TabsContent>
 
-				<TabsContent value="employees" className="mt-0">
-					<Card size="sm" className="shadow-xs">
-						<CardHeader className="border-b border-border pb-3">
-							<CardTitle className="text-base">Employees</CardTitle>
-							<CardDescription>
-								Roles and branch assignment for this business
-							</CardDescription>
-						</CardHeader>
-						<CardContent className="flex flex-col gap-4 pt-4">
-							{employeesError ? (
-								<Alert variant="destructive">
-									<AlertTitle>Failed to load employees</AlertTitle>
-									<AlertDescription className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-										<span className="wrap-break-word">Request failed.</span>
-										<button
-											type="button"
-											className={cn(
-												buttonVariants({ variant: "link", size: "sm" }),
-											)}
-											onClick={() => refetchEmployees()}
-										>
-											Try again
-										</button>
-									</AlertDescription>
-								</Alert>
-							) : null}
-
-							{employeesLoading ? (
-								<div className="flex flex-col gap-2">
-									{Array.from({ length: 8 }).map((_, i) => (
-										<Skeleton key={i} className="h-10 w-full" />
-									))}
-								</div>
-							) : (
-								<Table>
-									<TableHeader>
-										<TableRow>
-											<TableHead>Employee</TableHead>
-											<TableHead>Role</TableHead>
-											<TableHead>Branch</TableHead>
-											<TableHead className="text-right">Actions</TableHead>
-										</TableRow>
-									</TableHeader>
-									<TableBody>
-										{employeeRows.length === 0 ? (
-											<TableRow>
-												<TableCell colSpan={4} className="py-10 text-center">
-													<span className="text-sm text-muted-foreground">
-														No employees found.
-													</span>
-												</TableCell>
-											</TableRow>
-										) : (
-											employeeRows.map((emp: EmployeeOutput) => {
-												const selectedRoleId =
-													employeeRoleDraft[emp.id] ?? emp.role_id;
-												const selectedRole = roleById.get(selectedRoleId);
-
-												return (
-													<TableRow key={emp.id}>
-														<TableCell className="min-w-0">
-															<div className="flex flex-col gap-0.5 min-w-0">
-																<span className="font-medium truncate">
-																	{emp.user?.username ??
-																		emp.user?.phone_number ??
-																		emp.user_id}
-																</span>
-																<span className="text-sm text-muted-foreground truncate">
-																	{emp.user?.email ?? "—"}
-																</span>
-															</div>
-														</TableCell>
-														<TableCell>
-															<Select
-																value={selectedRoleId}
-																onValueChange={(value) => {
-																	if (!value) return;
-																	setEmployeeRoleDraft((prev) => ({
-																		...prev,
-																		[emp.id]: value,
-																	}));
-																}}
-															>
-																<SelectTrigger
-																	aria-label="Select employee role"
-																	className="w-56"
-																>
-																	<SelectValue placeholder="Select role">
-																		{roleLabel(selectedRole)}
-																	</SelectValue>
-																</SelectTrigger>
-																<SelectContent>
-																	{(roles ?? []).map((r) => (
-																		<SelectItem key={r.id} value={r.id}>
-																			{r.name}
-																		</SelectItem>
-																	))}
-																</SelectContent>
-															</Select>
-														</TableCell>
-														<TableCell>
-															<span className="font-medium truncate">
-																{emp.branch?.name ?? "—"}
-															</span>
-														</TableCell>
-														<TableCell className="text-right">
-															<button
-																type="button"
-																className={cn(
-																	buttonVariants({
-																		variant: "outline",
-																		size: "sm",
-																	}),
-																)}
-																disabled={
-																	updateEmployeeRoleState.isLoading ||
-																	!selectedRoleId ||
-																	selectedRoleId === emp.role_id
-																}
-																onClick={async () => {
-																	if (!selectedRoleId) return;
-																	await updateEmployeeRole({
-																		businessId,
-																		employeeId: emp.id,
-																		body: { role_id: selectedRoleId },
-																	}).unwrap();
-																}}
-															>
-																Save
-															</button>
-														</TableCell>
-													</TableRow>
-												);
-											})
-										)}
-									</TableBody>
-								</Table>
-							)}
-						</CardContent>
-					</Card>
-				</TabsContent>
-
-				<TabsContent value="branches" className="mt-0">
-					<Card size="sm" className="shadow-xs">
-						<CardHeader className="border-b border-border pb-3">
-							<CardTitle className="text-base">Branches</CardTitle>
-							<CardDescription>
+					<section className="overflow-hidden rounded-xl border border-border">
+						<div className="border-b border-border px-4 py-3">
+							<h2 className="text-sm font-semibold tracking-tight">Branches</h2>
+							<p className="text-xs text-muted-foreground">
 								Locations under this business
-							</CardDescription>
-						</CardHeader>
-						<CardContent className="flex flex-col gap-4 pt-4">
+							</p>
+						</div>
+						<div className="overflow-x-auto">
 							<Table>
 								<TableHeader>
 									<TableRow>
@@ -1001,32 +1073,36 @@ export default function BusinessDetailClient({
 									) : (
 										branches?.map((branch: BranchOutput) => (
 											<TableRow key={branch.id}>
-												<TableCell>{branch.name}</TableCell>
+												<TableCell className="font-medium">
+													{branch.name}
+												</TableCell>
 												<TableCell>
 													{branch.is_head_quarter ? "Yes" : "No"}
 												</TableCell>
-												<TableCell>{branch.address ?? "—"}</TableCell>
+												<TableCell className="text-muted-foreground">
+													{branch.address ?? "—"}
+												</TableCell>
 											</TableRow>
 										))
 									)}
 								</TableBody>
 							</Table>
-						</CardContent>
-					</Card>
+						</div>
+					</section>
 				</TabsContent>
 
-				<TabsContent value="bank-accounts" className="mt-0">
-					<Card size="sm" className="shadow-xs">
-						<CardHeader className="border-b border-border pb-3">
-							<CardTitle className="text-base">Bank accounts</CardTitle>
-							<CardDescription>
-								Linked payout accounts for this business
-							</CardDescription>
-						</CardHeader>
-						<CardContent className="flex flex-col gap-4 pt-4">
-							{bankAccountsError ? (
+				<TabsContent value="people" className="mt-0">
+					<section className="overflow-hidden rounded-xl border border-border">
+						<div className="border-b border-border px-4 py-3">
+							<h2 className="text-sm font-semibold tracking-tight">Staff</h2>
+							<p className="text-xs text-muted-foreground">
+								Roles and branch assignment for this business
+							</p>
+						</div>
+						<div className="flex flex-col gap-4 p-4">
+							{employeesError ? (
 								<Alert variant="destructive">
-									<AlertTitle>Failed to load bank accounts</AlertTitle>
+									<AlertTitle>Failed to load employees</AlertTitle>
 									<AlertDescription className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
 										<span className="wrap-break-word">Request failed.</span>
 										<button
@@ -1034,7 +1110,7 @@ export default function BusinessDetailClient({
 											className={cn(
 												buttonVariants({ variant: "link", size: "sm" }),
 											)}
-											onClick={() => refetchBankAccounts()}
+											onClick={() => refetchEmployees()}
 										>
 											Try again
 										</button>
@@ -1042,476 +1118,328 @@ export default function BusinessDetailClient({
 								</Alert>
 							) : null}
 
-							{bankAccountsLoading ? (
+							{employeesLoading ? (
 								<div className="flex flex-col gap-2">
-									{Array.from({ length: 6 }).map((_, i) => (
+									{Array.from({ length: 8 }).map((_, i) => (
 										<Skeleton key={i} className="h-10 w-full" />
 									))}
 								</div>
 							) : (
-								<Table>
-									<TableHeader>
-										<TableRow>
-											<TableHead>Bank</TableHead>
-											<TableHead>Account name</TableHead>
-											<TableHead>Account number</TableHead>
-											<TableHead>Status</TableHead>
-										</TableRow>
-									</TableHeader>
-									<TableBody>
-										{(bankAccounts ?? []).length === 0 ? (
+								<div className="overflow-x-auto">
+									<Table>
+										<TableHeader>
 											<TableRow>
-												<TableCell colSpan={4} className="py-10 text-center">
-													<span className="text-sm text-muted-foreground">
-														No bank accounts linked to this business.
-													</span>
-												</TableCell>
+												<TableHead>Employee</TableHead>
+												<TableHead>Role</TableHead>
+												<TableHead>Branch</TableHead>
+												<TableHead className="text-right">Actions</TableHead>
 											</TableRow>
-										) : (
-											(bankAccounts ?? []).map((account: BankAccountResponse) => (
-												<TableRow
-													key={`${account.bank_name}-${account.account_number}-${account.account_name}`}
-												>
-													<TableCell className="font-medium">
-														{account.bank_name}
-													</TableCell>
-													<TableCell>{account.account_name}</TableCell>
-													<TableCell className="font-mono text-sm">
-														{account.account_number}
-													</TableCell>
-													<TableCell>
-														<Badge
-															variant={
-																account.is_archived ? "secondary" : "default"
-															}
-														>
-															{account.is_archived ? "Archived" : "Active"}
-														</Badge>
+										</TableHeader>
+										<TableBody>
+											{employeeRows.length === 0 ? (
+												<TableRow>
+													<TableCell colSpan={4} className="py-10 text-center">
+														<span className="text-sm text-muted-foreground">
+															No employees found.
+														</span>
 													</TableCell>
 												</TableRow>
-											))
-										)}
-									</TableBody>
-								</Table>
+											) : (
+												employeeRows.map((emp: EmployeeOutput) => {
+													const selectedRoleId =
+														employeeRoleDraft[emp.id] ?? emp.role_id;
+													const selectedRole = roleById.get(selectedRoleId);
+
+													return (
+														<TableRow key={emp.id}>
+															<TableCell className="min-w-0">
+																<div className="flex min-w-0 flex-col gap-0.5">
+																	<span className="truncate font-medium">
+																		{emp.user?.username ??
+																			emp.user?.phone_number ??
+																			emp.user_id}
+																	</span>
+																	<span className="truncate text-sm text-muted-foreground">
+																		{emp.user?.email ?? "—"}
+																	</span>
+																</div>
+															</TableCell>
+															<TableCell>
+																<Select
+																	value={selectedRoleId}
+																	onValueChange={(value) => {
+																		if (!value) return;
+																		setEmployeeRoleDraft((prev) => ({
+																			...prev,
+																			[emp.id]: value,
+																		}));
+																	}}
+																>
+																	<SelectTrigger
+																		aria-label="Select employee role"
+																		className="w-56"
+																	>
+																		<SelectValue placeholder="Select role">
+																			{roleLabel(selectedRole)}
+																		</SelectValue>
+																	</SelectTrigger>
+																	<SelectContent>
+																		{(roles ?? []).map((r) => (
+																			<SelectItem key={r.id} value={r.id}>
+																				{r.name}
+																			</SelectItem>
+																		))}
+																	</SelectContent>
+																</Select>
+															</TableCell>
+															<TableCell>
+																<span className="truncate font-medium">
+																	{emp.branch?.name ?? "—"}
+																</span>
+															</TableCell>
+															<TableCell className="text-right">
+																<button
+																	type="button"
+																	className={cn(
+																		buttonVariants({
+																			variant: "outline",
+																			size: "sm",
+																		}),
+																	)}
+																	disabled={
+																		updateEmployeeRoleState.isLoading ||
+																		!selectedRoleId ||
+																		selectedRoleId === emp.role_id
+																	}
+																	onClick={async () => {
+																		if (!selectedRoleId) return;
+																		await updateEmployeeRole({
+																			businessId,
+																			employeeId: emp.id,
+																			body: { role_id: selectedRoleId },
+																		}).unwrap();
+																	}}
+																>
+																	Save
+																</button>
+															</TableCell>
+														</TableRow>
+													);
+												})
+											)}
+										</TableBody>
+									</Table>
+								</div>
 							)}
-						</CardContent>
-					</Card>
+						</div>
+					</section>
 				</TabsContent>
 
-				<TabsContent value="payments" className="mt-0">
-					<BusinessPaymentsTab businessId={businessId} />
-				</TabsContent>
-
-				<TabsContent value="referrals" className="mt-0">
-					<BusinessReferralsTab />
-				</TabsContent>
-
-				<TabsContent value="subscription" className="mt-0">
-					<div className="flex flex-col gap-4">
-						{/* Active plan as dense signature-adjacent panel */}
-						<section className="overflow-hidden rounded-xl border border-border bg-card shadow-xs">
-							<div className="border-b border-border px-5 py-4">
-								<p className="font-mono text-[11px] font-medium tracking-[0.12em] text-muted-foreground uppercase">
-									Billing
-								</p>
-								<h2 className="mt-1 text-base font-semibold tracking-tight">
-									Current subscription
-								</h2>
-							</div>
-							<div className="flex flex-col gap-4 p-5">
-								{activeSubscriptionError ? (
-									<Alert variant="destructive">
-										<AlertTitle>Failed to load current subscription</AlertTitle>
-										<AlertDescription className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-											<span className="wrap-break-word">
-												{getErrorMessage(
-													activeSubscriptionError,
-													"Request failed.",
-												)}
-											</span>
-											<Button
-												type="button"
-												variant="outline"
-												size="sm"
-												onClick={() => refetchActiveSubscription()}
-											>
-												Try again
-											</Button>
-										</AlertDescription>
-									</Alert>
-								) : activeSubscriptionLoading || activeSubscriptionFetching ? (
-									<Skeleton className="h-16 w-full" />
-								) : activeSubscription ? (
-									<div className="grid grid-cols-1 overflow-hidden rounded-lg border border-border sm:grid-cols-3">
-										<div className="flex flex-col gap-1 px-4 py-3">
-											<p className="text-xs font-medium text-muted-foreground">
-												Plan
-											</p>
-											<p className="text-base font-semibold tracking-tight">
-												{getSubscriptionPlanLabel(
-													null,
-													activeSubscription.plan_id
-														? subscriptionPlanById.get(
-																activeSubscription.plan_id,
-															)?.name
-														: null,
-												)}
-											</p>
-										</div>
-										<div className="flex flex-col gap-1 border-border px-4 py-3 sm:border-l">
-											<p className="text-xs font-medium text-muted-foreground">
-												Status
-											</p>
-											<p className="text-base font-semibold capitalize tracking-tight">
-												{activeSubscription.status}
-											</p>
-										</div>
-										<div className="flex flex-col gap-1 border-border px-4 py-3 sm:border-l">
-											<p className="text-xs font-medium text-muted-foreground">
-												Period
-											</p>
-											<p className="font-mono text-sm font-medium tabular-nums tracking-tight">
-												{formatDateTime(activeSubscription.started_at)}
-												{activeSubscription.ended_at
-													? ` → ${formatDateTime(activeSubscription.ended_at)}`
-													: ""}
-											</p>
-										</div>
-									</div>
-								) : (
-									<p className="text-sm text-muted-foreground">
-										No active subscription on this business.
-									</p>
+				<TabsContent value="money" className="mt-0 flex flex-col gap-4">
+					<div
+						role="tablist"
+						aria-label="Billing records"
+						className="flex w-fit flex-wrap gap-1 rounded-lg border border-border bg-muted/40 p-1"
+					>
+						{(
+							[
+								["history", "History"],
+								["payments", "Payments"],
+								["banks", "Banks"],
+							] as const
+						).map(([id, label]) => (
+							<button
+								key={id}
+								type="button"
+								role="tab"
+								aria-selected={billingPane === id}
+								onClick={() => setBillingPane(id)}
+								className={cn(
+									"h-7 rounded-md px-3 text-sm motion-safe:transition-colors",
+									billingPane === id
+										? "bg-background font-medium text-foreground shadow-xs"
+										: "text-muted-foreground hover:text-foreground",
 								)}
+							>
+								{label}
+							</button>
+						))}
+					</div>
 
-								{subscriptionPlansError ? (
-									<Alert variant="destructive">
-										<AlertTitle>Failed to load plans</AlertTitle>
-										<AlertDescription className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-											<span className="wrap-break-word">
-												{getErrorMessage(
-													subscriptionPlansError,
-													"Request failed.",
-												)}
-											</span>
-											<Button
-												type="button"
-												variant="outline"
-												size="sm"
-												onClick={() => refetchSubscriptionPlans()}
-											>
-												Try again
-											</Button>
-										</AlertDescription>
-									</Alert>
-								) : null}
-								{subscriptionPlansLoading || subscriptionPlansFetching ? (
-									<div className="flex flex-col gap-2">
-										{Array.from({ length: 2 }).map((_, i) => (
-											<Skeleton key={i} className="h-8 w-full" />
-										))}
-									</div>
-								) : null}
-							</div>
-						</section>
-
-						<section className="overflow-hidden rounded-xl border border-border bg-card shadow-xs">
-							<div className="flex flex-col gap-2 border-b border-border px-5 py-4 sm:flex-row sm:items-start sm:justify-between">
-								<div>
-									<h2 className="text-base font-semibold tracking-tight">
-										Usage
-									</h2>
-									<p className="mt-0.5 text-sm text-muted-foreground">
-										Credits for the current period
-									</p>
-								</div>
-								{subscriptionUsageError ? (
-									<Button
-										type="button"
-										variant="outline"
-										size="sm"
-										onClick={() => refetchSubscriptionUsage()}
-									>
-										Retry
-									</Button>
-								) : null}
-							</div>
-							<div className="p-5">
-								{subscriptionUsageError ? (
-									<Alert variant="destructive">
-										<AlertTitle>Could not load usage</AlertTitle>
-									</Alert>
-								) : subscriptionUsage ? (
-									<div className="grid grid-cols-1 overflow-hidden rounded-lg border border-border sm:grid-cols-3">
-										<div className="flex flex-col gap-1 px-4 py-4">
-											<p className="text-xs font-medium text-muted-foreground">
-												Used
-											</p>
-											<p className="font-mono text-2xl font-semibold tabular-nums tracking-tight">
-												{subscriptionUsage.credits_used}
-											</p>
-										</div>
-										<div className="flex flex-col gap-1 border-border px-4 py-4 sm:border-l">
-											<p className="text-xs font-medium text-muted-foreground">
-												Remaining
-											</p>
-											<p className="font-mono text-2xl font-semibold tabular-nums tracking-tight">
-												{subscriptionUsage.remaining_credits}
-											</p>
-										</div>
-										<div className="flex flex-col gap-1 border-border px-4 py-4 sm:border-l">
-											<p className="text-xs font-medium text-muted-foreground">
-												Limit
-											</p>
-											<p className="font-mono text-2xl font-semibold tabular-nums tracking-tight">
-												{subscriptionUsage.credits_limit}
-											</p>
-										</div>
-									</div>
-								) : (
-									<p className="text-sm text-muted-foreground">
-										No active subscription — usage is empty for this business.
-									</p>
-								)}
-							</div>
-						</section>
-
-						<section className="overflow-hidden rounded-xl border border-border bg-card shadow-xs">
-							<div className="border-b border-border px-5 py-4">
-								<h2 className="text-base font-semibold tracking-tight">
-									Grant credits
-								</h2>
-								<p className="mt-0.5 text-sm text-muted-foreground">
-									Add credits to this business without checkout.
-								</p>
-							</div>
-							<div className="flex flex-col gap-4 p-5">
-								{grantBanner ? (
-									<Alert
-										variant={
-											grantBanner.variant === "destructive"
-												? "destructive"
-												: "default"
-										}
-									>
-										<AlertTitle>{grantBanner.title}</AlertTitle>
-										<AlertDescription>{grantBanner.message}</AlertDescription>
-									</Alert>
-								) : null}
-								<form
-									className="flex flex-col gap-4 sm:flex-row sm:items-end"
-									onSubmit={(e) => {
-										e.preventDefault();
-										void onGrantCredits();
-									}}
-								>
-									<FieldGroup className="flex-1">
-										<Field>
-											<FieldLabel htmlFor="business-grant-credits">
-												Credits to grant
-											</FieldLabel>
-											<Input
-												id="business-grant-credits"
-												name="credits"
-												type="text"
-												inputMode="numeric"
-												autoComplete="off"
-												placeholder="e.g. 500"
-												value={grantCreditsInput}
-												onChange={(e) => {
-													setGrantCreditsInput(e.target.value);
-													setGrantBanner(null);
-												}}
-											/>
-											<FieldDescription>
-												Whole number, minimum 1.
-											</FieldDescription>
-										</Field>
-									</FieldGroup>
-									<Button type="submit" disabled={!canGrantCredits}>
-										{grantingCredits ? (
-											<Loader2Icon
-												data-icon="inline-start"
-												className="animate-spin"
-												aria-hidden
-											/>
-										) : null}
-										{grantingCredits ? "Granting…" : "Grant credits"}
-									</Button>
-								</form>
-							</div>
-						</section>
-
-						<section className="overflow-hidden rounded-xl border border-border bg-card shadow-xs">
-							<div className="border-b border-border px-5 py-4">
-								<h2 className="text-base font-semibold tracking-tight">
-									Manual subscription
-								</h2>
-								<p className="mt-0.5 text-sm text-muted-foreground">
-									Assign a plan without Chapa checkout.
-								</p>
-							</div>
-							<div className="flex flex-col gap-4 p-5">
-								{manualBanner ? (
-									<Alert
-										variant={
-											manualBanner.variant === "destructive"
-												? "destructive"
-												: "default"
-										}
-									>
-										<AlertTitle>{manualBanner.title}</AlertTitle>
-										<AlertDescription>{manualBanner.message}</AlertDescription>
-									</Alert>
-								) : null}
-								<form
-									className="flex flex-col gap-4 sm:flex-row sm:items-end"
-									onSubmit={(e) => {
-										e.preventDefault();
-										void onManualAssign();
-									}}
-								>
-									<FieldGroup className="flex-1">
-										<Field>
-											<FieldLabel htmlFor="business-manual-plan">Plan</FieldLabel>
-											<Select
-												value={manualPlanId}
-												onValueChange={(value) => {
-													setManualPlanId(value ?? "");
-													setManualBanner(null);
-												}}
-											>
-												<SelectTrigger id="business-manual-plan" className="w-full">
-													<SelectValue placeholder="Select a plan…">
-														{manualPlanId
-															? subscriptionPlanById.get(manualPlanId)?.name
-															: undefined}
-													</SelectValue>
-												</SelectTrigger>
-												<SelectContent>
-													{(subscriptionPlans ?? [])
-														.filter((p) => !p.is_archived)
-														.map((p) => (
-															<SelectItem key={p.id} value={p.id}>
-																{p.name}
-															</SelectItem>
-														))}
-												</SelectContent>
-											</Select>
-										</Field>
-									</FieldGroup>
-									<Button type="submit" disabled={!canManualAssign}>
-										{assigningSubscription ? (
-											<Loader2Icon
-												data-icon="inline-start"
-												className="animate-spin"
-												aria-hidden
-											/>
-										) : null}
-										{assigningSubscription ? "Assigning…" : "Assign plan"}
-									</Button>
-								</form>
-							</div>
-						</section>
-
-						<section className="overflow-hidden rounded-xl border border-border bg-card shadow-xs">
-							<div className="flex flex-col gap-2 border-b border-border px-5 py-4 sm:flex-row sm:items-start sm:justify-between">
-								<div>
-									<h2 className="text-base font-semibold tracking-tight">
-										History
-									</h2>
-									<p className="mt-0.5 text-sm text-muted-foreground">
-										Past and current subscription records
-									</p>
-								</div>
-								{subscriptionHistoryError ? (
-									<Button
-										type="button"
-										variant="outline"
-										size="sm"
-										onClick={() => refetchSubscriptionHistory()}
-									>
-										Retry
-									</Button>
-								) : null}
-							</div>
-							<div className="p-5">
-								{subscriptionHistoryError ? (
-									<Alert variant="destructive">
-										<AlertTitle>Couldn’t load history</AlertTitle>
-										<AlertDescription className="wrap-break-word">
+					{billingPane === "history" ? (
+						<div className="flex flex-col gap-3">
+							{subscriptionHistoryError ? (
+								<Alert variant="destructive">
+									<AlertTitle>Couldn’t load history</AlertTitle>
+									<AlertDescription className="flex flex-wrap items-center gap-2">
+										<span className="wrap-break-word">
 											{getErrorMessage(
 												subscriptionHistoryError,
 												"Request failed.",
 											)}
-										</AlertDescription>
-									</Alert>
-								) : subscriptionHistoryLoading || subscriptionHistoryFetching ? (
-									<div className="flex flex-col gap-2">
-										{Array.from({ length: 5 }).map((_, i) => (
-											<Skeleton key={i} className="h-10 w-full" />
-										))}
-									</div>
-								) : (
-									<div className="overflow-x-auto rounded-lg border border-border">
-										<Table aria-label="Subscription history">
-											<TableHeader>
+										</span>
+										<Button
+											type="button"
+											variant="outline"
+											size="sm"
+											onClick={() => refetchSubscriptionHistory()}
+										>
+											Retry
+										</Button>
+									</AlertDescription>
+								</Alert>
+							) : subscriptionHistoryLoading || subscriptionHistoryFetching ? (
+								<div className="flex flex-col gap-2">
+									{Array.from({ length: 5 }).map((_, i) => (
+										<Skeleton key={i} className="h-10 w-full" />
+									))}
+								</div>
+							) : (
+								<div className="overflow-x-auto rounded-xl border border-border">
+									<Table aria-label="Subscription history">
+										<TableHeader>
+											<TableRow>
+												<TableHead>Plan</TableHead>
+												<TableHead>Status</TableHead>
+												<TableHead>Started</TableHead>
+												<TableHead>Ended</TableHead>
+												<TableHead className="hidden lg:table-cell">
+													Chapa reference
+												</TableHead>
+											</TableRow>
+										</TableHeader>
+										<TableBody>
+											{(subscriptionHistory ?? []).length === 0 ? (
 												<TableRow>
-													<TableHead>Plan</TableHead>
-													<TableHead>Status</TableHead>
-													<TableHead>Started</TableHead>
-													<TableHead>Ended</TableHead>
-													<TableHead className="hidden lg:table-cell">
-														Chapa reference
-													</TableHead>
+													<TableCell
+														colSpan={5}
+														className="py-10 text-center text-sm text-muted-foreground"
+													>
+														No subscription history for this business.
+													</TableCell>
 												</TableRow>
-											</TableHeader>
-											<TableBody>
-												{(subscriptionHistory ?? []).length === 0 ? (
-													<TableRow>
-														<TableCell
-															colSpan={5}
-															className="py-10 text-center text-sm text-muted-foreground"
-														>
-															No subscription history for this business.
+											) : (
+												(subscriptionHistory ?? []).map(
+													(row: SubscriptionOutput) => (
+														<TableRow key={row.id}>
+															<TableCell className="font-medium">
+																{getSubscriptionPlanLabel(
+																	null,
+																	row.plan_id
+																		? subscriptionPlanById.get(row.plan_id)
+																				?.name
+																		: null,
+																)}
+															</TableCell>
+															<TableCell>
+																<Badge
+																	variant={subscriptionBadgeVariant(
+																		row.status,
+																	)}
+																	className="font-normal capitalize"
+																>
+																	{getSubscriptionStatusLabel(row.status)}
+																</Badge>
+															</TableCell>
+															<TableCell className="font-mono text-sm whitespace-nowrap tabular-nums">
+																{formatDateTime(row.started_at)}
+															</TableCell>
+															<TableCell className="font-mono text-sm whitespace-nowrap tabular-nums">
+																{formatDateTime(row.ended_at)}
+															</TableCell>
+															<TableCell className="hidden max-w-48 truncate font-mono text-xs lg:table-cell">
+																{row.chapa_transaction_reference ?? "—"}
+															</TableCell>
+														</TableRow>
+													),
+												)
+											)}
+										</TableBody>
+									</Table>
+								</div>
+							)}
+						</div>
+					) : null}
+
+					{billingPane === "payments" ? (
+						<BusinessPaymentsTab businessId={businessId} />
+					) : null}
+
+					{billingPane === "banks" ? (
+						<div className="flex flex-col gap-3">
+							{bankAccountsError ? (
+								<Alert variant="destructive">
+									<AlertTitle>Failed to load bank accounts</AlertTitle>
+									<AlertDescription className="flex flex-wrap items-center gap-2">
+										<span className="wrap-break-word">Request failed.</span>
+										<Button
+											type="button"
+											variant="outline"
+											size="sm"
+											onClick={() => refetchBankAccounts()}
+										>
+											Try again
+										</Button>
+									</AlertDescription>
+								</Alert>
+							) : null}
+							{bankAccountsLoading ? (
+								<div className="flex flex-col gap-2">
+									{Array.from({ length: 4 }).map((_, i) => (
+										<Skeleton key={i} className="h-10 w-full" />
+									))}
+								</div>
+							) : (
+								<div className="overflow-x-auto rounded-xl border border-border">
+									<Table>
+										<TableHeader>
+											<TableRow>
+												<TableHead>Bank</TableHead>
+												<TableHead>Account name</TableHead>
+												<TableHead>Account number</TableHead>
+												<TableHead>Status</TableHead>
+											</TableRow>
+										</TableHeader>
+										<TableBody>
+											{(bankAccounts ?? []).length === 0 ? (
+												<TableRow>
+													<TableCell
+														colSpan={4}
+														className="py-10 text-center text-sm text-muted-foreground"
+													>
+														No bank accounts linked to this business.
+													</TableCell>
+												</TableRow>
+											) : (
+												(bankAccounts ?? []).map((account: BankAccountResponse) => (
+													<TableRow
+														key={`${account.bank_name}-${account.account_number}-${account.account_name}`}
+													>
+														<TableCell className="font-medium">
+															{account.bank_name}
+														</TableCell>
+														<TableCell>{account.account_name}</TableCell>
+														<TableCell className="font-mono text-sm">
+															{account.account_number}
+														</TableCell>
+														<TableCell>
+															<Badge
+																variant={
+																	account.is_archived ? "secondary" : "default"
+																}
+															>
+																{account.is_archived ? "Archived" : "Active"}
+															</Badge>
 														</TableCell>
 													</TableRow>
-												) : (
-													(subscriptionHistory ?? []).map(
-														(row: SubscriptionOutput) => (
-															<TableRow key={row.id}>
-																<TableCell className="font-medium">
-																	{getSubscriptionPlanLabel(
-																		null,
-																		row.plan_id
-																			? subscriptionPlanById.get(row.plan_id)
-																					?.name
-																			: null,
-																	)}
-																</TableCell>
-																<TableCell>
-																	<Badge variant="outline">{row.status}</Badge>
-																</TableCell>
-																<TableCell className="font-mono text-sm whitespace-nowrap tabular-nums">
-																	{formatDateTime(row.started_at)}
-																</TableCell>
-																<TableCell className="font-mono text-sm whitespace-nowrap tabular-nums">
-																	{formatDateTime(row.ended_at)}
-																</TableCell>
-																<TableCell className="hidden max-w-48 truncate font-mono text-xs lg:table-cell">
-																	{row.chapa_transaction_reference ?? "—"}
-																</TableCell>
-															</TableRow>
-														),
-													)
-												)}
-											</TableBody>
-										</Table>
-									</div>
-								)}
-							</div>
-						</section>
-					</div>
+												))
+											)}
+										</TableBody>
+									</Table>
+								</div>
+							)}
+						</div>
+					) : null}
 				</TabsContent>
 			</Tabs>
 		</div>

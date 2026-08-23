@@ -109,7 +109,7 @@ export function BusinessPaymentsTab({ businessId }: BusinessPaymentsTabProps) {
 
 	return (
 		<div className="flex flex-col gap-4">
-			<div className="flex flex-col gap-4 rounded-xl border border-border bg-card p-4 shadow-xs sm:flex-row sm:flex-wrap sm:items-end">
+			<div className="flex flex-col gap-4 rounded-xl border border-border p-4 sm:flex-row sm:flex-wrap sm:items-end">
 				<Field className="min-w-40 flex-1">
 					<FieldLabel>Date range</FieldLabel>
 					<Select
@@ -174,27 +174,27 @@ export function BusinessPaymentsTab({ businessId }: BusinessPaymentsTabProps) {
 				</Alert>
 			) : null}
 
-			<div className="grid grid-cols-1 overflow-hidden rounded-xl border border-border bg-card shadow-xs sm:grid-cols-3">
-				<div className="flex flex-col gap-1 px-5 py-4">
-					<p className="text-xs font-medium text-muted-foreground">
+			<div className="grid grid-cols-1 overflow-hidden rounded-xl border border-border sm:grid-cols-3">
+				<div className="flex flex-col gap-1 px-4 py-3.5">
+					<p className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
 						Transactions
 					</p>
 					{listBusy ? (
-						<Skeleton className="mt-1 h-8 w-16" />
+						<Skeleton className="mt-1 h-5 w-16" />
 					) : (
-						<p className="font-mono text-2xl font-semibold tabular-nums tracking-tight">
+						<p className="font-mono text-sm font-medium tabular-nums tracking-tight">
 							{stats.total.toLocaleString()}
 						</p>
 					)}
 				</div>
-				<div className="flex flex-col gap-1 border-border px-5 py-4 sm:border-l">
-					<p className="text-xs font-medium text-muted-foreground">
+				<div className="flex flex-col gap-1 border-border px-4 py-3.5 sm:border-l">
+					<p className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
 						Total amount
 					</p>
 					{listBusy ? (
-						<Skeleton className="mt-1 h-8 w-28" />
+						<Skeleton className="mt-1 h-5 w-28" />
 					) : (
-						<p className="font-mono text-2xl font-semibold tabular-nums tracking-tight">
+						<p className="font-mono text-sm font-medium tabular-nums tracking-tight">
 							{stats.currency}{" "}
 							{stats.volume.toLocaleString(undefined, {
 								maximumFractionDigits: 0,
@@ -202,37 +202,37 @@ export function BusinessPaymentsTab({ businessId }: BusinessPaymentsTabProps) {
 						</p>
 					)}
 				</div>
-				<div className="flex flex-col gap-1 border-border px-5 py-4 sm:border-l">
-					<p className="text-xs font-medium text-muted-foreground">
+				<div className="flex flex-col gap-1 border-border px-4 py-3.5 sm:border-l">
+					<p className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
 						Success rate
 					</p>
 					{listBusy ? (
-						<Skeleton className="mt-1 h-8 w-16" />
+						<Skeleton className="mt-1 h-5 w-16" />
 					) : (
-						<p className="font-mono text-2xl font-semibold tabular-nums tracking-tight">
+						<p className="font-mono text-sm font-medium tabular-nums tracking-tight">
 							{stats.successRate}%
 						</p>
 					)}
 				</div>
 			</div>
 
-			<section className="overflow-hidden rounded-xl border border-border bg-card shadow-xs">
-				<div className="border-b border-border px-5 py-3">
-					<h2 className="text-base font-semibold tracking-tight">
+			<section className="overflow-hidden rounded-xl border border-border">
+				<div className="border-b border-border px-4 py-3">
+					<h2 className="text-sm font-semibold tracking-tight">
 						Verified payments
 					</h2>
-					<p className="mt-0.5 text-sm text-muted-foreground">
+					<p className="text-xs text-muted-foreground">
 						{getDateRangeLabel(datePreset)}
 						{statusFilter !== "all"
 							? ` · ${getStatusFilterLabel(statusFilter)}`
 							: ""}
 					</p>
 				</div>
-				<div className="p-4 sm:p-5">
+				<div className="overflow-x-auto">
 					{listBusy ? (
-						<div className="flex flex-col gap-2">
+						<div className="flex flex-col gap-2 p-4">
 							{Array.from({ length: 5 }).map((_, i) => (
-								<Skeleton key={i} className="h-12 w-full" />
+								<Skeleton key={i} className="h-10 w-full" />
 							))}
 						</div>
 					) : filteredRows.length === 0 ? (
@@ -240,27 +240,25 @@ export function BusinessPaymentsTab({ businessId }: BusinessPaymentsTabProps) {
 							No verified payments found for this period.
 						</p>
 					) : (
-						<div className="overflow-x-auto rounded-lg border border-border">
-							<Table>
-								<TableHeader>
-									<TableRow>
-										<TableHead>Reference</TableHead>
-										<TableHead>Amount</TableHead>
-										<TableHead>Status</TableHead>
-										<TableHead>Sender name</TableHead>
-										<TableHead>Sender bank account</TableHead>
-										<TableHead>Receiving bank name</TableHead>
-										<TableHead>Receiving bank account</TableHead>
-										<TableHead>Receipt</TableHead>
-									</TableRow>
-								</TableHeader>
-								<TableBody>
-									{filteredRows.map((row) => (
-										<PaymentRow key={row.id} row={row} />
-									))}
-								</TableBody>
-							</Table>
-						</div>
+						<Table>
+							<TableHeader>
+								<TableRow>
+									<TableHead>Reference</TableHead>
+									<TableHead>Amount</TableHead>
+									<TableHead>Status</TableHead>
+									<TableHead>Sender name</TableHead>
+									<TableHead>Sender bank account</TableHead>
+									<TableHead>Receiving bank name</TableHead>
+									<TableHead>Receiving bank account</TableHead>
+									<TableHead>Receipt</TableHead>
+								</TableRow>
+							</TableHeader>
+							<TableBody>
+								{filteredRows.map((row) => (
+									<PaymentRow key={row.id} row={row} />
+								))}
+							</TableBody>
+						</Table>
 					)}
 				</div>
 			</section>
