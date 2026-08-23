@@ -6,6 +6,7 @@ import {
 	ChevronRightIcon,
 	CircleDollarSignIcon,
 	MessageSquareIcon,
+	ScrollTextIcon,
 	SettingsIcon,
 	UserCogIcon,
 } from "lucide-react";
@@ -43,6 +44,11 @@ const systemFlatLinks = [
 		name: "Staff management",
 		href: "/admin/platform-staff",
 		icon: UserCogIcon,
+	},
+	{
+		name: "Audit logs",
+		href: "/admin/audit-logs",
+		icon: ScrollTextIcon,
 	},
 	{ name: "Global settings", href: "/admin/settings", icon: SettingsIcon },
 	{

@@ -10,6 +10,9 @@ import {
 } from "lucide-react";
 
 import { useListAllUsersQuery } from "@/services/auth/authApi";
+import { useAdminUpdateSuperuserMutation } from "@/services/admin/adminApi";
+import { AdminCreateBusinessDialog } from "@/components/admin/admin-create-business-dialog";
+import { AdminCreateUserDialog } from "@/components/admin/admin-create-user-dialog";
 import { useListAllBusinessesQuery } from "@/services/branch-management/branchManagementApi";
 import { useListAdminSubscriptionTransactionsQuery } from "@/services/subscription/subscriptionApi";
 import { useListSubscriptionPlansQuery } from "@/services/subscription-plan/subscriptionPlanApi";
@@ -232,6 +235,8 @@ export default function TransactionsPage() {
 	// ponytail: client slice only; server page params when list endpoint grows large
 	const [page, setPage] = useState(1);
 	const [pageSize, setPageSize] = useState<PageSize>(20);
+	const [createUserOpen, setCreateUserOpen] = useState(false);
+	const [createBusinessOpen, setCreateBusinessOpen] = useState(false);
 
 	const { data: businesses, isLoading: businessesLoading } =
 		useListAllBusinessesQuery();
@@ -511,14 +516,40 @@ export default function TransactionsPage() {
 								staff, and subscription.
 							</p>
 						</div>
-						{summarySnapshot && !summaryBusy ? (
-							<p className="font-mono text-xs tabular-nums text-muted-foreground">
-								{filteredRows.length.toLocaleString()} shown ·{" "}
-								{summarySnapshot.totalOwners.toLocaleString()} total
-							</p>
-						) : null}
+						<div className="flex flex-wrap items-center gap-2">
+							<Button
+								type="button"
+								variant="outline"
+								size="sm"
+								onClick={() => setCreateUserOpen(true)}
+							>
+								Create user
+							</Button>
+							<Button
+								type="button"
+								size="sm"
+								onClick={() => setCreateBusinessOpen(true)}
+							>
+								Create business
+							</Button>
+							{summarySnapshot && !summaryBusy ? (
+								<p className="font-mono text-xs tabular-nums text-muted-foreground">
+									{filteredRows.length.toLocaleString()} shown ·{" "}
+									{summarySnapshot.totalOwners.toLocaleString()} total
+								</p>
+							) : null}
+						</div>
 					</div>
 				</div>
+
+				<AdminCreateUserDialog
+					open={createUserOpen}
+					onOpenChange={setCreateUserOpen}
+				/>
+				<AdminCreateBusinessDialog
+					open={createBusinessOpen}
+					onOpenChange={setCreateBusinessOpen}
+				/>
 
 				{error ? (
 					<Alert variant="destructive">
@@ -1027,6 +1058,23 @@ function OwnerRow({
 			? namesSummary
 			: "owner";
 	const dateLabel = formatSubscriptionDate(row.started_at ?? row.created_at);
+	const [updateSuperuser, { isLoading: togglingStaff }] =
+		useAdminUpdateSuperuserMutation();
+	const [staffError, setStaffError] = useState<string | null>(null);
+
+	async function onToggleStaff(e: React.MouseEvent) {
+		e.stopPropagation();
+		if (!ownerId || !owner) return;
+		setStaffError(null);
+		try {
+			await updateSuperuser({
+				userId: ownerId,
+				body: { is_superuser: !owner.is_superuser },
+			}).unwrap();
+		} catch (err: unknown) {
+			setStaffError(getErrorMessage(err, "Could not update staff flag."));
+		}
+	}
 
 	return (
 		<TableRow
@@ -1051,14 +1099,36 @@ function OwnerRow({
 						<Skeleton className="h-3 w-24" />
 					</div>
 				) : owner ? (
-					<div className="flex flex-col gap-0.5">
-						<span className="font-medium text-foreground">
-							{formatUserDisplayName(owner)}
-						</span>
+					<div className="flex flex-col gap-1">
+						<div className="flex flex-wrap items-center gap-2">
+							<span className="font-medium text-foreground">
+								{formatUserDisplayName(owner)}
+							</span>
+							{owner.is_superuser ? (
+								<Badge variant="secondary">Staff</Badge>
+							) : null}
+							<Button
+								type="button"
+								variant="ghost"
+								size="sm"
+								className="h-7 px-2 text-xs"
+								disabled={togglingStaff}
+								onClick={(e) => void onToggleStaff(e)}
+							>
+								{togglingStaff
+									? "…"
+									: owner.is_superuser
+										? "Remove staff"
+										: "Make staff"}
+							</Button>
+						</div>
 						{owner.phone_number ? (
 							<span className="font-mono text-xs tabular-nums text-muted-foreground">
 								{owner.phone_number}
 							</span>
+						) : null}
+						{staffError ? (
+							<span className="text-xs text-destructive">{staffError}</span>
 						) : null}
 					</div>
 				) : (

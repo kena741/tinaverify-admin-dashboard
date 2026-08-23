@@ -398,6 +398,37 @@ export type AdminGrantCreditsRequest = {
 	credits: number;
 };
 
+/** OpenAPI `AdminBusinessCreateSchema` — `POST /api/v1/admin/businesses` */
+export type AdminBusinessCreateRequest = {
+	name: string;
+	owner_id: UUID;
+	tin_number?: string | null;
+};
+
+/** OpenAPI `AdminManualSubscriptionSchema` — `POST /api/v1/admin/subscriptions` */
+export type AdminManualSubscriptionRequest = {
+	business_id: UUID;
+	plan_id: UUID;
+	amount?: number | null;
+};
+
+/** OpenAPI `UpdateSuperuserSchema` — `PATCH /api/v1/admin/users/{user_id}/superuser` */
+export type UpdateSuperuserRequest = {
+	is_superuser: boolean;
+};
+
+/** OpenAPI `AuditLogOutputSchema` — `GET /api/v1/admin/audit-logs` */
+export type AuditLogOutput = {
+	id: UUID;
+	admin_id: UUID;
+	action: string;
+	entity_type: string | null;
+	entity_id: UUID | null;
+	details: Record<string, unknown> | null;
+	ip_address: string | null;
+	created_at: string;
+};
+
 /** OpenAPI `SubscriptionOutputSchema` */
 export type SubscriptionOutput = {
 	id: UUID;

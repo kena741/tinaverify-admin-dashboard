@@ -12,6 +12,7 @@ import {
 	useGetSubscriptionUsageQuery,
 	useGrantSubscriptionCreditsMutation,
 } from "../../../services/subscription/subscriptionApi";
+import { useAdminAssignSubscriptionMutation } from "../../../services/admin/adminApi";
 import { useListSubscriptionPlansQuery } from "../../../services/subscription-plan/subscriptionPlanApi";
 import type { BusinessOutput, SubscriptionOutput } from "../../../services/types";
 
@@ -106,7 +107,7 @@ function parseAmount(raw: string): number | null {
 	return n;
 }
 
-type ActionTab = "standard" | "custom" | "grant";
+type ActionTab = "standard" | "custom" | "grant" | "manual";
 
 export default function SubscriptionPage() {
 	const [businessPopoverOpen, setBusinessPopoverOpen] = useState(false);
@@ -117,8 +118,13 @@ export default function SubscriptionPage() {
 	const [actionTab, setActionTab] = useState<ActionTab>("standard");
 	const [customAmount, setCustomAmount] = useState("");
 	const [grantCreditsInput, setGrantCreditsInput] = useState("");
+	const [manualPlanId, setManualPlanId] = useState("");
+	const [manualAmount, setManualAmount] = useState("");
 	const [actionError, setActionError] = useState<string | null>(null);
 	const [grantSuccess, setGrantSuccess] = useState<SubscriptionOutput | null>(null);
+	const [manualSuccess, setManualSuccess] = useState<SubscriptionOutput | null>(
+		null,
+	);
 
 	const {
 		data: businesses = [],
@@ -176,28 +182,41 @@ export default function SubscriptionPage() {
 		useCheckoutSubscriptionCustomMutation();
 	const [grantSubscriptionCredits, { isLoading: granting }] =
 		useGrantSubscriptionCreditsMutation();
+	const [assignSubscription, { isLoading: assigning }] =
+		useAdminAssignSubscriptionMutation();
 
 	const amountParsed = parseAmount(customAmount);
+	const manualAmountParsed = parseAmount(manualAmount);
+	const creditsParsed = Number.parseInt(grantCreditsInput.trim(), 10);
 	const canStandardCheckout =
 		Boolean(businessId && standardPlanId) &&
 		!paying &&
 		!customPaying &&
-		!granting;
+		!granting &&
+		!assigning;
 
 	const canCustomCheckout =
 		Boolean(businessId && amountParsed !== null) &&
 		!paying &&
 		!customPaying &&
-		!granting;
+		!granting &&
+		!assigning;
 
-	const creditsParsed = Number.parseInt(grantCreditsInput.trim(), 10);
 	const canGrantCredits =
 		Boolean(businessId) &&
 		Number.isFinite(creditsParsed) &&
 		creditsParsed >= 1 &&
 		!paying &&
 		!customPaying &&
-		!granting;
+		!granting &&
+		!assigning;
+
+	const canManualAssign =
+		Boolean(businessId && manualPlanId) &&
+		!paying &&
+		!customPaying &&
+		!granting &&
+		!assigning;
 
 	const onStandardCheckout = async () => {
 		setActionError(null);
@@ -257,6 +276,7 @@ export default function SubscriptionPage() {
 	const onGrantCredits = async () => {
 		setActionError(null);
 		setGrantSuccess(null);
+		setManualSuccess(null);
 		if (!businessId) {
 			setActionError("Select a business first.");
 			return;
@@ -279,11 +299,38 @@ export default function SubscriptionPage() {
 		}
 	};
 
+	const onManualAssign = async () => {
+		setActionError(null);
+		setGrantSuccess(null);
+		setManualSuccess(null);
+		if (!businessId) {
+			setActionError("Select a business first.");
+			return;
+		}
+		if (!manualPlanId) {
+			setActionError("Select a subscription plan.");
+			return;
+		}
+		try {
+			const out = await assignSubscription({
+				body: {
+					business_id: businessId,
+					plan_id: manualPlanId,
+					amount: manualAmountParsed,
+				},
+			}).unwrap();
+			setManualSuccess(out);
+			setManualAmount("");
+		} catch (e: unknown) {
+			setActionError(getErrorMessage(e, "Could not assign subscription."));
+		}
+	};
+
 	return (
 		<div className="flex flex-col gap-6">
 			<PageHeader
 				title="Subscription"
-				description="Choose a business, then subscribe at a plan's list price, open checkout for a payment amount (no plan required), or grant credits directly."
+				description="Choose a business, then subscribe at a plan's list price, open checkout, grant credits, or assign a subscription manually."
 			/>
 
 			{businessesError ? (
@@ -458,13 +505,15 @@ export default function SubscriptionPage() {
 							setActionTab(next);
 							setActionError(null);
 							if (next !== "grant") setGrantSuccess(null);
+							if (next !== "manual") setManualSuccess(null);
 						}}
 						className="flex w-full flex-col gap-4"
 					>
-						<TabsList className="grid h-auto w-full grid-cols-1 gap-1 sm:grid-cols-3">
+						<TabsList className="grid h-auto w-full grid-cols-1 gap-1 sm:grid-cols-4">
 							<TabsTrigger value="standard">Plan price</TabsTrigger>
 							<TabsTrigger value="custom">Custom amount</TabsTrigger>
 							<TabsTrigger value="grant">Grant credits</TabsTrigger>
+							<TabsTrigger value="manual">Manual assign</TabsTrigger>
 						</TabsList>
 
 						<TabsContent
@@ -666,6 +715,95 @@ export default function SubscriptionPage() {
 										<Loader2Icon className="animate-spin" aria-hidden="true" />
 									) : null}
 									{granting ? "Granting…" : "Grant credits"}
+								</Button>
+							</div>
+						</TabsContent>
+
+						<TabsContent
+							value="manual"
+							className="flex flex-col gap-4 outline-none"
+						>
+							<p className="text-sm text-muted-foreground">
+								Assign a plan to this business without Chapa checkout (admin
+								manual subscription).
+							</p>
+							<FieldGroup>
+								<Field>
+									<FieldLabel htmlFor="manual-plan">Plan</FieldLabel>
+									<Select
+										value={manualPlanId}
+										onValueChange={(value) => {
+											setManualPlanId(value ?? "");
+											setActionError(null);
+											setManualSuccess(null);
+										}}
+										disabled={!businessId || plansLoading || plansFetching}
+									>
+										<SelectTrigger id="manual-plan" className="w-full">
+											<SelectValue placeholder="Select a plan…">
+												{manualPlanId
+													? plansById.get(manualPlanId)?.name
+													: undefined}
+											</SelectValue>
+										</SelectTrigger>
+										<SelectContent>
+											<SelectGroup>
+												{plans
+													.filter((p) => !p.is_archived)
+													.map((p) => (
+														<SelectItem key={p.id} value={p.id}>
+															{p.name} • {moneyLabel(p.price)} •{" "}
+															{p.duration_days} days
+														</SelectItem>
+													))}
+											</SelectGroup>
+										</SelectContent>
+									</Select>
+								</Field>
+								<Field>
+									<FieldLabel htmlFor="manual-amount">
+										Amount (optional)
+									</FieldLabel>
+									<Input
+										id="manual-amount"
+										type="text"
+										inputMode="decimal"
+										placeholder="Leave blank for plan list price"
+										value={manualAmount}
+										onChange={(e) => {
+											setManualAmount(e.target.value);
+											setActionError(null);
+											setManualSuccess(null);
+										}}
+										disabled={!businessId}
+									/>
+								</Field>
+							</FieldGroup>
+							{manualSuccess ? (
+								<Alert>
+									<AlertTitle>Subscription assigned</AlertTitle>
+									<AlertDescription className="space-y-1">
+										<p>
+											Status: <strong>{manualSuccess.status}</strong>
+										</p>
+										<p className="font-mono text-xs text-muted-foreground">
+											Subscription ID: {manualSuccess.id}
+										</p>
+									</AlertDescription>
+								</Alert>
+							) : null}
+							{actionError && actionTab === "manual" ? (
+								<p className="text-sm text-destructive">{actionError}</p>
+							) : null}
+							<div className="flex justify-end">
+								<Button
+									onClick={() => void onManualAssign()}
+									disabled={!canManualAssign}
+								>
+									{assigning ? (
+										<Loader2Icon className="animate-spin" aria-hidden="true" />
+									) : null}
+									{assigning ? "Assigning…" : "Assign subscription"}
 								</Button>
 							</div>
 						</TabsContent>

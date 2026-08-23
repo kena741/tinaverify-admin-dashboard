@@ -68,6 +68,7 @@ import {
 	useGrantSubscriptionCreditsMutation,
 	useListSubscriptionHistoryQuery,
 } from "../../../../services/subscription/subscriptionApi";
+import { useAdminAssignSubscriptionMutation } from "../../../../services/admin/adminApi";
 import { useListSubscriptionPlansQuery } from "../../../../services/subscription-plan/subscriptionPlanApi";
 import type {
 	BankAccountResponse,
@@ -281,6 +282,8 @@ export default function BusinessDetailClient({
 		useUpdateEmployeeRoleMutation();
 	const [grantSubscriptionCredits, { isLoading: grantingCredits }] =
 		useGrantSubscriptionCreditsMutation();
+	const [assignSubscription, { isLoading: assigningSubscription }] =
+		useAdminAssignSubscriptionMutation();
 
 	const [activeDialogOpen, setActiveDialogOpen] = useState(false);
 	const [statusBanner, setStatusBanner] = useState<{
@@ -290,6 +293,12 @@ export default function BusinessDetailClient({
 	} | null>(null);
 	const [grantCreditsInput, setGrantCreditsInput] = useState("");
 	const [grantBanner, setGrantBanner] = useState<{
+		variant: "default" | "destructive";
+		title: string;
+		message: string;
+	} | null>(null);
+	const [manualPlanId, setManualPlanId] = useState("");
+	const [manualBanner, setManualBanner] = useState<{
 		variant: "default" | "destructive";
 		title: string;
 		message: string;
@@ -344,6 +353,39 @@ export default function BusinessDetailClient({
 				variant: "destructive",
 				title: "Grant failed",
 				message: getErrorMessage(err, "Could not grant credits."),
+			});
+		}
+	}
+
+	const canManualAssign = Boolean(manualPlanId) && !assigningSubscription;
+
+	async function onManualAssign() {
+		setManualBanner(null);
+		if (!manualPlanId) {
+			setManualBanner({
+				variant: "destructive",
+				title: "Plan required",
+				message: "Select a plan to assign.",
+			});
+			return;
+		}
+		try {
+			const out = await assignSubscription({
+				body: {
+					business_id: businessId,
+					plan_id: manualPlanId,
+				},
+			}).unwrap();
+			setManualBanner({
+				variant: "default",
+				title: "Subscription assigned",
+				message: `Subscription ${out.id} is now ${out.status}.`,
+			});
+		} catch (err) {
+			setManualBanner({
+				variant: "destructive",
+				title: "Assign failed",
+				message: getErrorMessage(err, "Could not assign subscription."),
 			});
 		}
 	}
@@ -1295,6 +1337,78 @@ export default function BusinessDetailClient({
 											/>
 										) : null}
 										{grantingCredits ? "Granting…" : "Grant credits"}
+									</Button>
+								</form>
+							</div>
+						</section>
+
+						<section className="overflow-hidden rounded-xl border border-border bg-card shadow-xs">
+							<div className="border-b border-border px-5 py-4">
+								<h2 className="text-base font-semibold tracking-tight">
+									Manual subscription
+								</h2>
+								<p className="mt-0.5 text-sm text-muted-foreground">
+									Assign a plan without Chapa checkout.
+								</p>
+							</div>
+							<div className="flex flex-col gap-4 p-5">
+								{manualBanner ? (
+									<Alert
+										variant={
+											manualBanner.variant === "destructive"
+												? "destructive"
+												: "default"
+										}
+									>
+										<AlertTitle>{manualBanner.title}</AlertTitle>
+										<AlertDescription>{manualBanner.message}</AlertDescription>
+									</Alert>
+								) : null}
+								<form
+									className="flex flex-col gap-4 sm:flex-row sm:items-end"
+									onSubmit={(e) => {
+										e.preventDefault();
+										void onManualAssign();
+									}}
+								>
+									<FieldGroup className="flex-1">
+										<Field>
+											<FieldLabel htmlFor="business-manual-plan">Plan</FieldLabel>
+											<Select
+												value={manualPlanId}
+												onValueChange={(value) => {
+													setManualPlanId(value ?? "");
+													setManualBanner(null);
+												}}
+											>
+												<SelectTrigger id="business-manual-plan" className="w-full">
+													<SelectValue placeholder="Select a plan…">
+														{manualPlanId
+															? subscriptionPlanById.get(manualPlanId)?.name
+															: undefined}
+													</SelectValue>
+												</SelectTrigger>
+												<SelectContent>
+													{(subscriptionPlans ?? [])
+														.filter((p) => !p.is_archived)
+														.map((p) => (
+															<SelectItem key={p.id} value={p.id}>
+																{p.name}
+															</SelectItem>
+														))}
+												</SelectContent>
+											</Select>
+										</Field>
+									</FieldGroup>
+									<Button type="submit" disabled={!canManualAssign}>
+										{assigningSubscription ? (
+											<Loader2Icon
+												data-icon="inline-start"
+												className="animate-spin"
+												aria-hidden
+											/>
+										) : null}
+										{assigningSubscription ? "Assigning…" : "Assign plan"}
 									</Button>
 								</form>
 							</div>

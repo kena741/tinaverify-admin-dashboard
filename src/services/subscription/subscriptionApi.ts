@@ -207,6 +207,7 @@ export const subscriptionApi = createApi({
 				{ type: "SubscriptionHistory" as const, id: businessId },
 				{ type: "SubscriptionUsage" as const, id: businessId },
 				{ type: "SubscriptionTransactions" as const, id: "LIST" },
+				{ type: "TransactionLogs" as const, id: "LIST" },
 			],
 		}),
 
