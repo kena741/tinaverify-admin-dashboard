@@ -7,6 +7,6 @@ services:
       dockerfile: Dockerfile
       args:
         NEXT_PUBLIC_BACKEND_BASE_URL: ${NEXT_PUBLIC_BACKEND_BASE_URL:?NEXT_PUBLIC_BACKEND_BASE_URL is required at image build time}
-    image: ${CLOUD_RUN_IMAGE:-tinaverify-fe:local}
+    image: ${CLOUD_RUN_IMAGE:-tinaverify-admin:local}
     ports:
       - "${HOST_PORT:-3000}:8080"
