@@ -401,7 +401,7 @@ export default function BusinessDetailClient({
 							type="button"
 							variant="outline"
 							size="sm"
-							onClick={() => router.push("/admin/transactions")}
+							onClick={() => router.push("/admin/owners")}
 						>
 							Back to owners
 						</Button>
@@ -446,7 +446,7 @@ export default function BusinessDetailClient({
 								type="button"
 								variant="outline"
 								size="sm"
-								onClick={() => router.push("/admin/transactions")}
+								onClick={() => router.push("/admin/owners")}
 							>
 								Back to owners
 							</Button>
@@ -474,7 +474,7 @@ export default function BusinessDetailClient({
 					type="button"
 					variant="ghost"
 					size="sm"
-					onClick={() => router.push("/admin/transactions")}
+					onClick={() => router.push("/admin/owners")}
 				>
 					<ArrowLeft data-icon="inline-start" />
 					Owners
@@ -649,7 +649,7 @@ export default function BusinessDetailClient({
 										<AlertDialogAction
 											onClick={async () => {
 												await deleteBusiness({ businessId }).unwrap();
-												router.push("/admin/transactions");
+												router.push("/admin/owners");
 											}}
 										>
 											Delete

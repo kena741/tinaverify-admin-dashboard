@@ -19,6 +19,7 @@ import {
 import { BrandLogo } from "@/components/brand-logo";
 import { ServiceManagementNav } from "@/components/admin/service-management-nav";
 import { SystemManagementNav } from "@/components/admin/system-management-nav";
+import { usePlatformAccess } from "@/hooks/use-platform-access";
 import {
 	adminNavButtonClass,
 	adminNavGroupLabelClass,
@@ -55,7 +56,7 @@ const systemAdminMainNav: NavItem[] = [
 ];
 
 const systemAdminUsersNav: NavItem[] = [
-	{ name: "Owners", href: "/admin/transactions", icon: Users },
+	{ name: "Owners", href: "/admin/owners", icon: Users },
 ];
 
 const branchAdminMainNav: NavItem[] = [
@@ -68,7 +69,7 @@ const branchAdminMainNav: NavItem[] = [
 ];
 
 const branchAdminUsersNav: NavItem[] = [
-	{ name: "Owners", href: "/admin/transactions", icon: Users },
+	{ name: "Owners", href: "/admin/owners", icon: Users },
 	{ name: "Staff", href: "/admin/staff", icon: UserRound },
 	{ name: "Subscription", href: "/admin/subscription", icon: BadgeCheck },
 	{ name: "Notifications", href: "/admin/notifications", icon: Bell },
@@ -89,8 +90,13 @@ export function AppSidebar({
 }: AppSidebarProps) {
 	const pathname = usePathname();
 	const { isMobile, setOpenMobile } = useSidebar();
-	const mainNav = isSystemAdmin ? systemAdminMainNav : branchAdminMainNav;
-	const usersNav = isSystemAdmin ? systemAdminUsersNav : branchAdminUsersNav;
+	const { canPath } = usePlatformAccess();
+	const mainNav = (isSystemAdmin ? systemAdminMainNav : branchAdminMainNav).filter(
+		(item) => !isSystemAdmin || canPath(item.href),
+	);
+	const usersNav = (isSystemAdmin ? systemAdminUsersNav : branchAdminUsersNav).filter(
+		(item) => !isSystemAdmin || canPath(item.href),
+	);
 
 	function renderNavItems(items: NavItem[]) {
 		return items.map((item) => {
@@ -152,23 +158,27 @@ export function AppSidebar({
 				/>
 			</SidebarHeader>
 			<SidebarContent className="gap-4 px-2 py-4 group-data-[collapsible=icon]:px-2 group-data-[collapsible=icon]:pr-3">
-				<SidebarGroup className="p-0 group-data-[collapsible=icon]:p-0">
-					<SidebarGroupContent className="group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:flex-col group-data-[collapsible=icon]:items-center">
-						<SidebarMenu className="gap-0.5 group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:gap-1.5">
-							{renderNavItems(mainNav)}
-						</SidebarMenu>
-					</SidebarGroupContent>
-				</SidebarGroup>
-				<SidebarGroup className="p-0 group-data-[collapsible=icon]:p-0">
-					<SidebarGroupLabel className={adminNavGroupLabelClass()}>
-						Users
-					</SidebarGroupLabel>
-					<SidebarGroupContent className="group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:flex-col group-data-[collapsible=icon]:items-center">
-						<SidebarMenu className="gap-0.5 group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:gap-1.5">
-							{renderNavItems(usersNav)}
-						</SidebarMenu>
-					</SidebarGroupContent>
-				</SidebarGroup>
+				{mainNav.length > 0 ? (
+					<SidebarGroup className="p-0 group-data-[collapsible=icon]:p-0">
+						<SidebarGroupContent className="group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:flex-col group-data-[collapsible=icon]:items-center">
+							<SidebarMenu className="gap-0.5 group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:gap-1.5">
+								{renderNavItems(mainNav)}
+							</SidebarMenu>
+						</SidebarGroupContent>
+					</SidebarGroup>
+				) : null}
+				{usersNav.length > 0 ? (
+					<SidebarGroup className="p-0 group-data-[collapsible=icon]:p-0">
+						<SidebarGroupLabel className={adminNavGroupLabelClass()}>
+							Users
+						</SidebarGroupLabel>
+						<SidebarGroupContent className="group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:flex-col group-data-[collapsible=icon]:items-center">
+							<SidebarMenu className="gap-0.5 group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:gap-1.5">
+								{renderNavItems(usersNav)}
+							</SidebarMenu>
+						</SidebarGroupContent>
+					</SidebarGroup>
+				) : null}
 				{isSystemAdmin ? (
 					<>
 						<ServiceManagementNav pathname={pathname ?? ""} />
@@ -196,7 +206,8 @@ export function AppSidebar({
 							{userName}
 						</p>
 						<p className="truncate text-xs text-muted-foreground">
-							{userEmail || roleLabel}
+							{roleLabel}
+							{userEmail ? ` · ${userEmail}` : ""}
 						</p>
 					</div>
 				</Link>

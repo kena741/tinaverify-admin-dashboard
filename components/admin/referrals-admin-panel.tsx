@@ -96,7 +96,7 @@ export function ReferralsAdminPanel({ embedded = false }: ReferralsAdminPanelPro
 		isLoading: commissionLoading,
 		error: commissionError,
 		refetch: refetchCommission,
-	} = useGetReferralCommissionRateQuery();
+	} = useGetReferralCommissionRateQuery(undefined, { skip: embedded });
 
 	const [createCampaign, createCampaignState] = useCreateReferralCampaignMutation();
 	const [updateCommissionRate, updateCommissionState] =
@@ -112,10 +112,10 @@ export function ReferralsAdminPanel({ embedded = false }: ReferralsAdminPanelPro
 	const [commissionFormError, setCommissionFormError] = useState("");
 
 	useEffect(() => {
-		if (commissionEditOpen && commissionRateData) {
+		if (!embedded && commissionEditOpen && commissionRateData) {
 			setCommissionPercentInput(String(commissionRateData.commission_rate * 100));
 		}
-	}, [commissionEditOpen, commissionRateData]);
+	}, [embedded, commissionEditOpen, commissionRateData]);
 
 	const stats = useMemo(() => {
 		const rows = performance ?? [];
@@ -205,56 +205,60 @@ export function ReferralsAdminPanel({ embedded = false }: ReferralsAdminPanelPro
 				/>
 			)}
 
-			<Card className="shadow-sm">
-				<CardHeader className="flex flex-row items-center justify-between gap-4 space-y-0">
-					<div className="flex items-center gap-3">
-						<div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-brand-ink">
-							<PercentIcon className="size-5" aria-hidden />
+			{!embedded ? (
+				<Card className="shadow-sm">
+					<CardHeader className="flex flex-row items-center justify-between gap-4 space-y-0">
+						<div className="flex items-center gap-3">
+							<div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-brand-ink">
+								<PercentIcon className="size-5" aria-hidden />
+							</div>
+							<div>
+								<CardTitle>Commission rate</CardTitle>
+								<p className="text-sm text-muted-foreground">
+									Percentage of subscription revenue awarded to referrers.
+								</p>
+							</div>
 						</div>
-						<div>
-							<CardTitle>Commission rate</CardTitle>
-							<p className="text-sm text-muted-foreground">
-								Percentage of subscription revenue awarded to referrers.
+						<Button
+							type="button"
+							variant="outline"
+							size="sm"
+							onClick={() => setCommissionEditOpen(true)}
+							disabled={commissionLoading}
+						>
+							Edit rate
+						</Button>
+					</CardHeader>
+					<CardContent>
+						{commissionError ? (
+							<Alert variant="destructive">
+								<AlertTitle>Failed to load commission rate</AlertTitle>
+								<AlertDescription className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+									<span className="wrap-break-word">
+										{getErrorMessage(commissionError, "Request failed.")}
+									</span>
+									<Button
+										type="button"
+										variant="outline"
+										size="sm"
+										onClick={() => refetchCommission()}
+									>
+										Try again
+									</Button>
+								</AlertDescription>
+							</Alert>
+						) : commissionLoading ? (
+							<Skeleton className="h-10 w-32" />
+						) : (
+							<p className="text-3xl font-semibold tabular-nums">
+								{formatCommissionPercent(
+									commissionRateData?.commission_rate ?? 0,
+								)}
 							</p>
-						</div>
-					</div>
-					<Button
-						type="button"
-						variant="outline"
-						size="sm"
-						onClick={() => setCommissionEditOpen(true)}
-						disabled={commissionLoading}
-					>
-						Edit rate
-					</Button>
-				</CardHeader>
-				<CardContent>
-					{commissionError ? (
-						<Alert variant="destructive">
-							<AlertTitle>Failed to load commission rate</AlertTitle>
-							<AlertDescription className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-								<span className="wrap-break-word">
-									{getErrorMessage(commissionError, "Request failed.")}
-								</span>
-								<Button
-									type="button"
-									variant="outline"
-									size="sm"
-									onClick={() => refetchCommission()}
-								>
-									Try again
-								</Button>
-							</AlertDescription>
-						</Alert>
-					) : commissionLoading ? (
-						<Skeleton className="h-10 w-32" />
-					) : (
-						<p className="text-3xl font-semibold tabular-nums">
-							{formatCommissionPercent(commissionRateData?.commission_rate ?? 0)}
-						</p>
-					)}
-				</CardContent>
-			</Card>
+						)}
+					</CardContent>
+				</Card>
+			) : null}
 
 			<div className="grid gap-4 sm:grid-cols-3">
 				<StatCard
@@ -437,73 +441,82 @@ export function ReferralsAdminPanel({ embedded = false }: ReferralsAdminPanelPro
 				</DialogContent>
 			</Dialog>
 
-			<Dialog
-				open={commissionEditOpen}
-				onOpenChange={(open) => {
-					setCommissionEditOpen(open);
-					if (!open) setCommissionFormError("");
-				}}
-			>
-				<DialogContent className="sm:max-w-md">
-					<DialogHeader>
-						<DialogTitle>Update commission rate</DialogTitle>
-						<DialogDescription>
-							Set the percentage of the subscription amount awarded to the referrer.
-						</DialogDescription>
-					</DialogHeader>
+			{!embedded ? (
+				<Dialog
+					open={commissionEditOpen}
+					onOpenChange={(open) => {
+						setCommissionEditOpen(open);
+						if (!open) setCommissionFormError("");
+					}}
+				>
+					<DialogContent className="sm:max-w-md">
+						<DialogHeader>
+							<DialogTitle>Update commission rate</DialogTitle>
+							<DialogDescription>
+								Set the percentage of the subscription amount awarded to the
+								referrer.
+							</DialogDescription>
+						</DialogHeader>
 
-					<form onSubmit={handleUpdateCommission} className="flex flex-col gap-4">
-						{commissionFormError ? (
-							<Alert variant="destructive">
-								<AlertTitle>Could not update rate</AlertTitle>
-								<AlertDescription>{commissionFormError}</AlertDescription>
-							</Alert>
-						) : null}
+						<form
+							onSubmit={handleUpdateCommission}
+							className="flex flex-col gap-4"
+						>
+							{commissionFormError ? (
+								<Alert variant="destructive">
+									<AlertTitle>Could not update rate</AlertTitle>
+									<AlertDescription>{commissionFormError}</AlertDescription>
+								</Alert>
+							) : null}
 
-						<FieldGroup>
-							<Field>
-								<FieldLabel htmlFor="commission-percent">Commission (%)</FieldLabel>
-								<Input
-									id="commission-percent"
-									type="number"
-									min={0}
-									max={100}
-									step={0.1}
-									value={commissionPercentInput}
-									onChange={(e) => setCommissionPercentInput(e.target.value)}
-									placeholder="10"
-									required
-									autoFocus
-								/>
-								<FieldDescription>
-									For example, enter 10 for a 10% commission on each subscription.
-								</FieldDescription>
-							</Field>
-						</FieldGroup>
-
-						<DialogFooter>
-							<Button
-								type="button"
-								variant="outline"
-								onClick={() => setCommissionEditOpen(false)}
-								disabled={updateCommissionState.isLoading}
-							>
-								Cancel
-							</Button>
-							<Button type="submit" disabled={updateCommissionState.isLoading}>
-								{updateCommissionState.isLoading && (
-									<Loader2Icon
-										data-icon="inline-start"
-										className="animate-spin"
-										aria-hidden
+							<FieldGroup>
+								<Field>
+									<FieldLabel htmlFor="commission-percent">
+										Commission (%)
+									</FieldLabel>
+									<Input
+										id="commission-percent"
+										type="number"
+										min={0}
+										max={100}
+										step={0.1}
+										value={commissionPercentInput}
+										onChange={(e) => setCommissionPercentInput(e.target.value)}
+										placeholder="10"
+										required
+										autoFocus
 									/>
-								)}
-								{updateCommissionState.isLoading ? "Saving…" : "Save rate"}
-							</Button>
-						</DialogFooter>
-					</form>
-				</DialogContent>
-			</Dialog>
+									<FieldDescription>
+										For example, enter 10 for a 10% commission on each
+										subscription.
+									</FieldDescription>
+								</Field>
+							</FieldGroup>
+
+							<DialogFooter>
+								<Button
+									type="button"
+									variant="outline"
+									onClick={() => setCommissionEditOpen(false)}
+									disabled={updateCommissionState.isLoading}
+								>
+									Cancel
+								</Button>
+								<Button type="submit" disabled={updateCommissionState.isLoading}>
+									{updateCommissionState.isLoading && (
+										<Loader2Icon
+											data-icon="inline-start"
+											className="animate-spin"
+											aria-hidden
+										/>
+									)}
+									{updateCommissionState.isLoading ? "Saving…" : "Save rate"}
+								</Button>
+							</DialogFooter>
+						</form>
+					</DialogContent>
+				</Dialog>
+			) : null}
 		</div>
 	);
 }

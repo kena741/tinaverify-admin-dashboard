@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import {
 	BellIcon,
@@ -17,6 +17,7 @@ import {
 	SidebarProvider,
 	SidebarTrigger,
 } from "@/components/ui/sidebar";
+import { usePlatformAccess } from "@/hooks/use-platform-access";
 import { useAuth } from "../../store/useAuth";
 import { useAppSelector } from "../../store/hooks";
 import { selectAuthSessionPending } from "../../store/authSlice";
@@ -34,8 +35,16 @@ export default function AdminLayout({
 	children: React.ReactNode;
 }) {
 	const router = useRouter();
+	const pathname = usePathname();
 	const { user, logout, isSystemAdmin } = useAuth();
 	const sessionPending = useAppSelector(selectAuthSessionPending);
+	const {
+		roleLabel: platformRoleLabel,
+		canPath,
+		homePath,
+		isLoading: accessLoading,
+		isSystemAdmin: systemAdmin,
+	} = usePlatformAccess();
 	const [notificationsOpen, setNotificationsOpen] = useState(false);
 
 	useEffect(() => {
@@ -45,7 +54,24 @@ export default function AdminLayout({
 		}
 	}, [user, router, sessionPending]);
 
-	if (sessionPending || !user) {
+	useEffect(() => {
+		if (sessionPending || !user || accessLoading) return;
+		if (!systemAdmin) return;
+		if (!canPath(pathname ?? "/admin")) {
+			router.replace(homePath());
+		}
+	}, [
+		sessionPending,
+		user,
+		accessLoading,
+		systemAdmin,
+		canPath,
+		pathname,
+		homePath,
+		router,
+	]);
+
+	if (sessionPending || !user || (isSystemAdmin() && accessLoading)) {
 		return <AdminShellLoading />;
 	}
 
@@ -77,9 +103,11 @@ export default function AdminLayout({
 
 	const userName = user?.name || "User";
 	const userEmail = user?.email ?? "";
-	const roleLabel = isSystemAdmin()
-		? "System Administrator"
-		: user?.branchName || "Branch Staff";
+	const roleLabel =
+		platformRoleLabel ||
+		(isSystemAdmin()
+			? "System Administrator"
+			: user?.branchName || "Branch Staff");
 	const userInitials = getUserInitials(userName);
 
 	return (

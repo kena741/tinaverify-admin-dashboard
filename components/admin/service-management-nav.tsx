@@ -4,6 +4,7 @@ import Link from "next/link";
 import type { LucideIcon } from "lucide-react";
 import { ImageIcon, Share2Icon, TicketIcon } from "lucide-react";
 
+import { usePlatformAccess } from "@/hooks/use-platform-access";
 import { adminPathMatches } from "@/lib/admin-sidebar-path";
 import {
 	adminNavButtonClass,
@@ -32,6 +33,9 @@ const serviceLinks: {
 
 export function ServiceManagementNav({ pathname }: { pathname: string }) {
 	const { isMobile, setOpenMobile } = useSidebar();
+	const { canPath } = usePlatformAccess();
+	const links = serviceLinks.filter((item) => canPath(item.href));
+	if (links.length === 0) return null;
 
 	return (
 		<SidebarGroup className="p-0 group-data-[collapsible=icon]:p-0">
@@ -40,7 +44,7 @@ export function ServiceManagementNav({ pathname }: { pathname: string }) {
 			</SidebarGroupLabel>
 			<SidebarGroupContent>
 				<SidebarMenu className="gap-0.5">
-					{serviceLinks.map((item) => {
+					{links.map((item) => {
 						const isActive = adminPathMatches(pathname, item.href);
 						const Icon = item.icon;
 						return (

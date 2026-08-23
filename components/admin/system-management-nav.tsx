@@ -11,6 +11,7 @@ import {
 	UserCogIcon,
 } from "lucide-react";
 
+import { usePlatformAccess } from "@/hooks/use-platform-access";
 import {
 	adminPathMatches,
 	normalizeAdminPath,
@@ -65,14 +66,23 @@ function isGlobalSettingsActive(pathname: string) {
 
 export function SystemManagementNav({ pathname }: { pathname: string }) {
 	const { isMobile, setOpenMobile } = useSidebar();
+	const { canPath } = usePlatformAccess();
+
+	const visibleFinance = financeLinks.filter((item) => canPath(item.href));
+	const visibleFlat = systemFlatLinks.filter((item) => canPath(item.href));
+	const showFinance = visibleFinance.length > 0;
+
 	const financeActive =
-		normalizeAdminPath(pathname).startsWith("/admin/finance") ||
-		financeLinks.some((item) => adminPathMatches(pathname, item.href));
+		showFinance &&
+		(normalizeAdminPath(pathname).startsWith("/admin/finance") ||
+			visibleFinance.some((item) => adminPathMatches(pathname, item.href)));
 	const [financeOpen, setFinanceOpen] = useState(financeActive);
 
 	useEffect(() => {
 		if (financeActive) setFinanceOpen(true);
 	}, [financeActive]);
+
+	if (!showFinance && visibleFlat.length === 0) return null;
 
 	return (
 		<SidebarGroup className="p-0 group-data-[collapsible=icon]:p-0">
@@ -81,56 +91,58 @@ export function SystemManagementNav({ pathname }: { pathname: string }) {
 			</SidebarGroupLabel>
 			<SidebarGroupContent>
 				<SidebarMenu className="gap-0.5">
-					<SidebarMenuItem>
-						<SidebarMenuButton
-							type="button"
-							isActive={financeActive}
-							tooltip="Finance"
-							className={adminNavButtonClass(financeActive)}
-							onClick={() => setFinanceOpen((open) => !open)}
-						>
-							<CircleDollarSignIcon />
-							<span>Finance</span>
-							<ChevronRightIcon
-								className={cn(
-									"ml-auto size-4! opacity-50 transition-transform",
-									financeOpen && "rotate-90",
-								)}
-								aria-hidden
-							/>
-						</SidebarMenuButton>
-						{financeOpen ? (
-							<SidebarMenuSub className="ml-3.5 border-l border-sidebar-border pl-2.5">
-								{financeLinks.map((item) => {
-									const isActive = adminPathMatches(pathname, item.href);
-									return (
-										<SidebarMenuSubItem key={item.href}>
-											<SidebarMenuSubButton
-												isActive={isActive}
-												className={cn(
-													"h-8 rounded-md text-sidebar-foreground/75 hover:bg-primary/10 hover:text-sidebar-foreground",
-													isActive &&
-														"bg-primary/15 font-medium text-brand-ink",
-												)}
-												render={
-													<Link
-														href={item.href}
-														onClick={() => {
-															if (isMobile) setOpenMobile(false);
-														}}
-													/>
-												}
-											>
-												<span>{item.name}</span>
-											</SidebarMenuSubButton>
-										</SidebarMenuSubItem>
-									);
-								})}
-							</SidebarMenuSub>
-						) : null}
-					</SidebarMenuItem>
+					{showFinance ? (
+						<SidebarMenuItem>
+							<SidebarMenuButton
+								type="button"
+								isActive={financeActive}
+								tooltip="Finance"
+								className={adminNavButtonClass(financeActive)}
+								onClick={() => setFinanceOpen((open) => !open)}
+							>
+								<CircleDollarSignIcon />
+								<span>Finance</span>
+								<ChevronRightIcon
+									className={cn(
+										"ml-auto size-4! opacity-50 transition-transform",
+										financeOpen && "rotate-90",
+									)}
+									aria-hidden
+								/>
+							</SidebarMenuButton>
+							{financeOpen ? (
+								<SidebarMenuSub className="ml-3.5 border-l border-sidebar-border pl-2.5">
+									{visibleFinance.map((item) => {
+										const isActive = adminPathMatches(pathname, item.href);
+										return (
+											<SidebarMenuSubItem key={item.href}>
+												<SidebarMenuSubButton
+													isActive={isActive}
+													className={cn(
+														"h-8 rounded-md text-sidebar-foreground/75 hover:bg-primary/10 hover:text-sidebar-foreground",
+														isActive &&
+															"bg-primary/15 font-medium text-brand-ink",
+													)}
+													render={
+														<Link
+															href={item.href}
+															onClick={() => {
+																if (isMobile) setOpenMobile(false);
+															}}
+														/>
+													}
+												>
+													<span>{item.name}</span>
+												</SidebarMenuSubButton>
+											</SidebarMenuSubItem>
+										);
+									})}
+								</SidebarMenuSub>
+							) : null}
+						</SidebarMenuItem>
+					) : null}
 
-					{systemFlatLinks.map((item) => {
+					{visibleFlat.map((item) => {
 						const isActive =
 							item.href === "/admin/settings"
 								? isGlobalSettingsActive(pathname)

@@ -7,10 +7,10 @@ import {
 	ArrowDownIcon,
 	ArrowUpIcon,
 	ArrowUpDownIcon,
+	ChevronRightIcon,
 } from "lucide-react";
 
 import { useListAllUsersQuery } from "@/services/auth/authApi";
-import { useAdminUpdateSuperuserMutation } from "@/services/admin/adminApi";
 import { AdminCreateBusinessDialog } from "@/components/admin/admin-create-business-dialog";
 import { AdminCreateUserDialog } from "@/components/admin/admin-create-user-dialog";
 import { useListAllBusinessesQuery } from "@/services/branch-management/branchManagementApi";
@@ -584,7 +584,7 @@ export default function TransactionsPage() {
 								Platform owners
 							</p>
 							<p className="admin-brand-band-muted">
-								People who operate businesses on Zulu Dine
+								People who operate businesses on Tina Verify
 							</p>
 						</div>
 						{summaryBusy ? (
@@ -932,6 +932,9 @@ export default function TransactionsPage() {
 											sortDir={sortDir}
 											onSort={toggleSort}
 										/>
+										<TableHead className="w-8">
+											<span className="sr-only">Open</span>
+										</TableHead>
 									</TableRow>
 								</TableHeader>
 								<TableBody>
@@ -1052,29 +1055,15 @@ function OwnerRow({
 }) {
 	const count = ownerBusinesses.length;
 	const namesSummary = formatBusinessNames(ownerBusinesses);
-	const ownerLabel = owner
-		? formatUserDisplayName(owner)
+	const displayName = owner ? formatUserDisplayName(owner) : null;
+	const phone = owner?.phone_number?.trim() ?? "";
+	const showPhone = Boolean(displayName && phone && phone !== displayName);
+	const ownerLabel = displayName
+		? displayName
 		: namesSummary !== "—"
 			? namesSummary
 			: "owner";
 	const dateLabel = formatSubscriptionDate(row.started_at ?? row.created_at);
-	const [updateSuperuser, { isLoading: togglingStaff }] =
-		useAdminUpdateSuperuserMutation();
-	const [staffError, setStaffError] = useState<string | null>(null);
-
-	async function onToggleStaff(e: React.MouseEvent) {
-		e.stopPropagation();
-		if (!ownerId || !owner) return;
-		setStaffError(null);
-		try {
-			await updateSuperuser({
-				userId: ownerId,
-				body: { is_superuser: !owner.is_superuser },
-			}).unwrap();
-		} catch (err: unknown) {
-			setStaffError(getErrorMessage(err, "Could not update staff flag."));
-		}
-	}
 
 	return (
 		<TableRow
@@ -1098,37 +1087,18 @@ function OwnerRow({
 						<Skeleton className="h-4 w-28" />
 						<Skeleton className="h-3 w-24" />
 					</div>
-				) : owner ? (
-					<div className="flex flex-col gap-1">
+				) : owner && displayName ? (
+					<div className="flex flex-col gap-0.5">
 						<div className="flex flex-wrap items-center gap-2">
-							<span className="font-medium text-foreground">
-								{formatUserDisplayName(owner)}
-							</span>
+							<span className="font-medium text-foreground">{displayName}</span>
 							{owner.is_superuser ? (
 								<Badge variant="secondary">Staff</Badge>
 							) : null}
-							<Button
-								type="button"
-								variant="ghost"
-								size="sm"
-								className="h-7 px-2 text-xs"
-								disabled={togglingStaff}
-								onClick={(e) => void onToggleStaff(e)}
-							>
-								{togglingStaff
-									? "…"
-									: owner.is_superuser
-										? "Remove staff"
-										: "Make staff"}
-							</Button>
 						</div>
-						{owner.phone_number ? (
+						{showPhone ? (
 							<span className="font-mono text-xs tabular-nums text-muted-foreground">
-								{owner.phone_number}
+								{phone}
 							</span>
-						) : null}
-						{staffError ? (
-							<span className="text-xs text-destructive">{staffError}</span>
 						) : null}
 					</div>
 				) : (
@@ -1144,27 +1114,29 @@ function OwnerRow({
 				)}
 			</TableCell>
 			<TableCell>
-				<div className="flex max-w-64 flex-col gap-0.5">
-					<span className="font-mono text-sm font-medium tabular-nums">
-						{count > 0
-							? `${count} business${count === 1 ? "" : "es"}`
-							: "—"}
-					</span>
+				<div className="flex max-w-64 items-center gap-2">
 					<span
-						className="truncate text-xs text-muted-foreground"
+						className="min-w-0 truncate text-sm font-medium text-foreground"
 						title={namesSummary}
 					>
 						{namesSummary}
 					</span>
+					{count > 0 ? (
+						<span className="shrink-0 rounded-md bg-muted px-1.5 py-0.5 font-mono text-[11px] tabular-nums text-muted-foreground">
+							{count}
+						</span>
+					) : null}
 				</div>
 			</TableCell>
-			<TableCell>{getSubscriptionPlanLabel(row.plan)}</TableCell>
+			<TableCell className="text-sm text-muted-foreground">
+				{getSubscriptionPlanLabel(row.plan)}
+			</TableCell>
 			<TableCell>
 				<Badge variant={statusBadgeVariant(row.status)}>
 					{getSubscriptionStatusLabel(row.status)}
 				</Badge>
 			</TableCell>
-			<TableCell className="text-right font-mono tabular-nums">
+			<TableCell className="text-right font-mono text-sm tabular-nums text-muted-foreground">
 				{row.amount === null || row.amount === undefined
 					? "—"
 					: Number.isFinite(row.amount)
@@ -1173,11 +1145,17 @@ function OwnerRow({
 							})
 						: "—"}
 			</TableCell>
-			<TableCell className="text-right font-mono tabular-nums">
+			<TableCell className="text-right font-mono text-sm tabular-nums text-muted-foreground">
 				{row.credits_limit.toLocaleString()}
 			</TableCell>
 			<TableCell className="whitespace-nowrap font-mono text-sm tabular-nums text-muted-foreground">
 				{dateLabel}
+			</TableCell>
+			<TableCell className="w-8 pr-3">
+				<ChevronRightIcon
+					className="size-4 text-muted-foreground/70"
+					aria-hidden
+				/>
 			</TableCell>
 		</TableRow>
 	);
