@@ -69,9 +69,11 @@ export const adminApi = createApi({
 				invalidatesTags: [{ type: "AuditLog", id: "LIST" }],
 				async onQueryStarted(_arg, { dispatch, queryFulfilled }) {
 					try {
-						await queryFulfilled;
+						const { data: user } = await queryFulfilled;
 						dispatch(
-							authApi.util.invalidateTags([{ type: "User", id: "LIST" }]),
+							authApi.util.updateQueryData("listAllUsers", undefined, (draft) => {
+								if (!draft.some((u) => u.id === user.id)) draft.push(user);
+							}),
 						);
 					} catch {
 						/* keep cache */

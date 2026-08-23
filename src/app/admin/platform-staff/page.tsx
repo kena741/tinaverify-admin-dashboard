@@ -4,10 +4,14 @@ import { useMemo, useState } from "react";
 import { KeyRoundIcon, PlusIcon, ShieldIcon, Trash2Icon, UsersIcon } from "lucide-react";
 
 import { PlatformRoleDetailSheet } from "@/components/admin/platform-role-detail-sheet";
-import type { PlatformRoleOutput, UserOutput } from "@/services/types";
-import { formatUserDisplayName } from "@/lib/userDisplay";
+import type { PlatformRoleOutput, PlatformStaffOutput } from "@/services/types";
+import { formatPlatformLabel, formatUserDisplayName } from "@/lib/userDisplay";
 import { cn } from "@/lib/utils";
-import { useListAllUsersQuery } from "@/services/auth/authApi";
+import { useGetUserByIdQuery } from "@/services/auth/authApi";
+import {
+	useAdminRegisterUserMutation,
+	useAdminUpdateSuperuserMutation,
+} from "@/services/admin/adminApi";
 import {
 	useCreatePlatformPermissionMutation,
 	useCreatePlatformRoleMutation,
@@ -97,6 +101,85 @@ function initialsFromName(name: string): string {
 
 type AccessTab = "people" | "roles" | "permissions";
 
+function StaffPersonRow({
+	member,
+	roleName,
+	busy,
+	onToggleActive,
+	onRemove,
+}: {
+	member: PlatformStaffOutput;
+	roleName: string | undefined;
+	busy: boolean;
+	onToggleActive: (staffId: string, userId: string, isActive: boolean) => void;
+	onRemove: (staffId: string, userId: string, label: string) => void;
+}) {
+	const { data: user, isLoading } = useGetUserByIdQuery({
+		userId: member.user_id,
+	});
+	const label = user
+		? formatUserDisplayName(user)
+		: isLoading
+			? "Loading…"
+			: "Unknown user";
+	const secondary =
+		user?.email?.trim() || user?.phone_number?.trim() || null;
+	const roleLabel = roleName ? formatPlatformLabel(roleName) : "No role";
+
+	return (
+		<li className="flex flex-col gap-3 border-b border-border px-4 py-3.5 last:border-b-0 sm:flex-row sm:items-center sm:justify-between">
+			<div className="flex min-w-0 items-center gap-3">
+				<div
+					className={cn(
+						"flex size-10 shrink-0 items-center justify-center rounded-full text-xs font-semibold",
+						member.is_active
+							? "bg-primary text-primary-foreground"
+							: "bg-muted text-muted-foreground",
+					)}
+					aria-hidden
+				>
+					{initialsFromName(label === "Loading…" ? "?" : label)}
+				</div>
+				<div className="min-w-0">
+					<div className="flex flex-wrap items-center gap-2">
+						<p className="truncate font-medium text-foreground">{label}</p>
+						<Badge variant={member.is_active ? "default" : "secondary"}>
+							{member.is_active ? "Active" : "Inactive"}
+						</Badge>
+					</div>
+					{secondary ? (
+						<p className="truncate text-sm text-muted-foreground">{secondary}</p>
+					) : null}
+					<p className="truncate text-sm text-muted-foreground">{roleLabel}</p>
+				</div>
+			</div>
+			<div className="flex shrink-0 items-center gap-2 pl-13 sm:pl-0">
+				<Button
+					type="button"
+					variant="outline"
+					size="sm"
+					disabled={busy}
+					onClick={() =>
+						onToggleActive(member.id, member.user_id, member.is_active)
+					}
+				>
+					{member.is_active ? "Deactivate" : "Activate"}
+				</Button>
+				<Button
+					type="button"
+					variant="ghost"
+					size="icon-sm"
+					className="text-muted-foreground hover:text-destructive"
+					aria-label={`Remove ${label}`}
+					onClick={() => onRemove(member.id, member.user_id, label)}
+				>
+					<Trash2Icon aria-hidden />
+				</Button>
+			</div>
+		</li>
+	);
+}
+
 export default function PlatformStaffPage() {
 	const {
 		data: roles,
@@ -119,7 +202,6 @@ export default function PlatformStaffPage() {
 		error: staffError,
 		refetch: refetchStaff,
 	} = useListPlatformStaffQuery();
-	const { data: users } = useListAllUsersQuery();
 
 	const [createRole, createRoleState] = useCreatePlatformRoleMutation();
 	const [createPermission, createPermissionState] =
@@ -128,6 +210,9 @@ export default function PlatformStaffPage() {
 	const [deletePermission, deletePermissionState] =
 		useDeletePlatformPermissionMutation();
 	const [createStaff, createStaffState] = useCreatePlatformStaffMutation();
+	const [registerUser, registerUserState] = useAdminRegisterUserMutation();
+	const [updateSuperuser, updateSuperuserState] =
+		useAdminUpdateSuperuserMutation();
 	const [updateStaff, updateStaffState] = useUpdatePlatformStaffMutation();
 	const [deleteStaff, deleteStaffState] = useDeletePlatformStaffMutation();
 
@@ -144,8 +229,13 @@ export default function PlatformStaffPage() {
 	const [roleDescription, setRoleDescription] = useState("");
 	const [permissionAction, setPermissionAction] = useState("");
 	const [permissionDescription, setPermissionDescription] = useState("");
-	const [staffUserId, setStaffUserId] = useState("");
 	const [staffRoleId, setStaffRoleId] = useState("");
+	const [staffPhone, setStaffPhone] = useState("");
+	const [staffPassword, setStaffPassword] = useState("");
+	const [staffEmail, setStaffEmail] = useState("");
+	const [staffUsername, setStaffUsername] = useState("");
+	const [staffFirstName, setStaffFirstName] = useState("");
+	const [staffLastName, setStaffLastName] = useState("");
 	const [roleFormError, setRoleFormError] = useState("");
 	const [permissionFormError, setPermissionFormError] = useState("");
 	const [staffFormError, setStaffFormError] = useState("");
@@ -160,17 +250,12 @@ export default function PlatformStaffPage() {
 	} | null>(null);
 	const [staffPendingDelete, setStaffPendingDelete] = useState<{
 		id: string;
+		userId: string;
 		label: string;
 	} | null>(null);
 	const [deleteRoleError, setDeleteRoleError] = useState("");
 	const [deletePermissionError, setDeletePermissionError] = useState("");
 	const [deleteStaffError, setDeleteStaffError] = useState("");
-
-	const usersById = useMemo(() => {
-		const map = new Map<string, UserOutput>();
-		for (const u of users ?? []) map.set(u.id, u);
-		return map;
-	}, [users]);
 
 	const rolesById = useMemo(() => {
 		const map = new Map<string, PlatformRoleOutput>();
@@ -190,16 +275,6 @@ export default function PlatformStaffPage() {
 	const roleCount = roles?.length ?? 0;
 	const permissionCount = permissions?.length ?? 0;
 	const staffCount = staff?.length ?? 0;
-
-	const staffUserIds = useMemo(
-		() => new Set((staff ?? []).map((s) => s.user_id)),
-		[staff],
-	);
-
-	const usersAvailableForStaff = useMemo(
-		() => (users ?? []).filter((u) => !staffUserIds.has(u.id)),
-		[users, staffUserIds],
-	);
 
 	const filteredRoles = useMemo(() => {
 		const list = roles ?? [];
@@ -228,23 +303,34 @@ export default function PlatformStaffPage() {
 		const q = staffSearch.trim().toLowerCase();
 		if (!q) return list;
 		return list.filter((s) => {
-			const user = usersById.get(s.user_id);
 			const role = rolesById.get(s.platform_role_id);
 			const hay = [
-				user ? formatUserDisplayName(user) : "",
-				user?.email ?? "",
-				user?.phone_number ?? "",
 				role?.name ?? "",
+				role ? formatPlatformLabel(role.name) : "",
 				s.user_id,
 			]
 				.join(" ")
 				.toLowerCase();
 			return hay.includes(q);
 		});
-	}, [staff, staffSearch, usersById, rolesById]);
+	}, [staff, staffSearch, rolesById]);
 
-	const selectedStaffUser = usersAvailableForStaff.find((u) => u.id === staffUserId);
 	const selectedStaffRole = activeRoles.find((r) => r.id === staffRoleId);
+	const isAddingStaff =
+		registerUserState.isLoading ||
+		createStaffState.isLoading ||
+		updateSuperuserState.isLoading;
+
+	function resetStaffForm() {
+		setStaffRoleId("");
+		setStaffPhone("");
+		setStaffPassword("");
+		setStaffEmail("");
+		setStaffUsername("");
+		setStaffFirstName("");
+		setStaffLastName("");
+		setStaffFormError("");
+	}
 
 	async function handleCreateRole(e: React.FormEvent) {
 		e.preventDefault();
@@ -299,19 +385,38 @@ export default function PlatformStaffPage() {
 	async function handleCreateStaff(e: React.FormEvent) {
 		e.preventDefault();
 		setStaffFormError("");
-		if (!staffUserId || !staffRoleId) {
-			setStaffFormError("Select a user and a platform role.");
+		const phoneNumber = staffPhone.trim();
+		if (!phoneNumber || !staffPassword || !staffRoleId) {
+			setStaffFormError("Phone, password, and platform role are required.");
 			return;
 		}
 		try {
+			const user = await registerUser({
+				body: {
+					phone_number: phoneNumber,
+					password: staffPassword,
+					email: staffEmail.trim() || null,
+					username: staffUsername.trim() || null,
+					user_information:
+						staffFirstName.trim() || staffLastName.trim()
+							? {
+									first_name: staffFirstName.trim() || "—",
+									last_name: staffLastName.trim() || "—",
+								}
+							: null,
+				},
+			}).unwrap();
 			await createStaff({
 				body: {
-					user_id: staffUserId,
+					user_id: user.id,
 					platform_role_id: staffRoleId,
 				},
 			}).unwrap();
-			setStaffUserId("");
-			setStaffRoleId("");
+			await updateSuperuser({
+				userId: user.id,
+				body: { is_superuser: true },
+			}).unwrap();
+			resetStaffForm();
 			setAddStaffOpen(false);
 		} catch (err) {
 			setStaffFormError(getErrorMessage(err, "Failed to add platform staff."));
@@ -350,16 +455,29 @@ export default function PlatformStaffPage() {
 		setDeleteStaffError("");
 		try {
 			await deleteStaff({ staffId: staffPendingDelete.id }).unwrap();
+			await updateSuperuser({
+				userId: staffPendingDelete.userId,
+				body: { is_superuser: false },
+			}).unwrap();
 			setStaffPendingDelete(null);
 		} catch (err) {
 			setDeleteStaffError(getErrorMessage(err, "Failed to remove staff."));
 		}
 	}
 
-	async function handleToggleStaffActive(staffId: string, isActive: boolean) {
+	async function handleToggleStaffActive(
+		staffId: string,
+		userId: string,
+		isActive: boolean,
+	) {
+		const nextActive = !isActive;
 		await updateStaff({
 			staffId,
-			body: { is_active: !isActive },
+			body: { is_active: nextActive },
+		}).unwrap();
+		await updateSuperuser({
+			userId,
+			body: { is_superuser: nextActive },
 		}).unwrap();
 	}
 
@@ -507,71 +625,23 @@ export default function PlatformStaffPage() {
 						</div>
 					) : (
 						<ul className="overflow-hidden rounded-xl border border-border bg-card" aria-label="Platform staff">
-							{filteredStaff.map((member) => {
-								const user = usersById.get(member.user_id);
-								const role = rolesById.get(member.platform_role_id);
-								const label = user
-									? formatUserDisplayName(user)
-									: member.user_id.slice(0, 8);
-								return (
-									<li
-										key={member.id}
-										className="flex flex-col gap-3 border-b border-border px-4 py-3.5 last:border-b-0 sm:flex-row sm:items-center sm:justify-between"
-									>
-										<div className="flex min-w-0 items-center gap-3">
-											<div
-												className={cn(
-													"flex size-10 shrink-0 items-center justify-center rounded-full text-xs font-semibold",
-													member.is_active
-														? "bg-primary text-primary-foreground"
-														: "bg-muted text-muted-foreground",
-												)}
-												aria-hidden
-											>
-												{initialsFromName(label)}
-											</div>
-											<div className="min-w-0">
-												<div className="flex flex-wrap items-center gap-2">
-													<p className="truncate font-medium text-foreground">{label}</p>
-													<Badge variant={member.is_active ? "default" : "secondary"}>
-														{member.is_active ? "Active" : "Inactive"}
-													</Badge>
-												</div>
-												<p className="truncate text-sm text-muted-foreground">
-													{role?.name ?? "No role"}
-													{user?.email ? ` · ${user.email}` : ""}
-												</p>
-											</div>
-										</div>
-										<div className="flex shrink-0 items-center gap-2 pl-13 sm:pl-0">
-											<Button
-												type="button"
-												variant="outline"
-												size="sm"
-												disabled={updateStaffState.isLoading}
-												onClick={() =>
-													void handleToggleStaffActive(member.id, member.is_active)
-												}
-											>
-												{member.is_active ? "Deactivate" : "Activate"}
-											</Button>
-											<Button
-												type="button"
-												variant="ghost"
-												size="icon-sm"
-												className="text-muted-foreground hover:text-destructive"
-												aria-label={`Remove ${label}`}
-												onClick={() => {
-													setDeleteStaffError("");
-													setStaffPendingDelete({ id: member.id, label });
-												}}
-											>
-												<Trash2Icon aria-hidden />
-											</Button>
-										</div>
-									</li>
-								);
-							})}
+							{filteredStaff.map((member) => (
+								<StaffPersonRow
+									key={member.id}
+									member={member}
+									roleName={rolesById.get(member.platform_role_id)?.name}
+									busy={
+										updateStaffState.isLoading || updateSuperuserState.isLoading
+									}
+									onToggleActive={(staffId, userId, isActive) => {
+										void handleToggleStaffActive(staffId, userId, isActive);
+									}}
+									onRemove={(staffId, userId, label) => {
+										setDeleteStaffError("");
+										setStaffPendingDelete({ id: staffId, userId, label });
+									}}
+								/>
+							))}
 						</ul>
 					)}
 				</TabsContent>
@@ -653,7 +723,9 @@ export default function PlatformStaffPage() {
 										/>
 										<div className="relative z-10 flex items-start justify-between gap-2">
 											<div className="min-w-0">
-												<p className="font-medium text-foreground">{role.name}</p>
+												<p className="font-medium text-foreground">
+													{formatPlatformLabel(role.name)}
+												</p>
 												<p className="mt-1 line-clamp-2 text-sm text-muted-foreground">
 													{role.description || "No description"}
 												</p>
@@ -934,18 +1006,14 @@ export default function PlatformStaffPage() {
 				open={addStaffOpen}
 				onOpenChange={(open) => {
 					setAddStaffOpen(open);
-					if (!open) {
-						setStaffUserId("");
-						setStaffRoleId("");
-						setStaffFormError("");
-					}
+					if (!open) resetStaffForm();
 				}}
 			>
 				<DialogContent className="sm:max-w-md">
 					<DialogHeader>
 						<DialogTitle>Add person</DialogTitle>
 						<DialogDescription>
-							Assign an existing user a platform role.
+							Create a new user and assign a platform role.
 						</DialogDescription>
 					</DialogHeader>
 					<form
@@ -960,32 +1028,63 @@ export default function PlatformStaffPage() {
 						) : null}
 						<FieldGroup>
 							<Field>
-								<FieldLabel htmlFor="staff-user">User</FieldLabel>
-								<Select
-									value={staffUserId}
-									onValueChange={(v) => {
-										if (v != null) setStaffUserId(v);
-									}}
-								>
-									<SelectTrigger id="staff-user" className="h-10 w-full">
-										<span className="flex flex-1 truncate text-left">
-											{selectedStaffUser
-												? formatUserDisplayName(selectedStaffUser)
-												: usersAvailableForStaff.length === 0
-													? "No users available"
-													: "Select a user…"}
-										</span>
-									</SelectTrigger>
-									<SelectContent>
-										{usersAvailableForStaff.map((u) => (
-											<SelectItem key={u.id} value={u.id}>
-												{formatUserDisplayName(u)}
-												{u.email ? ` · ${u.email}` : ""}
-											</SelectItem>
-										))}
-									</SelectContent>
-								</Select>
+								<FieldLabel htmlFor="staff-phone">Phone</FieldLabel>
+								<Input
+									id="staff-phone"
+									type="tel"
+									autoComplete="tel"
+									value={staffPhone}
+									onChange={(e) => setStaffPhone(e.target.value)}
+									required
+								/>
 							</Field>
+							<Field>
+								<FieldLabel htmlFor="staff-password">Password</FieldLabel>
+								<Input
+									id="staff-password"
+									type="password"
+									autoComplete="new-password"
+									value={staffPassword}
+									onChange={(e) => setStaffPassword(e.target.value)}
+									required
+								/>
+							</Field>
+							<Field>
+								<FieldLabel htmlFor="staff-email">Email</FieldLabel>
+								<Input
+									id="staff-email"
+									type="email"
+									autoComplete="email"
+									value={staffEmail}
+									onChange={(e) => setStaffEmail(e.target.value)}
+								/>
+							</Field>
+							<Field>
+								<FieldLabel htmlFor="staff-username">Username</FieldLabel>
+								<Input
+									id="staff-username"
+									value={staffUsername}
+									onChange={(e) => setStaffUsername(e.target.value)}
+								/>
+							</Field>
+							<div className="grid grid-cols-2 gap-3">
+								<Field>
+									<FieldLabel htmlFor="staff-first-name">First name</FieldLabel>
+									<Input
+										id="staff-first-name"
+										value={staffFirstName}
+										onChange={(e) => setStaffFirstName(e.target.value)}
+									/>
+								</Field>
+								<Field>
+									<FieldLabel htmlFor="staff-last-name">Last name</FieldLabel>
+									<Input
+										id="staff-last-name"
+										value={staffLastName}
+										onChange={(e) => setStaffLastName(e.target.value)}
+									/>
+								</Field>
+							</div>
 							<Field>
 								<FieldLabel htmlFor="staff-role">Platform role</FieldLabel>
 								<Select
@@ -997,7 +1096,7 @@ export default function PlatformStaffPage() {
 									<SelectTrigger id="staff-role" className="h-10 w-full">
 										<span className="flex flex-1 truncate text-left">
 											{selectedStaffRole
-												? selectedStaffRole.name
+												? formatPlatformLabel(selectedStaffRole.name)
 												: activeRoles.length === 0
 													? "No active roles"
 													: "Select a role…"}
@@ -1006,7 +1105,7 @@ export default function PlatformStaffPage() {
 									<SelectContent>
 										{activeRoles.map((r) => (
 											<SelectItem key={r.id} value={r.id}>
-												{r.name}
+												{formatPlatformLabel(r.name)}
 											</SelectItem>
 										))}
 									</SelectContent>
@@ -1018,12 +1117,12 @@ export default function PlatformStaffPage() {
 								type="button"
 								variant="outline"
 								onClick={() => setAddStaffOpen(false)}
-								disabled={createStaffState.isLoading}
+								disabled={isAddingStaff}
 							>
 								Cancel
 							</Button>
-							<Button type="submit" disabled={createStaffState.isLoading}>
-								{createStaffState.isLoading ? "Adding…" : "Add person"}
+							<Button type="submit" disabled={isAddingStaff}>
+								{isAddingStaff ? "Adding…" : "Add person"}
 							</Button>
 						</DialogFooter>
 					</form>
@@ -1050,7 +1149,13 @@ export default function PlatformStaffPage() {
 					<AlertDialogHeader>
 						<AlertDialogTitle>Delete role?</AlertDialogTitle>
 						<AlertDialogDescription>
-							Permanently delete <strong>{rolePendingDelete?.name}</strong>?
+							Permanently delete{" "}
+							<strong>
+								{rolePendingDelete
+									? formatPlatformLabel(rolePendingDelete.name)
+									: ""}
+							</strong>
+							?
 							Staff with this role may lose access.
 						</AlertDialogDescription>
 					</AlertDialogHeader>

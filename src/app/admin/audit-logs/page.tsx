@@ -1,12 +1,14 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { Loader2Icon } from "lucide-react";
 
 import { PageHeader } from "@/components/admin/page-header";
 import { useListAdminAuditLogsQuery } from "@/services/admin/adminApi";
-import { useListAllUsersQuery } from "@/services/auth/authApi";
-import { formatUserDisplayName } from "@/lib/userDisplay";
+import { useGetUserByIdQuery } from "@/services/auth/authApi";
+import { useGetBusinessQuery } from "@/services/branch-management/branchManagementApi";
+import type { AuditLogOutput } from "@/services/types";
+import { formatPlatformLabel, formatUserDisplayName } from "@/lib/userDisplay";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -59,19 +61,117 @@ function formatWhen(iso: string): string {
 	});
 }
 
+function detailString(
+	details: Record<string, unknown> | null | undefined,
+	key: string,
+): string | null {
+	const value = details?.[key];
+	return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+function AuditAdminCell({ adminId }: { adminId: string }) {
+	const { data: user, isLoading } = useGetUserByIdQuery({ userId: adminId });
+	if (isLoading) {
+		return <span className="text-sm text-muted-foreground">Loading…</span>;
+	}
+	if (!user) {
+		return <span className="text-sm text-muted-foreground">Unknown admin</span>;
+	}
+	const name = formatUserDisplayName(user);
+	const secondary = user.email?.trim() || user.phone_number?.trim() || null;
+	return (
+		<div className="min-w-0">
+			<p className="truncate text-sm font-medium text-foreground">{name}</p>
+			{secondary ? (
+				<p className="truncate text-xs text-muted-foreground">{secondary}</p>
+			) : null}
+		</div>
+	);
+}
+
+function AuditEntityCell({ row }: { row: AuditLogOutput }) {
+	const entityType = (row.entity_type ?? "").toLowerCase();
+	const isUser = entityType === "user";
+	const isBusiness = entityType === "business";
+
+	const { data: user, isLoading: userLoading } = useGetUserByIdQuery(
+		{ userId: row.entity_id ?? "" },
+		{ skip: !isUser || !row.entity_id },
+	);
+	const { data: business, isLoading: businessLoading } = useGetBusinessQuery(
+		{ businessId: row.entity_id ?? "" },
+		{ skip: !isBusiness || !row.entity_id },
+	);
+
+	const detailEmail = detailString(row.details, "email");
+	const detailPhone = detailString(row.details, "phone_number");
+	const detailName =
+		detailString(row.details, "name") ||
+		detailString(row.details, "username") ||
+		[
+			detailString(row.details, "first_name"),
+			detailString(row.details, "last_name"),
+		]
+			.filter(Boolean)
+			.join(" ")
+			.trim() ||
+		null;
+
+	let title = "—";
+	let secondary: string | null = null;
+
+	if (isUser) {
+		if (user) {
+			title = formatUserDisplayName(user);
+			secondary = user.email?.trim() || user.phone_number?.trim() || null;
+		} else if (detailEmail || detailPhone || detailName) {
+			title = detailName || detailEmail || detailPhone || "User";
+			const extras = [detailEmail, detailPhone].filter(
+				(v): v is string => Boolean(v) && v !== title,
+			);
+			secondary = extras[0] ?? null;
+		} else if (userLoading) {
+			title = "Loading…";
+		} else {
+			title = "Unknown user";
+		}
+	} else if (isBusiness) {
+		if (business) {
+			title = business.name;
+			secondary = business.tin_number || null;
+		} else if (detailName) {
+			title = detailName;
+		} else if (businessLoading) {
+			title = "Loading…";
+		} else {
+			title = "Unknown business";
+		}
+	} else if (row.entity_type) {
+		title = formatPlatformLabel(row.entity_type);
+		secondary = detailName || detailEmail || detailPhone;
+	}
+
+	const typeLabel = row.entity_type
+		? formatPlatformLabel(row.entity_type)
+		: null;
+
+	return (
+		<div className="min-w-0">
+			{typeLabel ? (
+				<p className="text-xs text-muted-foreground">{typeLabel}</p>
+			) : null}
+			<p className="truncate text-sm font-medium text-foreground">{title}</p>
+			{secondary ? (
+				<p className="truncate text-xs text-muted-foreground">{secondary}</p>
+			) : null}
+		</div>
+	);
+}
+
 export default function AuditLogsPage() {
 	const [offset, setOffset] = useState(0);
-	const { data: users } = useListAllUsersQuery();
 	const { data, error, isLoading, isFetching, refetch } =
 		useListAdminAuditLogsQuery({ limit: PAGE_SIZE, offset });
-
-	const usersById = useMemo(() => {
-		const map = new Map<string, string>();
-		for (const u of users ?? []) {
-			map.set(u.id, formatUserDisplayName(u));
-		}
-		return map;
-	}, [users]);
 
 	const rows = data ?? [];
 	const canPrev = offset > 0;
@@ -121,30 +221,21 @@ export default function AuditLogsPage() {
 								<TableBody>
 									{rows.map((row) => (
 										<TableRow key={row.id}>
-											<TableCell className="whitespace-nowrap font-mono text-xs tabular-nums text-muted-foreground">
+											<TableCell className="whitespace-nowrap text-sm text-muted-foreground">
 												{formatWhen(row.created_at)}
 											</TableCell>
-											<TableCell className="text-sm">
-												{usersById.get(row.admin_id) ?? (
-													<span className="font-mono text-xs">
-														{row.admin_id.slice(0, 8)}…
-													</span>
-												)}
+											<TableCell>
+												<AuditAdminCell adminId={row.admin_id} />
 											</TableCell>
 											<TableCell>
-												<Badge variant="secondary">{row.action}</Badge>
+												<Badge variant="secondary">
+													{formatPlatformLabel(row.action)}
+												</Badge>
 											</TableCell>
-											<TableCell className="text-sm">
-												<span className="text-muted-foreground">
-													{row.entity_type ?? "—"}
-												</span>
-												{row.entity_id ? (
-													<span className="ml-1 font-mono text-xs text-muted-foreground">
-														{row.entity_id.slice(0, 8)}…
-													</span>
-												) : null}
+											<TableCell>
+												<AuditEntityCell row={row} />
 											</TableCell>
-											<TableCell className="font-mono text-xs text-muted-foreground">
+											<TableCell className="text-sm text-muted-foreground">
 												{row.ip_address ?? "—"}
 											</TableCell>
 										</TableRow>
@@ -155,8 +246,9 @@ export default function AuditLogsPage() {
 					)}
 
 					<div className="mt-4 flex items-center justify-between gap-3">
-						<p className="font-mono text-xs tabular-nums text-muted-foreground">
-							Offset {offset}
+						<p className="text-xs text-muted-foreground">
+							Showing {rows.length} event{rows.length === 1 ? "" : "s"}
+							{offset > 0 ? ` · from ${offset + 1}` : ""}
 							{isFetching ? " · refreshing…" : ""}
 						</p>
 						<div className="flex items-center gap-2">

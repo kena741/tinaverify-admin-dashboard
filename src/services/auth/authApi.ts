@@ -91,10 +91,11 @@ export const authApi = createApi({
 		/**
 		 * `GET /api/v1/users/all` — pages until all users are loaded.
 		 * Used for admin owner lists (join onto business.owner_id).
+		 * Prefer getUserById when you only need a few users (e.g. platform staff).
 		 */
 		listAllUsers: builder.query<UserOutput[], void>({
 			async queryFn(_arg, _api, _extraOptions, baseQuery) {
-				const pageSize = 100;
+				const pageSize = 500;
 				let offset = 0;
 				const items: UserOutput[] = [];
 				for (;;) {
@@ -112,6 +113,7 @@ export const authApi = createApi({
 					items.push(...batch);
 					const total = Number(page?.total_count);
 					if (
+						batch.length === 0 ||
 						batch.length < pageSize ||
 						(Number.isFinite(total) && items.length >= total)
 					) {
@@ -121,16 +123,8 @@ export const authApi = createApi({
 				}
 				return { data: items };
 			},
-			providesTags: (result) =>
-				result
-					? [
-							{ type: "User" as const, id: "LIST" },
-							...result.map((u) => ({
-								type: "User" as const,
-								id: u.id,
-							})),
-						]
-					: [{ type: "User" as const, id: "LIST" }],
+			keepUnusedDataFor: 300,
+			providesTags: () => [{ type: "User" as const, id: "LIST" }],
 		}),
 
 		/** `GET /api/v1/users/{user_id}` */

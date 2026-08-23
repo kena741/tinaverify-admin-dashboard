@@ -10,6 +10,16 @@ export function formatUserDisplayName(u: UserOutput): string {
 	return u.phone_number;
 }
 
+/** `super_admin` → `Super Admin` */
+export function formatPlatformLabel(raw: string): string {
+	return raw
+		.trim()
+		.split(/[_\s-]+/)
+		.filter(Boolean)
+		.map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+		.join(" ");
+}
+
 /** Uses nested `user` from `GET /api/v1/business/{business_id}/employees` — no extra user fetch. */
 export function employeeUserDisplayName(emp: EmployeeOutput): string {
 	const u = emp.user;
