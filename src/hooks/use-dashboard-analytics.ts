@@ -8,6 +8,7 @@ import {
 	isoRangeFromLocalDates,
 	parseAnalyticsCount,
 	parseRevenueAmount,
+	parseRevenueBucket,
 } from "@/lib/analytics";
 import { useGetAnalyticsSummaryQuery } from "@/services/analytics/analyticsApi";
 import { useAuth } from "@/store/useAuth";
@@ -52,10 +53,14 @@ export function useDashboardAnalytics(range: DashboardAnalyticsRange) {
 		{ skip: !systemAdmin || !customRangeValid },
 	);
 
-	const periodRevenue = useMemo(
-		() => parseRevenueAmount(summary?.revenue.custom),
+	const periodRevenueBucket = useMemo(
+		() => parseRevenueBucket(summary?.revenue.custom),
 		[summary],
 	);
+
+	const periodRevenue = periodRevenueBucket.total;
+	const periodRevenueApi = periodRevenueBucket.api;
+	const periodRevenueManual = periodRevenueBucket.manual;
 
 	const totalVerifiedAmount = useMemo(
 		() => parseRevenueAmount(summary?.total_verified_amount),
@@ -108,6 +113,8 @@ export function useDashboardAnalytics(range: DashboardAnalyticsRange) {
 	return {
 		summary,
 		periodRevenue,
+		periodRevenueApi,
+		periodRevenueManual,
 		totalVerifiedAmount,
 		totalVerifiedTransactions,
 		totalFailedTransactions,

@@ -13,6 +13,7 @@ export type SubscriptionStatusFilter =
 	| "active"
 	| "expired"
 	| "cancelled"
+	| "upgraded"
 	| "insufficient_credits"
 	| "unsubscribed";
 
@@ -25,6 +26,7 @@ export const SUBSCRIPTION_STATUS_FILTER_LABELS: Record<
 	active: "Active",
 	expired: "Expired",
 	cancelled: "Cancelled",
+	upgraded: "Upgraded",
 	insufficient_credits: "Insufficient credits",
 	unsubscribed: "Unsubscribed",
 };
@@ -41,6 +43,7 @@ export const SUBSCRIPTION_STATUS_LABELS: Record<string, string> = {
 	expired: "Expired",
 	unsubscribed: "Unsubscribed",
 	cancelled: "Cancelled",
+	upgraded: "Upgraded",
 	insufficient_credits: "Insufficient credits",
 };
 
@@ -93,6 +96,7 @@ export function buildLatestBusinessSubscriptionRows(
 const STATUS_PRIORITY: Record<string, number> = {
 	active: 5,
 	pending: 4,
+	upgraded: 4,
 	insufficient_credits: 3,
 	expired: 2,
 	cancelled: 1,

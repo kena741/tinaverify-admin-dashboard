@@ -89,7 +89,7 @@ import {
 	getSubscriptionPlanLabel,
 	getSubscriptionStatusLabel,
 } from "@/lib/subscription-filters";
-import { formatUserDisplayName } from "@/lib/userDisplay";
+import { formatPlatformLabel, formatUserDisplayName } from "@/lib/userDisplay";
 
 
 function roleLabel(role?: RoleOutput | null) {
@@ -137,7 +137,7 @@ function subscriptionBadgeVariant(
 ): "default" | "secondary" | "destructive" | "outline" {
 	const s = (status ?? "").toLowerCase();
 	if (s === "active") return "default";
-	if (s === "pending") return "secondary";
+	if (s === "pending" || s === "upgraded") return "secondary";
 	if (s === "expired" || s === "cancelled" || s === "insufficient_credits")
 		return "destructive";
 	return "outline";
@@ -1414,6 +1414,8 @@ export default function BusinessDetailClient({
 												<TableHead>Plan</TableHead>
 												<TableHead>Status</TableHead>
 												<TableHead>Amount</TableHead>
+												<TableHead>Paid</TableHead>
+												<TableHead>Method</TableHead>
 												<TableHead>Credits</TableHead>
 												<TableHead>Started</TableHead>
 												<TableHead>Ended</TableHead>
@@ -1426,7 +1428,7 @@ export default function BusinessDetailClient({
 											{(subscriptionHistory ?? []).length === 0 ? (
 												<TableRow>
 													<TableCell
-														colSpan={7}
+														colSpan={9}
 														className="py-10 text-center text-sm text-muted-foreground"
 													>
 														No subscription history for this business.
@@ -1455,6 +1457,21 @@ export default function BusinessDetailClient({
 																	: row.amount.toLocaleString(undefined, {
 																			maximumFractionDigits: 2,
 																		})}
+															</TableCell>
+															<TableCell className="font-mono text-sm tabular-nums">
+																{row.transaction_amount == null
+																	? "—"
+																	: row.transaction_amount.toLocaleString(
+																			undefined,
+																			{ maximumFractionDigits: 2 },
+																		)}
+															</TableCell>
+															<TableCell className="text-sm text-muted-foreground">
+																{row.transaction_payment_method
+																	? formatPlatformLabel(
+																			row.transaction_payment_method,
+																		)
+																	: "—"}
 															</TableCell>
 															<TableCell className="font-mono text-sm tabular-nums">
 																{row.credits_limit.toLocaleString()}

@@ -450,6 +450,7 @@ export type SubscriptionStatus =
 	| "active"
 	| "expired"
 	| "cancelled"
+	| "upgraded"
 	| "insufficient_credits";
 
 /** OpenAPI `SubscriptionBusinessOutputSchema` */
@@ -471,6 +472,8 @@ export type AdminSubscriptionOutput = {
 	ended_at?: string | null;
 	chapa_transaction_reference?: string | null;
 	created_at?: string | null;
+	transaction_payment_method?: string | null;
+	transaction_amount?: number | null;
 	business?: SubscriptionBusinessOutput | null;
 	plan?: SubscriptionPlanOutput | null;
 };
@@ -640,14 +643,19 @@ export type SendCustomSmsResponse = {
 // -----------------------------
 
 /** `GET /api/v1/analytics/summary` — platform KPIs (admin only). */
+export type AnalyticsRevenueBucket = {
+	total: string | number;
+	api: string | number;
+	manual: string | number;
+};
+
 export type AnalyticsRevenueOutput = {
-	daily: string | number;
-	weekly: string | number;
-	monthly: string | number;
-	/** Platform lifetime paid subscription revenue. */
-	all_time?: string | number;
+	daily: AnalyticsRevenueBucket;
+	weekly: AnalyticsRevenueBucket;
+	monthly: AnalyticsRevenueBucket;
+	all_time: AnalyticsRevenueBucket;
 	/** Revenue for the requested `start_date` / `end_date` range. */
-	custom: string | number;
+	custom: AnalyticsRevenueBucket;
 };
 
 export type AnalyticsTopPlanOutput = {

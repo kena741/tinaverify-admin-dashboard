@@ -191,6 +191,8 @@ export default function DashboardPage() {
 	const {
 		summary,
 		periodRevenue,
+		periodRevenueApi,
+		periodRevenueManual,
 		totalVerifiedAmount,
 		totalVerifiedTransactions,
 		totalFailedTransactions,
@@ -443,6 +445,10 @@ export default function DashboardPage() {
 								</p>
 								<p className="admin-brand-band-muted">
 									Collected subscription payments in the selected window
+								</p>
+								<p className="mt-1 font-mono text-xs tabular-nums text-primary-foreground/75">
+									API {formatRevenueAmount(periodRevenueApi)} · Manual{" "}
+									{formatRevenueAmount(periodRevenueManual)}
 								</p>
 							</div>
 						) : (

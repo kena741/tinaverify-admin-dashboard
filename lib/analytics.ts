@@ -49,6 +49,24 @@ export function parseRevenueAmount(
 	return Number.isFinite(n) ? n : 0;
 }
 
+/** Parse a revenue window `{ total, api, manual }` from analytics summary. */
+export function parseRevenueBucket(
+	bucket:
+		| {
+				total?: string | number | null;
+				api?: string | number | null;
+				manual?: string | number | null;
+		  }
+		| null
+		| undefined,
+): { total: number; api: number; manual: number } {
+	return {
+		total: parseRevenueAmount(bucket?.total),
+		api: parseRevenueAmount(bucket?.api),
+		manual: parseRevenueAmount(bucket?.manual),
+	};
+}
+
 export type PaidSubscriptionRow = {
 	amount?: number | string | null;
 	status?: string | null;

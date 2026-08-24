@@ -79,6 +79,7 @@ type SortDir = "asc" | "desc";
 const STATUS_SORT_RANK: Record<string, number> = {
 	active: 5,
 	pending: 4,
+	upgraded: 4,
 	insufficient_credits: 3,
 	expired: 2,
 	cancelled: 1,
@@ -92,6 +93,7 @@ function isStatusFilter(v: string): v is SubscriptionStatusFilter {
 		v === "active" ||
 		v === "expired" ||
 		v === "cancelled" ||
+		v === "upgraded" ||
 		v === "insufficient_credits" ||
 		v === "unsubscribed"
 	);
@@ -202,7 +204,8 @@ function statusBadgeVariant(
 ): "default" | "secondary" | "destructive" | "outline" {
 	const s = status.toLowerCase();
 	if (s === "active") return "default";
-	if (s === "pending" || s === "insufficient_credits") return "secondary";
+	if (s === "pending" || s === "upgraded" || s === "insufficient_credits")
+		return "secondary";
 	if (s === "expired" || s === "cancelled" || s === "unsubscribed")
 		return "destructive";
 	return "outline";
@@ -721,6 +724,7 @@ export default function TransactionsPage() {
 												<SelectItem value="active">Active</SelectItem>
 												<SelectItem value="expired">Expired</SelectItem>
 												<SelectItem value="cancelled">Cancelled</SelectItem>
+												<SelectItem value="upgraded">Upgraded</SelectItem>
 												<SelectItem value="insufficient_credits">
 													Insufficient credits
 												</SelectItem>
