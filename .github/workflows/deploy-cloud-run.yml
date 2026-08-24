@@ -33,9 +33,17 @@ jobs:
       NEXT_PUBLIC_BACKEND_BASE_URL: ${{ secrets.NEXT_PUBLIC_BACKEND_BASE_URL }}
     steps:
       - name: Validate configuration
+        env:
+          GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
         run: |
-          test -n "${{ secrets.GCP_SA_KEY }}" || (echo "Missing secret GCP_SA_KEY (JSON key for github-actions-tinaverify@zulu-dine-492112.iam.gserviceaccount.com)" && exit 1)
-          test -n "${NEXT_PUBLIC_BACKEND_BASE_URL}" || (echo "Missing environment secret NEXT_PUBLIC_BACKEND_BASE_URL for ${TARGET}" && exit 1)
+          if [ -z "$GCP_SA_KEY" ]; then
+            echo "Missing secret GCP_SA_KEY (JSON key for github-actions-tinaverify@zulu-dine-492112.iam.gserviceaccount.com)"
+            exit 1
+          fi
+          if [ -z "$NEXT_PUBLIC_BACKEND_BASE_URL" ]; then
+            echo "Missing environment secret NEXT_PUBLIC_BACKEND_BASE_URL for ${TARGET}"
+            exit 1
+          fi
 
       - uses: actions/checkout@v4
 
