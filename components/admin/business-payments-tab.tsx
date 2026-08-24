@@ -88,7 +88,9 @@ export function BusinessPaymentsTab({ businessId }: BusinessPaymentsTabProps) {
 		let rows = transactions ?? [];
 		if (statusFilter !== "all") {
 			rows = rows.filter(
-				(t) => t.status.toLowerCase() === statusFilter.toLowerCase(),
+				(t) =>
+					typeof t.status === "string" &&
+					t.status.toLowerCase() === statusFilter.toLowerCase(),
 			);
 		}
 		return rows;

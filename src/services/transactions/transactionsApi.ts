@@ -14,8 +14,13 @@ function bearerHeaders(accessToken?: string | null) {
 	return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
-/** Backend may return a bare array or a wrapped `{ items | transactions | results }` object. */
-function normalizeTransactionList(data: unknown): VerifiedTransactionOutput[] {
+/**
+ * OpenAPI returns either a bare array or `Record<string, VerifiedTransactionOutput[]>`
+ * (bank / group keys). Also tolerate `{ items|transactions|results|data }`.
+ */
+export function normalizeTransactionList(
+	data: unknown,
+): VerifiedTransactionOutput[] {
 	if (Array.isArray(data)) return data as VerifiedTransactionOutput[];
 	if (data && typeof data === "object") {
 		const o = data as Record<string, unknown>;
@@ -24,6 +29,8 @@ function normalizeTransactionList(data: unknown): VerifiedTransactionOutput[] {
 			return o.transactions as VerifiedTransactionOutput[];
 		if (Array.isArray(o.results)) return o.results as VerifiedTransactionOutput[];
 		if (Array.isArray(o.data)) return o.data as VerifiedTransactionOutput[];
+		const groups = Object.values(o).filter(Array.isArray) as VerifiedTransactionOutput[][];
+		if (groups.length > 0) return groups.flat();
 	}
 	return [];
 }
