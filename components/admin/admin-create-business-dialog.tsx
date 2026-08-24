@@ -69,7 +69,10 @@ export function AdminCreateBusinessDialog({
 	onOpenChange: (open: boolean) => void;
 	defaultOwnerId?: string | null;
 }) {
-	const { data: users, isLoading: usersLoading } = useListAllUsersQuery();
+	const { data: users, isLoading: usersLoading } = useListAllUsersQuery(
+		undefined,
+		{ skip: !open },
+	);
 	const [createBusiness, { isLoading }] = useAdminCreateBusinessMutation();
 	const [name, setName] = useState("");
 	const [tin, setTin] = useState("");

@@ -95,32 +95,78 @@ export const authApi = createApi({
 		 */
 		listAllUsers: builder.query<UserOutput[], void>({
 			async queryFn(_arg, _api, _extraOptions, baseQuery) {
-				const pageSize = 500;
-				let offset = 0;
-				const items: UserOutput[] = [];
-				for (;;) {
-					const res = await baseQuery({
-						url: "/api/v1/users/all",
-						method: "GET",
-						params: { offset, limit: pageSize },
-						headers: bearerHeaders(),
-					});
-					if (res.error) {
-						return { error: res.error as FetchBaseQueryError };
-					}
-					const page = res.data as PaginatedUserResponse;
-					const batch = Array.isArray(page?.items) ? page.items : [];
-					items.push(...batch);
-					const total = Number(page?.total_count);
-					if (
-						batch.length === 0 ||
-						batch.length < pageSize ||
-						(Number.isFinite(total) && items.length >= total)
-					) {
-						break;
-					}
-					offset += pageSize;
+				const requestedLimit = 500;
+				const first = await baseQuery({
+					url: "/api/v1/users/all",
+					method: "GET",
+					params: { offset: 0, limit: requestedLimit },
+					headers: bearerHeaders(),
+				});
+				if (first.error) {
+					return { error: first.error as FetchBaseQueryError };
 				}
+				const firstPage = first.data as PaginatedUserResponse;
+				const firstBatch = Array.isArray(firstPage?.items)
+					? firstPage.items
+					: [];
+				if (firstBatch.length === 0) {
+					return { data: [] };
+				}
+
+				// ponytail: API may clamp limit below requested; use what we actually got
+				const pageSize = Math.max(
+					1,
+					Number(firstPage?.limit) ||
+						Number(firstPage?.returned_count) ||
+						firstBatch.length,
+				);
+				const total = Number(firstPage?.total_count);
+				const items: UserOutput[] = [...firstBatch];
+
+				if (Number.isFinite(total) && total > items.length) {
+					const offsets: number[] = [];
+					for (let offset = pageSize; offset < total; offset += pageSize) {
+						offsets.push(offset);
+					}
+					const pages = await Promise.all(
+						offsets.map((offset) =>
+							baseQuery({
+								url: "/api/v1/users/all",
+								method: "GET",
+								params: { offset, limit: pageSize },
+								headers: bearerHeaders(),
+							}),
+						),
+					);
+					for (const res of pages) {
+						if (res.error) {
+							return { error: res.error as FetchBaseQueryError };
+						}
+						const page = res.data as PaginatedUserResponse;
+						const batch = Array.isArray(page?.items) ? page.items : [];
+						items.push(...batch);
+					}
+				} else if (!Number.isFinite(total) && firstBatch.length >= pageSize) {
+					let offset = pageSize;
+					for (;;) {
+						const res = await baseQuery({
+							url: "/api/v1/users/all",
+							method: "GET",
+							params: { offset, limit: pageSize },
+							headers: bearerHeaders(),
+						});
+						if (res.error) {
+							return { error: res.error as FetchBaseQueryError };
+						}
+						const page = res.data as PaginatedUserResponse;
+						const batch = Array.isArray(page?.items) ? page.items : [];
+						if (batch.length === 0) break;
+						items.push(...batch);
+						if (batch.length < pageSize) break;
+						offset += pageSize;
+					}
+				}
+
 				return { data: items };
 			},
 			keepUnusedDataFor: 300,

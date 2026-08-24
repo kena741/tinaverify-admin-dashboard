@@ -498,8 +498,8 @@ export default function TransactionsPage() {
 
 	const listBusy =
 		statusFilter === "unsubscribed"
-			? businessesLoading || statsLoading || usersLoading
-			: statsLoading || isFetching || businessesLoading || usersLoading;
+			? businessesLoading || statsLoading
+			: statsLoading || isFetching || businessesLoading;
 
 	return (
 		<div className="mx-auto flex w-full max-w-6xl flex-col gap-6 pb-8">
