@@ -36,6 +36,7 @@ import { cn } from "@/lib/utils";
 
 const financeLinks = [
 	{ name: "Subscription", href: "/admin/subscription" },
+	{ name: "Transactions", href: "/admin/finance/transactions" },
 	{ name: "Payment settings", href: "/admin/finance/payment-settings" },
 	{ name: "Taxes", href: "/admin/finance/taxes" },
 ] as const;
