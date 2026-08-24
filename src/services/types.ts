@@ -709,24 +709,6 @@ export type CreditUsageOutput = {
 };
 
 // -----------------------------
-// Payments / gateways
-// -----------------------------
-
-export type PaymentGatewayState = {
-	enabled: boolean;
-};
-
-export type PaymentGatewaysOutput = {
-	chapa: PaymentGatewayState;
-	telebirr: PaymentGatewayState;
-};
-
-export type PaymentGatewaysUpdateRequest = {
-	chapa?: PaymentGatewayState;
-	telebirr?: PaymentGatewayState;
-};
-
-// -----------------------------
 // Global settings
 // -----------------------------
 

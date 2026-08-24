@@ -264,11 +264,9 @@ export const subscriptionApi = createApi({
 
 export const {
 	useGetActiveSubscriptionQuery,
-	useLazyGetActiveSubscriptionQuery,
 	useListAdminSubscriptionTransactionsQuery,
 	useListSubscriptionHistoryQuery,
 	useGetSubscriptionUsageQuery,
-	useLazyGetSubscriptionUsageQuery,
 	useCheckoutSubscriptionMutation,
 	useCheckoutSubscriptionCustomMutation,
 	useGrantSubscriptionCreditsMutation,

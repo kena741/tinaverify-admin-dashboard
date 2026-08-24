@@ -73,22 +73,6 @@ export const roleApi = createApi({
 					: [{ type: "Role" as const, id: "LIST" }],
 		}),
 
-		/** `GET /api/v1/roles/list?business_id=...` */
-		listRolesByBusiness: builder.query<RoleOutput[], { businessId: string }>({
-			query: ({ businessId }) => ({
-				url: "/api/v1/roles/list",
-				params: { business_id: businessId },
-				headers: bearerHeaders(),
-			}),
-			providesTags: (result, _err, { businessId }) =>
-				result
-					? [
-							{ type: "Role" as const, id: `BUSINESS_${businessId}` },
-							...result.map((r) => ({ type: "Role" as const, id: r.id })),
-						]
-					: [{ type: "Role" as const, id: `BUSINESS_${businessId}` }],
-		}),
-
 		/** `POST /api/v1/roles` */
 		createRole: builder.mutation<RoleOutput, { body: RoleCreateRequest }>({
 			query: ({ body }) => ({
@@ -173,13 +157,10 @@ export const {
 	useListPermissionsQuery,
 	useCreatePermissionMutation,
 	useListRolesQuery,
-	useListRolesByBusinessQuery,
 	useCreateRoleMutation,
 	useGetRoleQuery,
-	useLazyGetRoleQuery,
 	useDeleteRoleMutation,
 	useGetRolePermissionsQuery,
-	useLazyGetRolePermissionsQuery,
 	useAssignPermissionsToRoleMutation,
 	useRemovePermissionFromRoleMutation,
 } = roleApi;

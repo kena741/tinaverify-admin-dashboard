@@ -12,7 +12,6 @@ import { smsApi } from "../services/sms/smsApi";
 import { transactionsApi } from "../services/transactions/transactionsApi";
 import { bannersApi } from "../services/banners/bannersApi";
 import { analyticsApi } from "../services/analytics/analyticsApi";
-import { paymentsApi } from "../services/payments/paymentsApi";
 import { globalSettingsApi } from "../services/global-settings/globalSettingsApi";
 import { contactMessagesApi } from "../services/contact-messages/contactMessagesApi";
 import { platformApi } from "../services/platform/platformApi";
@@ -34,7 +33,6 @@ const appReducer = combineReducers({
 	[transactionsApi.reducerPath]: transactionsApi.reducer,
 	[bannersApi.reducerPath]: bannersApi.reducer,
 	[analyticsApi.reducerPath]: analyticsApi.reducer,
-	[paymentsApi.reducerPath]: paymentsApi.reducer,
 	[globalSettingsApi.reducerPath]: globalSettingsApi.reducer,
 	[contactMessagesApi.reducerPath]: contactMessagesApi.reducer,
 });
@@ -73,7 +71,6 @@ export const store = configureStore({
 			transactionsApi.middleware,
 			bannersApi.middleware,
 			analyticsApi.middleware,
-			paymentsApi.middleware,
 			globalSettingsApi.middleware,
 			contactMessagesApi.middleware,
 		),

@@ -6,11 +6,9 @@ import type {
 	BranchCreateRequest,
 	BranchOutput,
 	BranchUpdateRequest,
-	BusinessCreateRequest,
 	BusinessOutput,
 	DeactivateBusinessRequest,
 	EmployeeOutput,
-	RoleOutput,
 	UpdateEmployeeRequest,
 } from "../types";
 
@@ -32,7 +30,7 @@ export type ListAllUserBranchesResult = {
 export const branchManagementApi = createApi({
 	reducerPath: "branchManagementApi",
 	baseQuery: backendBaseQuery,
-	tagTypes: ["Branch", "MyBusinesses", "Business", "Employee", "Role"],
+	tagTypes: ["Branch", "MyBusinesses", "Business", "Employee"],
 	endpoints: (builder) => ({
 		/** `GET /api/v1/business` */
 		listAllBusinesses: builder.query<BusinessOutput[], void>({
@@ -146,37 +144,6 @@ export const branchManagementApi = createApi({
 							})),
 						]
 					: [{ type: "Branch" as const, id: "LIST" }],
-		}),
-
-		createBusiness: builder.mutation<
-			BusinessOutput,
-			{ body: BusinessCreateRequest; accessToken: string }
-		>({
-			query: ({ body, accessToken }) => ({
-				url: "/api/v1/business",
-				method: "POST",
-				body,
-				headers: {
-					...bearerHeaders(accessToken),
-				},
-			}),
-			invalidatesTags: [
-				{ type: "MyBusinesses", id: "LIST" },
-				{ type: "Business", id: "LIST" },
-				{ type: "Branch", id: "LIST" },
-			],
-		}),
-
-		/** `GET /api/v1/business/roles?business_id=` */
-		listBusinessRoles: builder.query<RoleOutput[], { businessId: string }>({
-			query: ({ businessId }) => ({
-				url: "/api/v1/business/roles",
-				params: { business_id: businessId },
-				headers: bearerHeaders(),
-			}),
-			providesTags: (_result, _err, { businessId }) => [
-				{ type: "Role" as const, id: businessId },
-			],
 		}),
 
 		/** `GET /api/v1/business/{business_id}/employees` */
@@ -301,20 +268,15 @@ export const branchManagementApi = createApi({
 export const {
 	useListAllBusinessesQuery,
 	useGetBusinessQuery,
-	useLazyGetBusinessQuery,
 	useDeleteBusinessMutation,
 	useSetBusinessActiveMutation,
 	useListMyBusinessesQuery,
 	useListAllUserBranchesQuery,
-	useListBusinessRolesQuery,
 	useListBusinessEmployeesQuery,
 	useUpdateEmployeeRoleMutation,
-	useCreateBusinessMutation,
 	useCreateBranchMutation,
 	useListBusinessBranchesQuery,
-	useLazyListBusinessBranchesQuery,
 	useGetBranchQuery,
-	useLazyGetBranchQuery,
 	useUpdateBranchMutation,
 	useDeleteBranchMutation,
 } = branchManagementApi;

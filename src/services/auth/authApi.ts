@@ -7,11 +7,8 @@ import type {
 	BusinessOutput,
 	LoginRequest,
 	PaginatedUserResponse,
-	RegisterUserRequest,
-	UserPasswordUpdateRequest,
 	UserAuthResponse,
 	UserOutput,
-	UserUpdateRequest,
 } from "../types";
 
 function bearerHeaders(accessToken?: string | null) {
@@ -27,14 +24,6 @@ export const authApi = createApi({
 	baseQuery: backendBaseQuery,
 	tagTypes: ["Me", "User", "MyBusinesses", "MyBranch"],
 	endpoints: (builder) => ({
-		registerUser: builder.mutation<UserAuthResponse, RegisterUserRequest>({
-			query: (body) => ({
-				url: "/api/v1/users",
-				method: "POST",
-				body,
-			}),
-		}),
-
 		loginUser: builder.mutation<UserAuthResponse, LoginRequest>({
 			query: ({ username, password }) => {
 				const body = new URLSearchParams();
@@ -58,14 +47,6 @@ export const authApi = createApi({
 				headers: bearerHeaders(),
 			}),
 			providesTags: [{ type: "Me" as const, id: "ME" }],
-		}),
-
-		refreshToken: builder.mutation<UserAuthResponse, { refreshToken: string }>({
-			query: ({ refreshToken }) => ({
-				url: "/api/v1/users/refresh-token",
-				method: "POST",
-				params: { refresh_token: refreshToken },
-			}),
 		}),
 
 		/** `GET /api/v1/users/me/business` */
@@ -182,66 +163,13 @@ export const authApi = createApi({
 			}),
 			providesTags: (_r, _e, { userId }) => [{ type: "User" as const, id: userId }],
 		}),
-
-		/** `PATCH /api/v1/users/{user_id}` */
-		updateUser: builder.mutation<
-			UserOutput,
-			{ userId: string; body: UserUpdateRequest }
-		>({
-			query: ({ userId, body }) => ({
-				url: `/api/v1/users/${userId}`,
-				method: "PATCH",
-				body,
-				headers: { "Content-Type": "application/json", ...bearerHeaders() },
-			}),
-			invalidatesTags: (_r, _e, { userId }) => [
-				{ type: "User" as const, id: userId },
-				{ type: "User" as const, id: "LIST" },
-				{ type: "Me" as const, id: "ME" },
-			],
-		}),
-
-		/** `DELETE /api/v1/users/{user_id}` */
-		deleteUser: builder.mutation<void, { userId: string }>({
-			query: ({ userId }) => ({
-				url: `/api/v1/users/${userId}`,
-				method: "DELETE",
-				headers: bearerHeaders(),
-			}),
-			invalidatesTags: (_r, _e, { userId }) => [
-				{ type: "User" as const, id: userId },
-				{ type: "User" as const, id: "LIST" },
-			],
-		}),
-
-		/** `PATCH /api/v1/users/me/password?user_id=...` */
-		updateMyPassword: builder.mutation<
-			void,
-			{ userId: string; body: UserPasswordUpdateRequest }
-		>({
-			query: ({ userId, body }) => ({
-				url: "/api/v1/users/me/password",
-				method: "PATCH",
-				params: { user_id: userId },
-				body,
-				headers: { "Content-Type": "application/json", ...bearerHeaders() },
-			}),
-		}),
 	}),
 });
 
 export const {
-	useRegisterUserMutation,
-	useLoginUserMutation,
 	useReadMeQuery,
-	useLazyReadMeQuery,
-	useRefreshTokenMutation,
 	useListMyBusinessesQuery,
 	useGetMyBranchQuery,
 	useListAllUsersQuery,
 	useGetUserByIdQuery,
-	useLazyGetUserByIdQuery,
-	useUpdateUserMutation,
-	useDeleteUserMutation,
-	useUpdateMyPasswordMutation,
 } = authApi;
