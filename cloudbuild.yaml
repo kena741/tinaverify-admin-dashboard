@@ -15,7 +15,7 @@ images:
   - ${_IMAGE}
 timeout: 1200s
 substitutions:
-  _NEXT_PUBLIC_ADMIN_GRANT_CREDITS: "false"
+  _NEXT_PUBLIC_ADMIN_GRANT_CREDITS: "true"
   _NEXT_PUBLIC_ADMIN_BUSINESS_SMS: "false"
 options:
   logging: CLOUD_LOGGING_ONLY

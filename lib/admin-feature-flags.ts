@@ -1,7 +1,6 @@
 /**
  * Admin UI feature gates. Values are baked at `next build` via NEXT_PUBLIC_*.
- * Staging can enable grant credits; prod keeps them off until ready.
- * Local `next dev` always enables grant credits.
+ * Local `next dev` always enables grant credits; deployed builds use NEXT_PUBLIC_*.
  */
 export const ADMIN_FEATURE = {
 	grantCredits:
