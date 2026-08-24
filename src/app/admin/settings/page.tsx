@@ -424,7 +424,7 @@ export default function GlobalSettingsPage() {
 					</TabsTrigger>
 					<TabsTrigger value="roles" className="admin-tabs-line">
 						<KeyRoundIcon className="size-4" aria-hidden />
-						Roles
+						Business Roles
 					</TabsTrigger>
 				</TabsList>
 
