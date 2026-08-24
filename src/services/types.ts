@@ -500,7 +500,7 @@ export type TransactionLogStatus =
 	| "pending"
 	| "canceled";
 
-/** OpenAPI `TransactionLogOutputSchema` — Chapa payment logs */
+/** OpenAPI `TransactionLogOutputSchema` — Chapa / manual payment logs */
 export type TransactionLogOutput = {
 	id: UUID;
 	tx_ref: string;
@@ -511,6 +511,7 @@ export type TransactionLogOutput = {
 	payment_method: string | null;
 	phone_number: string | null;
 	currency: string | null;
+	receipt_url: string | null;
 	created_at: string;
 	updated_at: string;
 };

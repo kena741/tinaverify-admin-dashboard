@@ -17,6 +17,13 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@/components/ui/select";
+import {
+	Sheet,
+	SheetContent,
+	SheetDescription,
+	SheetHeader,
+	SheetTitle,
+} from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
 	Table,
@@ -81,6 +88,10 @@ function statusBadgeVariant(
 export default function FinanceTransactionsPage() {
 	const [offset, setOffset] = useState(0);
 	const [statusFilter, setStatusFilter] = useState<string>("all");
+	const [receiptPreview, setReceiptPreview] = useState<{
+		url: string;
+		label: string;
+	} | null>(null);
 
 	const status =
 		statusFilter === "all" ? null : (statusFilter as TransactionLogStatus);
@@ -172,6 +183,7 @@ export default function FinanceTransactionsPage() {
 										<TableHead>Phone</TableHead>
 										<TableHead>Tx ref</TableHead>
 										<TableHead>Reference</TableHead>
+										<TableHead>Receipt</TableHead>
 									</TableRow>
 								</TableHeader>
 								<TableBody>
@@ -212,6 +224,26 @@ export default function FinanceTransactionsPage() {
 											>
 												{row.reference ?? "—"}
 											</TableCell>
+											<TableCell>
+												{row.receipt_url ? (
+													<button
+														type="button"
+														className="text-sm font-medium underline-offset-2 hover:underline"
+														onClick={() => {
+															const url = row.receipt_url;
+															if (!url) return;
+															setReceiptPreview({
+																url,
+																label: row.name ?? row.tx_ref,
+															});
+														}}
+													>
+														View
+													</button>
+												) : (
+													<span className="text-muted-foreground">—</span>
+												)}
+											</TableCell>
 										</TableRow>
 									))}
 								</TableBody>
@@ -249,6 +281,43 @@ export default function FinanceTransactionsPage() {
 					</div>
 				</CardContent>
 			</Card>
+
+			<Sheet
+				open={receiptPreview !== null}
+				onOpenChange={(open) => {
+					if (!open) setReceiptPreview(null);
+				}}
+			>
+				<SheetContent side="right" className="sm:max-w-lg">
+					<SheetHeader>
+						<SheetTitle>Receipt</SheetTitle>
+						<SheetDescription>
+							{receiptPreview?.label ?? "Payment receipt"}
+						</SheetDescription>
+					</SheetHeader>
+					<div className="flex flex-col gap-3 px-4 pb-6">
+						{receiptPreview ? (
+							<>
+								{/* eslint-disable-next-line @next/next/no-img-element */}
+								<img
+									src={receiptPreview.url}
+									alt={`Receipt for ${receiptPreview.label}`}
+									className="max-h-[70vh] w-full rounded-md border border-border bg-muted object-contain"
+									referrerPolicy="no-referrer"
+								/>
+								<a
+									href={receiptPreview.url}
+									target="_blank"
+									rel="noopener noreferrer"
+									className="text-sm font-medium underline-offset-2 hover:underline"
+								>
+									Open original
+								</a>
+							</>
+						) : null}
+					</div>
+				</SheetContent>
+			</Sheet>
 		</div>
 	);
 }
