@@ -330,7 +330,7 @@ export default function SubscriptionPage() {
 		<div className="flex flex-col gap-6">
 			<PageHeader
 				title="Subscription"
-				description="Choose a business, then subscribe at a plan's list price, open custom checkout, use Fix to grant credits, or assign a subscription manually."
+				description="Choose a business, then subscribe at a plan's list price, open custom checkout, use Fix / development to grant credits, or assign a subscription manually."
 			/>
 
 			{businessesError ? (
@@ -512,7 +512,7 @@ export default function SubscriptionPage() {
 						<TabsList className="grid h-auto w-full grid-cols-1 gap-1 sm:grid-cols-4">
 							<TabsTrigger value="standard">Plan price</TabsTrigger>
 							<TabsTrigger value="custom">Custom amount</TabsTrigger>
-							<TabsTrigger value="fix">Fix</TabsTrigger>
+							<TabsTrigger value="fix">Fix / development</TabsTrigger>
 							<TabsTrigger value="manual">Manual assign</TabsTrigger>
 						</TabsList>
 
@@ -663,6 +663,14 @@ export default function SubscriptionPage() {
 							value="fix"
 							className="flex flex-col gap-4 outline-none"
 						>
+							<Alert>
+								<AlertTitle>Fix / development</AlertTitle>
+								<AlertDescription>
+									Grant credits is parked here while the subscription credits
+									API is being updated. Prefer this over day-to-day billing
+									flows until the backend work is done.
+								</AlertDescription>
+							</Alert>
 							<p className="text-sm text-muted-foreground">
 								Grant credits to the selected business&apos;s subscription
 								without going through checkout.

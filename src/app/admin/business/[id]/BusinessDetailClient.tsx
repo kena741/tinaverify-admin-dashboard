@@ -947,7 +947,10 @@ export default function BusinessDetailClient({
 
 					<div className="flex flex-col gap-1.5 rounded-lg border border-border bg-muted/30 p-2.5">
 						<p className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
-							Fix
+							Fix / development
+						</p>
+						<p className="text-[11px] leading-snug text-muted-foreground">
+							Temporary while subscription credits API is being updated.
 						</p>
 						<form
 							className="flex flex-wrap items-end gap-2"
