@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { ChevronsUpDownIcon, Loader2Icon } from "lucide-react";
 
 import { PageHeader } from "@/components/admin/page-header";
+import { ConfirmCreditActionDialog } from "@/components/admin/confirm-credit-action-dialog";
 import { useListAllBusinessesQuery } from "../../../services/branch-management/branchManagementApi";
 import {
 	useCheckoutSubscriptionCustomMutation,
@@ -120,8 +121,10 @@ export default function SubscriptionPage() {
 	const [actionTab, setActionTab] = useState<ActionTab>("standard");
 	const [customAmount, setCustomAmount] = useState("");
 	const [grantCreditsInput, setGrantCreditsInput] = useState("");
+	const [grantConfirmOpen, setGrantConfirmOpen] = useState(false);
 	const [manualPlanId, setManualPlanId] = useState("");
 	const [manualAmount, setManualAmount] = useState("");
+	const [assignConfirmOpen, setAssignConfirmOpen] = useState(false);
 	const [actionError, setActionError] = useState<string | null>(null);
 	const [grantSuccess, setGrantSuccess] = useState<SubscriptionOutput | null>(null);
 	const [manualSuccess, setManualSuccess] = useState<SubscriptionOutput | null>(
@@ -177,6 +180,11 @@ export default function SubscriptionPage() {
 		for (const p of plans) m.set(p.id, p);
 		return m;
 	}, [plans]);
+
+	const selectedBusinessName =
+		selectedBusiness?.name?.trim() || "this business";
+	const selectedManualPlanName =
+		plansById.get(manualPlanId)?.name ?? "this plan";
 
 	const [checkoutSubscription, { isLoading: paying }] =
 		useCheckoutSubscriptionMutation();
@@ -275,7 +283,7 @@ export default function SubscriptionPage() {
 		}
 	};
 
-	const onGrantCredits = async () => {
+	const onGrantCredits = () => {
 		if (!ADMIN_FEATURE.grantCredits) return;
 		setActionError(null);
 		setGrantSuccess(null);
@@ -289,7 +297,13 @@ export default function SubscriptionPage() {
 			setActionError("Enter a whole number of credits (at least 1).");
 			return;
 		}
+		setGrantConfirmOpen(true);
+	};
 
+	// ponytail: reference image is a UI gate only — grant-credits API is JSON `{ credits }` today
+	const onConfirmGrantCredits = async (referenceImage: File) => {
+		if (!businessId) return;
+		const n = Number.parseInt(grantCreditsInput.trim(), 10);
 		try {
 			const out = await grantSubscriptionCredits({
 				businessId,
@@ -297,12 +311,19 @@ export default function SubscriptionPage() {
 			}).unwrap();
 			setGrantSuccess(out);
 			setGrantCreditsInput("");
+			setGrantConfirmOpen(false);
+			setActionError(null);
 		} catch (e: unknown) {
-			setActionError(getErrorMessage(e, "Could not grant credits."));
+			setActionError(
+				getErrorMessage(
+					e,
+					`Could not grant credits (ref: ${referenceImage.name}).`,
+				),
+			);
 		}
 	};
 
-	const onManualAssign = async () => {
+	const onManualAssign = () => {
 		setActionError(null);
 		setGrantSuccess(null);
 		setManualSuccess(null);
@@ -314,6 +335,12 @@ export default function SubscriptionPage() {
 			setActionError("Select a subscription plan.");
 			return;
 		}
+		setAssignConfirmOpen(true);
+	};
+
+	// ponytail: reference image is a UI gate only — assign API has no image field today
+	const onConfirmManualAssign = async (referenceImage: File) => {
+		if (!businessId || !manualPlanId) return;
 		try {
 			const out = await assignSubscription({
 				body: {
@@ -324,8 +351,15 @@ export default function SubscriptionPage() {
 			}).unwrap();
 			setManualSuccess(out);
 			setManualAmount("");
+			setAssignConfirmOpen(false);
+			setActionError(null);
 		} catch (e: unknown) {
-			setActionError(getErrorMessage(e, "Could not assign subscription."));
+			setActionError(
+				getErrorMessage(
+					e,
+					`Could not assign subscription (ref: ${referenceImage.name}).`,
+				),
+			);
 		}
 	};
 
@@ -700,14 +734,9 @@ export default function SubscriptionPage() {
 									</FieldGroup>
 									{grantSuccess ? (
 										<Alert>
-											<AlertTitle>Subscription updated</AlertTitle>
-											<AlertDescription className="space-y-1">
-												<p>
-													Status: <strong>{grantSuccess.status}</strong>
-												</p>
-												<p className="font-mono text-xs text-muted-foreground">
-													Subscription ID: {grantSuccess.id}
-												</p>
+											<AlertTitle>Credits granted</AlertTitle>
+											<AlertDescription>
+												Status is now <strong>{grantSuccess.status}</strong>.
 											</AlertDescription>
 										</Alert>
 									) : null}
@@ -716,7 +745,7 @@ export default function SubscriptionPage() {
 									) : null}
 									<div className="flex justify-end">
 										<Button
-											onClick={() => void onGrantCredits()}
+											onClick={onGrantCredits}
 											disabled={!canGrantCredits}
 										>
 											{granting ? (
@@ -812,13 +841,8 @@ export default function SubscriptionPage() {
 							{manualSuccess ? (
 								<Alert>
 									<AlertTitle>Subscription assigned</AlertTitle>
-									<AlertDescription className="space-y-1">
-										<p>
-											Status: <strong>{manualSuccess.status}</strong>
-										</p>
-										<p className="font-mono text-xs text-muted-foreground">
-											Subscription ID: {manualSuccess.id}
-										</p>
+									<AlertDescription>
+										Status is now <strong>{manualSuccess.status}</strong>.
 									</AlertDescription>
 								</Alert>
 							) : null}
@@ -827,7 +851,7 @@ export default function SubscriptionPage() {
 							) : null}
 							<div className="flex justify-end">
 								<Button
-									onClick={() => void onManualAssign()}
+									onClick={onManualAssign}
 									disabled={!canManualAssign}
 								>
 									{assigning ? (
@@ -840,6 +864,26 @@ export default function SubscriptionPage() {
 					</Tabs>
 				</CardContent>
 			</Card>
+
+			<ConfirmCreditActionDialog
+				open={grantConfirmOpen}
+				onOpenChange={setGrantConfirmOpen}
+				title="Confirm grant credits?"
+				summary={`Are you sure you want to grant ${creditsParsed} credits to ${selectedBusinessName}?`}
+				confirmLabel="Yes, grant credits"
+				isPending={granting}
+				onConfirm={onConfirmGrantCredits}
+			/>
+
+			<ConfirmCreditActionDialog
+				open={assignConfirmOpen}
+				onOpenChange={setAssignConfirmOpen}
+				title="Confirm assign plan?"
+				summary={`Are you sure you want to assign ${selectedManualPlanName} to ${selectedBusinessName}?`}
+				confirmLabel="Yes, assign plan"
+				isPending={assigning}
+				onConfirm={onConfirmManualAssign}
+			/>
 		</div>
 	);
 }

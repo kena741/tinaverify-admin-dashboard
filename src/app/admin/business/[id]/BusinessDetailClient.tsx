@@ -80,6 +80,7 @@ import type {
 import { useListRolesQuery } from "../../../../services/role/roleApi";
 import { useGetUserByIdQuery } from "../../../../services/auth/authApi";
 import { BusinessPaymentsTab } from "@/components/admin/business-payments-tab";
+import { ConfirmCreditActionDialog } from "@/components/admin/confirm-credit-action-dialog";
 import { SendBusinessSmsDialog } from "@/components/admin/send-business-sms-dialog";
 import { usePlatformAccess } from "@/hooks/use-platform-access";
 import { ADMIN_FEATURE } from "@/lib/admin-feature-flags";
@@ -316,12 +317,14 @@ export default function BusinessDetailClient({
 		message: string;
 	} | null>(null);
 	const [grantCreditsInput, setGrantCreditsInput] = useState("");
+	const [grantConfirmOpen, setGrantConfirmOpen] = useState(false);
 	const [grantBanner, setGrantBanner] = useState<{
 		variant: "default" | "destructive";
 		title: string;
 		message: string;
 	} | null>(null);
 	const [manualPlanId, setManualPlanId] = useState("");
+	const [assignConfirmOpen, setAssignConfirmOpen] = useState(false);
 	const [manualBanner, setManualBanner] = useState<{
 		variant: "default" | "destructive";
 		title: string;
@@ -351,7 +354,7 @@ export default function BusinessDetailClient({
 		grantCreditsParsed >= 1 &&
 		!grantingCredits;
 
-	async function onGrantCredits() {
+	function openGrantConfirm() {
 		if (!ADMIN_FEATURE.grantCredits) return;
 		setGrantBanner(null);
 		if (!canGrantCredits) {
@@ -362,16 +365,22 @@ export default function BusinessDetailClient({
 			});
 			return;
 		}
+		setGrantConfirmOpen(true);
+	}
+
+	// ponytail: reference image is a UI gate only — grant-credits API is JSON `{ credits }` today
+	async function onConfirmGrantCredits(referenceImage: File) {
 		try {
 			const out = await grantSubscriptionCredits({
 				businessId,
 				body: { credits: grantCreditsParsed },
 			}).unwrap();
 			setGrantCreditsInput("");
+			setGrantConfirmOpen(false);
 			setGrantBanner({
 				variant: "default",
 				title: "Credits granted",
-				message: `Subscription ${out.id} is now ${out.status}. Usage will refresh automatically.`,
+				message: `Granted ${grantCreditsParsed} credits (ref: ${referenceImage.name}). Status is now ${out.status}.`,
 			});
 		} catch (err) {
 			setGrantBanner({
@@ -383,8 +392,11 @@ export default function BusinessDetailClient({
 	}
 
 	const canManualAssign = Boolean(manualPlanId) && !assigningSubscription;
+	const selectedAssignPlan = manualPlanId
+		? subscriptionPlanById.get(manualPlanId)
+		: undefined;
 
-	async function onManualAssign() {
+	function openAssignConfirm() {
 		setManualBanner(null);
 		if (!manualPlanId) {
 			setManualBanner({
@@ -394,6 +406,12 @@ export default function BusinessDetailClient({
 			});
 			return;
 		}
+		setAssignConfirmOpen(true);
+	}
+
+	// ponytail: reference image is a UI gate only — assign API has no image field today
+	async function onConfirmManualAssign(referenceImage: File) {
+		if (!manualPlanId) return;
 		try {
 			const out = await assignSubscription({
 				body: {
@@ -401,10 +419,11 @@ export default function BusinessDetailClient({
 					plan_id: manualPlanId,
 				},
 			}).unwrap();
+			setAssignConfirmOpen(false);
 			setManualBanner({
 				variant: "default",
 				title: "Subscription assigned",
-				message: `Subscription ${out.id} is now ${out.status}.`,
+				message: `Assigned ${selectedAssignPlan?.name ?? "plan"} (ref: ${referenceImage.name}). Status is now ${out.status}.`,
 			});
 		} catch (err) {
 			setManualBanner({
@@ -931,10 +950,10 @@ export default function BusinessDetailClient({
 						className="flex flex-wrap items-end gap-2"
 						onSubmit={(e) => {
 							e.preventDefault();
-							void onManualAssign();
+							openAssignConfirm();
 						}}
 					>
-						<Field className="min-w-[10rem] flex-1">
+						<Field className="min-w-40 flex-1">
 							<FieldLabel
 								htmlFor="quick-assign-plan"
 								className="text-xs text-muted-foreground"
@@ -983,7 +1002,7 @@ export default function BusinessDetailClient({
 							className="flex flex-wrap items-end gap-2 rounded-lg border border-border bg-muted/30 p-2.5"
 							onSubmit={(e) => {
 								e.preventDefault();
-								void onGrantCredits();
+								openGrantConfirm();
 							}}
 						>
 							<div className="flex w-full flex-wrap items-center gap-2">
@@ -991,7 +1010,7 @@ export default function BusinessDetailClient({
 									Grant credits
 								</p>
 							</div>
-							<Field className="min-w-[10rem] flex-1">
+							<Field className="min-w-40 flex-1">
 								<FieldLabel
 									htmlFor="quick-grant-credits"
 									className="text-xs text-muted-foreground"
@@ -1044,6 +1063,26 @@ export default function BusinessDetailClient({
 					)}
 				</div>
 			</section>
+
+			<ConfirmCreditActionDialog
+				open={grantConfirmOpen}
+				onOpenChange={setGrantConfirmOpen}
+				title="Confirm grant credits?"
+				summary={`Are you sure you want to grant ${grantCreditsParsed} credits to ${business.name}?`}
+				confirmLabel="Yes, grant credits"
+				isPending={grantingCredits}
+				onConfirm={onConfirmGrantCredits}
+			/>
+
+			<ConfirmCreditActionDialog
+				open={assignConfirmOpen}
+				onOpenChange={setAssignConfirmOpen}
+				title="Confirm assign plan?"
+				summary={`Are you sure you want to assign ${selectedAssignPlan?.name ?? "this plan"} to ${business.name}?`}
+				confirmLabel="Yes, assign plan"
+				isPending={assigningSubscription}
+				onConfirm={onConfirmManualAssign}
+			/>
 
 			{businessSmsEnabled ? (
 				<SendBusinessSmsDialog
