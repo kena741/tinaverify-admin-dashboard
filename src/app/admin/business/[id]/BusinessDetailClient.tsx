@@ -893,7 +893,7 @@ export default function BusinessDetailClient({
 					</div>
 				) : null}
 
-				<div className="grid gap-2 border-t border-border pt-3 sm:grid-cols-2">
+				<div className="grid gap-3 border-t border-border pt-3 sm:grid-cols-2">
 					<form
 						className="flex flex-wrap items-end gap-2"
 						onSubmit={(e) => {
@@ -945,46 +945,51 @@ export default function BusinessDetailClient({
 						</Button>
 					</form>
 
-					<form
-						className="flex flex-wrap items-end gap-2"
-						onSubmit={(e) => {
-							e.preventDefault();
-							void onGrantCredits();
-						}}
-					>
-						<Field className="min-w-[10rem] flex-1">
-							<FieldLabel
-								htmlFor="quick-grant-credits"
-								className="text-xs text-muted-foreground"
-							>
-								Grant credits
-							</FieldLabel>
-							<Input
-								id="quick-grant-credits"
-								name="credits"
-								type="text"
-								inputMode="numeric"
-								autoComplete="off"
-								placeholder="e.g. 500"
-								className="h-9 bg-background"
-								value={grantCreditsInput}
-								onChange={(e) => {
-									setGrantCreditsInput(e.target.value);
-									setGrantBanner(null);
-								}}
-							/>
-						</Field>
-						<Button type="submit" size="sm" disabled={!canGrantCredits}>
-							{grantingCredits ? (
-								<Loader2Icon
-									data-icon="inline-start"
-									className="animate-spin"
-									aria-hidden
+					<div className="flex flex-col gap-1.5 rounded-lg border border-border bg-muted/30 p-2.5">
+						<p className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
+							Fix
+						</p>
+						<form
+							className="flex flex-wrap items-end gap-2"
+							onSubmit={(e) => {
+								e.preventDefault();
+								void onGrantCredits();
+							}}
+						>
+							<Field className="min-w-[10rem] flex-1">
+								<FieldLabel
+									htmlFor="quick-grant-credits"
+									className="text-xs text-muted-foreground"
+								>
+									Grant credits
+								</FieldLabel>
+								<Input
+									id="quick-grant-credits"
+									name="credits"
+									type="text"
+									inputMode="numeric"
+									autoComplete="off"
+									placeholder="e.g. 500"
+									className="h-9 bg-background"
+									value={grantCreditsInput}
+									onChange={(e) => {
+										setGrantCreditsInput(e.target.value);
+										setGrantBanner(null);
+									}}
 								/>
-							) : null}
-							{grantingCredits ? "…" : "Grant"}
-						</Button>
-					</form>
+							</Field>
+							<Button type="submit" size="sm" disabled={!canGrantCredits}>
+								{grantingCredits ? (
+									<Loader2Icon
+										data-icon="inline-start"
+										className="animate-spin"
+										aria-hidden
+									/>
+								) : null}
+								{grantingCredits ? "…" : "Grant"}
+							</Button>
+						</form>
+					</div>
 				</div>
 			</section>
 

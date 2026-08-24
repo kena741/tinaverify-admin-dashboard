@@ -10,7 +10,7 @@ import {
 	ChevronRightIcon,
 } from "lucide-react";
 
-import { useListAllUsersQuery } from "@/services/auth/authApi";
+import { useGetUserByIdQuery } from "@/services/auth/authApi";
 import { AdminCreateBusinessDialog } from "@/components/admin/admin-create-business-dialog";
 import { AdminCreateUserDialog } from "@/components/admin/admin-create-user-dialog";
 import { useListAllBusinessesQuery } from "@/services/branch-management/branchManagementApi";
@@ -19,7 +19,6 @@ import { useListSubscriptionPlansQuery } from "@/services/subscription-plan/subs
 import type {
 	AdminSubscriptionOutput,
 	BusinessOutput,
-	UserOutput,
 } from "@/services/types";
 import {
 	buildLatestBusinessSubscriptionRows,
@@ -240,7 +239,6 @@ export default function TransactionsPage() {
 
 	const { data: businesses, isLoading: businessesLoading } =
 		useListAllBusinessesQuery();
-	const { data: allUsers, isLoading: usersLoading } = useListAllUsersQuery();
 	const { data: plans } = useListSubscriptionPlansQuery();
 
 	const {
@@ -250,14 +248,6 @@ export default function TransactionsPage() {
 		error,
 		refetch,
 	} = useListAdminSubscriptionTransactionsQuery();
-
-	const usersById = useMemo(() => {
-		const map: Record<string, UserOutput> = {};
-		for (const user of allUsers ?? []) {
-			map[user.id] = user;
-		}
-		return map;
-	}, [allUsers]);
 
 	const ownerIdByBusinessId = useMemo(() => {
 		const map = new Map<string, string>();
@@ -319,9 +309,9 @@ export default function TransactionsPage() {
 
 		const q = searchTerm.trim().toLowerCase();
 		if (q) {
+			// ponytail: search businesses/plans only; owner names hydrate per-row via getUserById
 			businessRows = businessRows.filter((row) => {
 				const ownerId = ownerIdByBusinessId.get(row.business_id);
-				const owner = ownerId ? usersById[ownerId] : undefined;
 				const ownerBizNames = ownerId
 					? (businessesByOwnerId.get(ownerId) ?? [])
 							.map((b) => b.name)
@@ -335,10 +325,7 @@ export default function TransactionsPage() {
 					row.chapa_transaction_reference,
 					row.business_id,
 					ownerBizNames,
-					owner ? formatUserDisplayName(owner) : "",
-					owner?.email,
-					owner?.phone_number,
-					owner?.username,
+					ownerId,
 				]
 					.filter(Boolean)
 					.join(" ")
@@ -407,7 +394,6 @@ export default function TransactionsPage() {
 		searchTerm,
 		ownerIdByBusinessId,
 		businessesByOwnerId,
-		usersById,
 		bizCountFilter,
 		minAmount,
 		dateFrom,
@@ -943,24 +929,11 @@ export default function TransactionsPage() {
 										const ownerBusinesses = ownerId
 											? (businessesByOwnerId.get(ownerId) ?? [])
 											: [];
-										const ownerUser = ownerId
-											? usersById[ownerId]
-											: undefined;
-										const ownerLoadState: "loading" | "ready" | "missing" =
-											!ownerId
-												? "missing"
-												: usersLoading && !allUsers
-													? "loading"
-													: ownerUser
-														? "ready"
-														: "missing";
 										return (
 											<OwnerRow
 												key={ownerId ?? row.id}
 												row={row}
 												ownerId={ownerId}
-												owner={ownerUser ?? null}
-												ownerLoadState={ownerLoadState}
 												ownerBusinesses={ownerBusinesses}
 												onSelect={() =>
 													router.push(`/admin/business/${row.business_id}`)
@@ -1041,18 +1014,23 @@ export default function TransactionsPage() {
 function OwnerRow({
 	row,
 	ownerId,
-	owner,
-	ownerLoadState,
 	ownerBusinesses,
 	onSelect,
 }: {
 	row: AdminSubscriptionOutput;
 	ownerId: string | undefined;
-	owner: UserOutput | null;
-	ownerLoadState: "loading" | "ready" | "missing";
 	ownerBusinesses: BusinessOutput[];
 	onSelect: () => void;
 }) {
+	const {
+		data: owner,
+		isLoading: ownerLoading,
+		isError: ownerError,
+	} = useGetUserByIdQuery(
+		{ userId: ownerId ?? "" },
+		{ skip: !ownerId },
+	);
+
 	const count = ownerBusinesses.length;
 	const namesSummary = formatBusinessNames(ownerBusinesses);
 	const displayName = owner ? formatUserDisplayName(owner) : null;
@@ -1082,7 +1060,7 @@ function OwnerRow({
 			<TableCell>
 				{!ownerId ? (
 					<span className="text-muted-foreground">No owner linked</span>
-				) : ownerLoadState === "loading" ? (
+				) : ownerLoading ? (
 					<div className="flex flex-col gap-1">
 						<Skeleton className="h-4 w-28" />
 						<Skeleton className="h-3 w-24" />
@@ -1103,7 +1081,9 @@ function OwnerRow({
 					</div>
 				) : (
 					<div className="flex flex-col gap-0.5">
-						<span className="text-muted-foreground">Owner lookup failed</span>
+						<span className="text-muted-foreground">
+							{ownerError ? "Owner lookup failed" : "Unknown owner"}
+						</span>
 						<span
 							className="font-mono text-xs text-muted-foreground"
 							title={ownerId}
@@ -1160,6 +1140,7 @@ function OwnerRow({
 		</TableRow>
 	);
 }
+
 
 function OwnersLedgerStat({
 	label,

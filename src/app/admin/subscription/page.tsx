@@ -107,7 +107,7 @@ function parseAmount(raw: string): number | null {
 	return n;
 }
 
-type ActionTab = "standard" | "custom" | "grant" | "manual";
+type ActionTab = "standard" | "custom" | "fix" | "manual";
 
 export default function SubscriptionPage() {
 	const [businessPopoverOpen, setBusinessPopoverOpen] = useState(false);
@@ -330,7 +330,7 @@ export default function SubscriptionPage() {
 		<div className="flex flex-col gap-6">
 			<PageHeader
 				title="Subscription"
-				description="Choose a business, then subscribe at a plan's list price, open checkout, grant credits, or assign a subscription manually."
+				description="Choose a business, then subscribe at a plan's list price, open custom checkout, use Fix to grant credits, or assign a subscription manually."
 			/>
 
 			{businessesError ? (
@@ -504,7 +504,7 @@ export default function SubscriptionPage() {
 							const next = v as ActionTab;
 							setActionTab(next);
 							setActionError(null);
-							if (next !== "grant") setGrantSuccess(null);
+							if (next !== "fix") setGrantSuccess(null);
 							if (next !== "manual") setManualSuccess(null);
 						}}
 						className="flex w-full flex-col gap-4"
@@ -512,7 +512,7 @@ export default function SubscriptionPage() {
 						<TabsList className="grid h-auto w-full grid-cols-1 gap-1 sm:grid-cols-4">
 							<TabsTrigger value="standard">Plan price</TabsTrigger>
 							<TabsTrigger value="custom">Custom amount</TabsTrigger>
-							<TabsTrigger value="grant">Grant credits</TabsTrigger>
+							<TabsTrigger value="fix">Fix</TabsTrigger>
 							<TabsTrigger value="manual">Manual assign</TabsTrigger>
 						</TabsList>
 
@@ -660,11 +660,11 @@ export default function SubscriptionPage() {
 						</TabsContent>
 
 						<TabsContent
-							value="grant"
+							value="fix"
 							className="flex flex-col gap-4 outline-none"
 						>
 							<p className="text-sm text-muted-foreground">
-								Add credits to the selected business&apos;s subscription usage
+								Grant credits to the selected business&apos;s subscription
 								without going through checkout.
 							</p>
 							<FieldGroup>
@@ -706,7 +706,7 @@ export default function SubscriptionPage() {
 									</AlertDescription>
 								</Alert>
 							) : null}
-							{actionError && actionTab === "grant" ? (
+							{actionError && actionTab === "fix" ? (
 								<p className="text-sm text-destructive">{actionError}</p>
 							) : null}
 							<div className="flex justify-end">
