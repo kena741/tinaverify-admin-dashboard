@@ -138,7 +138,6 @@ export const adminApi = createApi({
 					dispatch(
 						subscriptionApi.util.invalidateTags([
 							{ type: "Subscription", id: body.business_id },
-							{ type: "SubscriptionHistory", id: body.business_id },
 							{ type: "SubscriptionUsage", id: body.business_id },
 							{ type: "SubscriptionTransactions", id: "LIST" },
 							{ type: "TransactionLogs", id: "LIST" },

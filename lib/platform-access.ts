@@ -82,7 +82,6 @@ export function firstAllowedSystemAdminPath(
 	const candidates = [
 		"/admin/dashboard",
 		"/admin/owners",
-		"/admin/subscription",
 		"/admin/services/banners",
 		"/admin/referrals",
 		"/admin/settings/contact-messages",

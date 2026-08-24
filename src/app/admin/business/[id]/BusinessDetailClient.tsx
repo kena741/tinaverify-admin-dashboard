@@ -65,17 +65,17 @@ import {
 	useGetActiveSubscriptionQuery,
 	useGetSubscriptionUsageQuery,
 	useGrantSubscriptionCreditsMutation,
-	useListSubscriptionHistoryQuery,
+	useListAdminSubscriptionTransactionsQuery,
 } from "../../../../services/subscription/subscriptionApi";
 import { useAdminAssignSubscriptionMutation } from "../../../../services/admin/adminApi";
 import { useListSubscriptionPlansQuery } from "../../../../services/subscription-plan/subscriptionPlanApi";
 import type {
+	AdminSubscriptionOutput,
 	BankAccountResponse,
 	BranchOutput,
 	BusinessOutput,
 	EmployeeOutput,
 	RoleOutput,
-	SubscriptionOutput,
 } from "../../../../services/types";
 import { useListRolesQuery } from "../../../../services/role/roleApi";
 import { useGetUserByIdQuery } from "../../../../services/auth/authApi";
@@ -287,7 +287,7 @@ export default function BusinessDetailClient({
 		isFetching: subscriptionHistoryFetching,
 		error: subscriptionHistoryError,
 		refetch: refetchSubscriptionHistory,
-	} = useListSubscriptionHistoryQuery(
+	} = useListAdminSubscriptionTransactionsQuery(
 		{ businessId },
 		{ skip: missingBusinessId },
 	);
@@ -1413,10 +1413,12 @@ export default function BusinessDetailClient({
 											<TableRow>
 												<TableHead>Plan</TableHead>
 												<TableHead>Status</TableHead>
+												<TableHead>Amount</TableHead>
+												<TableHead>Credits</TableHead>
 												<TableHead>Started</TableHead>
 												<TableHead>Ended</TableHead>
 												<TableHead className="hidden lg:table-cell">
-													Chapa reference
+													Reference
 												</TableHead>
 											</TableRow>
 										</TableHeader>
@@ -1424,7 +1426,7 @@ export default function BusinessDetailClient({
 											{(subscriptionHistory ?? []).length === 0 ? (
 												<TableRow>
 													<TableCell
-														colSpan={5}
+														colSpan={7}
 														className="py-10 text-center text-sm text-muted-foreground"
 													>
 														No subscription history for this business.
@@ -1432,16 +1434,10 @@ export default function BusinessDetailClient({
 												</TableRow>
 											) : (
 												(subscriptionHistory ?? []).map(
-													(row: SubscriptionOutput) => (
+													(row: AdminSubscriptionOutput) => (
 														<TableRow key={row.id}>
 															<TableCell className="font-medium">
-																{getSubscriptionPlanLabel(
-																	null,
-																	row.plan_id
-																		? subscriptionPlanById.get(row.plan_id)
-																				?.name
-																		: null,
-																)}
+																{getSubscriptionPlanLabel(row.plan)}
 															</TableCell>
 															<TableCell>
 																<Badge
@@ -1452,6 +1448,16 @@ export default function BusinessDetailClient({
 																>
 																	{getSubscriptionStatusLabel(row.status)}
 																</Badge>
+															</TableCell>
+															<TableCell className="font-mono text-sm tabular-nums">
+																{row.amount == null
+																	? "—"
+																	: row.amount.toLocaleString(undefined, {
+																			maximumFractionDigits: 2,
+																		})}
+															</TableCell>
+															<TableCell className="font-mono text-sm tabular-nums">
+																{row.credits_limit.toLocaleString()}
 															</TableCell>
 															<TableCell className="font-mono text-sm whitespace-nowrap tabular-nums">
 																{formatDateTime(row.started_at)}

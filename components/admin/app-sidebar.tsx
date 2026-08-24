@@ -4,7 +4,6 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { LucideIcon } from "lucide-react";
 import {
-	BadgeCheck,
 	Bell,
 	ClipboardList,
 	Landmark,
@@ -71,7 +70,6 @@ const branchAdminMainNav: NavItem[] = [
 const branchAdminUsersNav: NavItem[] = [
 	{ name: "Owners", href: "/admin/owners", icon: Users },
 	{ name: "Staff", href: "/admin/staff", icon: UserRound },
-	{ name: "Subscription", href: "/admin/subscription", icon: BadgeCheck },
 	{ name: "Notifications", href: "/admin/notifications", icon: Bell },
 ];
 

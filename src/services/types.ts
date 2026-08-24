@@ -456,7 +456,7 @@ export type SubscriptionStatus =
 export type SubscriptionBusinessOutput = {
 	id: UUID;
 	name: string;
-	tin_number: string;
+	tin_number: string | null;
 };
 
 /** OpenAPI `AdminSubscriptionOutputSchema` — `GET /api/v1/subscriptions/transactions` */
