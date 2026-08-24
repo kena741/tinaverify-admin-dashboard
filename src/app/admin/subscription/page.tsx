@@ -48,6 +48,8 @@ import {
 	SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
+import { ADMIN_FEATURE } from "@/lib/admin-feature-flags";
 
 function moneyLabel(price: string) {
 	const n = Number(price);
@@ -274,6 +276,7 @@ export default function SubscriptionPage() {
 	};
 
 	const onGrantCredits = async () => {
+		if (!ADMIN_FEATURE.grantCredits) return;
 		setActionError(null);
 		setGrantSuccess(null);
 		setManualSuccess(null);
@@ -330,7 +333,7 @@ export default function SubscriptionPage() {
 		<div className="flex flex-col gap-6">
 			<PageHeader
 				title="Subscription"
-				description="Choose a business, then subscribe at a plan's list price, open custom checkout, use Fix / development to grant credits, or assign a subscription manually."
+				description="Choose a business, then subscribe at a plan's list price, open custom checkout, or assign a subscription manually."
 			/>
 
 			{businessesError ? (
@@ -512,7 +515,7 @@ export default function SubscriptionPage() {
 						<TabsList className="grid h-auto w-full grid-cols-1 gap-1 sm:grid-cols-4">
 							<TabsTrigger value="standard">Plan price</TabsTrigger>
 							<TabsTrigger value="custom">Custom amount</TabsTrigger>
-							<TabsTrigger value="fix">Fix / development</TabsTrigger>
+							<TabsTrigger value="fix">Under development</TabsTrigger>
 							<TabsTrigger value="manual">Manual assign</TabsTrigger>
 						</TabsList>
 
@@ -663,68 +666,87 @@ export default function SubscriptionPage() {
 							value="fix"
 							className="flex flex-col gap-4 outline-none"
 						>
-							<Alert>
-								<AlertTitle>Fix / development</AlertTitle>
-								<AlertDescription>
-									Grant credits is parked here while the subscription credits
-									API is being updated. Prefer this over day-to-day billing
-									flows until the backend work is done.
-								</AlertDescription>
-							</Alert>
-							<p className="text-sm text-muted-foreground">
-								Grant credits to the selected business&apos;s subscription
-								without going through checkout.
-							</p>
-							<FieldGroup>
-								<Field>
-									<FieldLabel htmlFor="grant-credits">
-										Credits to grant
-									</FieldLabel>
-									<Input
-										id="grant-credits"
-										name="credits"
-										type="text"
-										inputMode="numeric"
-										autoComplete="off"
-										placeholder="e.g. 500…"
-										value={grantCreditsInput}
-										onChange={(e) => {
-											setGrantCreditsInput(e.target.value);
-											setActionError(null);
-											setGrantSuccess(null);
-										}}
-										disabled={!businessId}
-									/>
-									<FieldDescription>
-										Whole number, minimum 1. Requires an authenticated admin
-										context on the API.
-									</FieldDescription>
-								</Field>
-							</FieldGroup>
-							{grantSuccess ? (
-								<Alert>
-									<AlertTitle>Subscription updated</AlertTitle>
-									<AlertDescription className="space-y-1">
-										<p>
-											Status: <strong>{grantSuccess.status}</strong>
-										</p>
-										<p className="font-mono text-xs text-muted-foreground">
-											Subscription ID: {grantSuccess.id}
-										</p>
-									</AlertDescription>
-								</Alert>
-							) : null}
-							{actionError && actionTab === "fix" ? (
-								<p className="text-sm text-destructive">{actionError}</p>
-							) : null}
-							<div className="flex justify-end">
-								<Button onClick={onGrantCredits} disabled={!canGrantCredits}>
-									{granting ? (
-										<Loader2Icon className="animate-spin" aria-hidden="true" />
+							{ADMIN_FEATURE.grantCredits ? (
+								<>
+									<p className="text-sm text-muted-foreground">
+										Grant credits to the selected business&apos;s subscription
+										without going through checkout.
+									</p>
+									<FieldGroup>
+										<Field>
+											<FieldLabel htmlFor="grant-credits">
+												Credits to grant
+											</FieldLabel>
+											<Input
+												id="grant-credits"
+												name="credits"
+												type="text"
+												inputMode="numeric"
+												autoComplete="off"
+												placeholder="e.g. 500…"
+												value={grantCreditsInput}
+												onChange={(e) => {
+													setGrantCreditsInput(e.target.value);
+													setActionError(null);
+													setGrantSuccess(null);
+												}}
+												disabled={!businessId}
+											/>
+											<FieldDescription>
+												Whole number, minimum 1. Requires an authenticated admin
+												context on the API.
+											</FieldDescription>
+										</Field>
+									</FieldGroup>
+									{grantSuccess ? (
+										<Alert>
+											<AlertTitle>Subscription updated</AlertTitle>
+											<AlertDescription className="space-y-1">
+												<p>
+													Status: <strong>{grantSuccess.status}</strong>
+												</p>
+												<p className="font-mono text-xs text-muted-foreground">
+													Subscription ID: {grantSuccess.id}
+												</p>
+											</AlertDescription>
+										</Alert>
 									) : null}
-									{granting ? "Granting…" : "Grant credits"}
-								</Button>
-							</div>
+									{actionError && actionTab === "fix" ? (
+										<p className="text-sm text-destructive">{actionError}</p>
+									) : null}
+									<div className="flex justify-end">
+										<Button
+											onClick={() => void onGrantCredits()}
+											disabled={!canGrantCredits}
+										>
+											{granting ? (
+												<Loader2Icon
+													className="animate-spin"
+													aria-hidden="true"
+												/>
+											) : null}
+											{granting ? "Granting…" : "Grant credits"}
+										</Button>
+									</div>
+								</>
+							) : (
+								<div className="flex flex-col gap-3 rounded-lg border border-dashed border-border bg-muted/20 px-4 py-5">
+									<div className="flex flex-wrap items-center gap-2">
+										<p className="text-sm font-medium tracking-tight">
+											Grant credits
+										</p>
+										<Badge
+											variant="outline"
+											className="font-normal text-muted-foreground"
+										>
+											Unavailable
+										</Badge>
+									</div>
+									<p className="text-sm text-muted-foreground">
+										Will return when the credits API is ready.
+									</p>
+								</div>
+							)}
 						</TabsContent>
 
 						<TabsContent

@@ -81,6 +81,8 @@ import { useListRolesQuery } from "../../../../services/role/roleApi";
 import { useGetUserByIdQuery } from "../../../../services/auth/authApi";
 import { BusinessPaymentsTab } from "@/components/admin/business-payments-tab";
 import { SendBusinessSmsDialog } from "@/components/admin/send-business-sms-dialog";
+import { usePlatformAccess } from "@/hooks/use-platform-access";
+import { ADMIN_FEATURE } from "@/lib/admin-feature-flags";
 import { cn } from "@/lib/utils";
 import {
 	getSubscriptionPlanLabel,
@@ -180,6 +182,9 @@ export default function BusinessDetailClient({
 	const router = useRouter();
 	const searchParams = useSearchParams();
 	const businessId = params.id;
+	const { canMutateOwners } = usePlatformAccess();
+	const grantCreditsEnabled = ADMIN_FEATURE.grantCredits;
+	const businessSmsEnabled = ADMIN_FEATURE.businessSms;
 	const missingBusinessId = !businessId;
 	const [sendSmsOpen, setSendSmsOpen] = useState(false);
 
@@ -347,6 +352,7 @@ export default function BusinessDetailClient({
 		!grantingCredits;
 
 	async function onGrantCredits() {
+		if (!ADMIN_FEATURE.grantCredits) return;
 		setGrantBanner(null);
 		if (!canGrantCredits) {
 			setGrantBanner({
@@ -559,56 +565,83 @@ export default function BusinessDetailClient({
 						</p>
 					</div>
 					<div className="flex shrink-0 flex-wrap items-center gap-2">
-						<Button
-							type="button"
-							variant="outline"
-							size="sm"
-							disabled={!user?.phone_number}
-							onClick={() => setSendSmsOpen(true)}
-						>
-							<MessageSquare data-icon="inline-start" />
-							SMS
-						</Button>
-						<DropdownMenu>
-							<DropdownMenuTrigger
-								render={
-									<Button
-										type="button"
-										variant="ghost"
-										size="icon-sm"
-										aria-label="More actions"
-									/>
-								}
+						{businessSmsEnabled ? (
+							<Button
+								type="button"
+								variant="outline"
+								size="sm"
+								disabled={!user?.phone_number}
+								onClick={() => setSendSmsOpen(true)}
 							>
-								<MoreHorizontal aria-hidden="true" />
-							</DropdownMenuTrigger>
-							<DropdownMenuContent align="end" className="w-48">
-								<DropdownMenuGroup>
-									<DropdownMenuItem
-										disabled={!user?.phone_number}
-										onClick={() => {
-											if (user?.phone_number) {
-												void navigator.clipboard.writeText(user.phone_number);
-											}
-										}}
-									>
-										Copy phone
-									</DropdownMenuItem>
-									<DropdownMenuItem onClick={() => setActiveDialogOpen(true)}>
-										{business.is_active
-											? "Deactivate business"
-											: "Activate business"}
-									</DropdownMenuItem>
-									<DropdownMenuSeparator />
-									<DropdownMenuItem
-										variant="destructive"
-										onClick={() => setDeleteDialogOpen(true)}
-									>
-										Delete business…
-									</DropdownMenuItem>
-								</DropdownMenuGroup>
-							</DropdownMenuContent>
-						</DropdownMenu>
+								<MessageSquare data-icon="inline-start" />
+								SMS
+							</Button>
+						) : (
+							<Button
+								type="button"
+								variant="outline"
+								size="sm"
+								disabled
+								title="SMS is upcoming — API not ready"
+								className="gap-2"
+							>
+								<MessageSquare data-icon="inline-start" />
+								SMS
+								<Badge variant="secondary" className="font-normal">
+									Upcoming
+								</Badge>
+							</Button>
+						)}
+						{(canMutateOwners || user?.phone_number) ? (
+							<DropdownMenu>
+								<DropdownMenuTrigger
+									render={
+										<Button
+											type="button"
+											variant="ghost"
+											size="icon-sm"
+											aria-label="More actions"
+										/>
+									}
+								>
+									<MoreHorizontal aria-hidden="true" />
+								</DropdownMenuTrigger>
+								<DropdownMenuContent align="end" className="w-48">
+									<DropdownMenuGroup>
+										<DropdownMenuItem
+											disabled={!user?.phone_number}
+											onClick={() => {
+												if (user?.phone_number) {
+													void navigator.clipboard.writeText(
+														user.phone_number,
+													);
+												}
+											}}
+										>
+											Copy phone
+										</DropdownMenuItem>
+										{canMutateOwners ? (
+											<>
+												<DropdownMenuItem
+													onClick={() => setActiveDialogOpen(true)}
+												>
+													{business.is_active
+														? "Deactivate business"
+														: "Activate business"}
+												</DropdownMenuItem>
+												<DropdownMenuSeparator />
+												<DropdownMenuItem
+													variant="destructive"
+													onClick={() => setDeleteDialogOpen(true)}
+												>
+													Delete business…
+												</DropdownMenuItem>
+											</>
+										) : null}
+									</DropdownMenuGroup>
+								</DropdownMenuContent>
+							</DropdownMenu>
+						) : null}
 					</div>
 				</div>
 
@@ -945,26 +978,25 @@ export default function BusinessDetailClient({
 						</Button>
 					</form>
 
-					<div className="flex flex-col gap-1.5 rounded-lg border border-border bg-muted/30 p-2.5">
-						<p className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
-							Fix / development
-						</p>
-						<p className="text-[11px] leading-snug text-muted-foreground">
-							Temporary while subscription credits API is being updated.
-						</p>
+					{grantCreditsEnabled ? (
 						<form
-							className="flex flex-wrap items-end gap-2"
+							className="flex flex-wrap items-end gap-2 rounded-lg border border-border bg-muted/30 p-2.5"
 							onSubmit={(e) => {
 								e.preventDefault();
 								void onGrantCredits();
 							}}
 						>
+							<div className="flex w-full flex-wrap items-center gap-2">
+								<p className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
+									Grant credits
+								</p>
+							</div>
 							<Field className="min-w-[10rem] flex-1">
 								<FieldLabel
 									htmlFor="quick-grant-credits"
 									className="text-xs text-muted-foreground"
 								>
-									Grant credits
+									Credits
 								</FieldLabel>
 								<Input
 									id="quick-grant-credits"
@@ -992,16 +1024,35 @@ export default function BusinessDetailClient({
 								{grantingCredits ? "…" : "Grant"}
 							</Button>
 						</form>
-					</div>
+					) : (
+						<div className="flex flex-col gap-1.5 rounded-lg border border-dashed border-border bg-muted/20 px-3 py-2.5">
+							<div className="flex flex-wrap items-center gap-2">
+								<p className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
+									Under development
+								</p>
+								<Badge variant="outline" className="font-normal text-muted-foreground">
+									Unavailable
+								</Badge>
+							</div>
+							<p className="text-xs leading-snug text-muted-foreground">
+								<span className="font-medium text-foreground/80">
+									Grant credits
+								</span>{" "}
+								will return when the credits API is ready.
+							</p>
+						</div>
+					)}
 				</div>
 			</section>
 
-			<SendBusinessSmsDialog
-				open={sendSmsOpen}
-				onOpenChange={setSendSmsOpen}
-				businessName={business.name}
-				phoneNumber={user?.phone_number}
-			/>
+			{businessSmsEnabled ? (
+				<SendBusinessSmsDialog
+					open={sendSmsOpen}
+					onOpenChange={setSendSmsOpen}
+					businessName={business.name}
+					phoneNumber={user?.phone_number}
+				/>
+			) : null}
 
 			<Tabs value={activeTab} onValueChange={onTabChange} className="gap-3">
 				<TabsList className="h-auto w-full flex-wrap justify-start gap-1 rounded-lg border border-border bg-muted/40 p-1">
@@ -1140,13 +1191,18 @@ export default function BusinessDetailClient({
 												<TableHead>Employee</TableHead>
 												<TableHead>Role</TableHead>
 												<TableHead>Branch</TableHead>
-												<TableHead className="text-right">Actions</TableHead>
+												{canMutateOwners ? (
+													<TableHead className="text-right">Actions</TableHead>
+												) : null}
 											</TableRow>
 										</TableHeader>
 										<TableBody>
 											{employeeRows.length === 0 ? (
 												<TableRow>
-													<TableCell colSpan={4} className="py-10 text-center">
+													<TableCell
+														colSpan={canMutateOwners ? 4 : 3}
+														className="py-10 text-center"
+													>
 														<span className="text-sm text-muted-foreground">
 															No employees found.
 														</span>
@@ -1173,64 +1229,74 @@ export default function BusinessDetailClient({
 																</div>
 															</TableCell>
 															<TableCell>
-																<Select
-																	value={selectedRoleId}
-																	onValueChange={(value) => {
-																		if (!value) return;
-																		setEmployeeRoleDraft((prev) => ({
-																			...prev,
-																			[emp.id]: value,
-																		}));
-																	}}
-																>
-																	<SelectTrigger
-																		aria-label="Select employee role"
-																		className="w-56"
+																{canMutateOwners ? (
+																	<Select
+																		value={selectedRoleId}
+																		onValueChange={(value) => {
+																			if (!value) return;
+																			setEmployeeRoleDraft((prev) => ({
+																				...prev,
+																				[emp.id]: value,
+																			}));
+																		}}
 																	>
-																		<SelectValue placeholder="Select role">
-																			{roleLabel(selectedRole)}
-																		</SelectValue>
-																	</SelectTrigger>
-																	<SelectContent>
-																		{(roles ?? []).map((r) => (
-																			<SelectItem key={r.id} value={r.id}>
-																				{r.name}
-																			</SelectItem>
-																		))}
-																	</SelectContent>
-																</Select>
+																		<SelectTrigger
+																			aria-label="Select employee role"
+																			className="w-56"
+																		>
+																			<SelectValue placeholder="Select role">
+																				{roleLabel(selectedRole)}
+																			</SelectValue>
+																		</SelectTrigger>
+																		<SelectContent>
+																			{(roles ?? []).map((r) => (
+																				<SelectItem key={r.id} value={r.id}>
+																					{r.name}
+																				</SelectItem>
+																			))}
+																		</SelectContent>
+																	</Select>
+																) : (
+																	<span className="text-sm font-medium">
+																		{roleLabel(
+																			roleById.get(emp.role_id) ?? selectedRole,
+																		)}
+																	</span>
+																)}
 															</TableCell>
 															<TableCell>
 																<span className="truncate font-medium">
 																	{emp.branch?.name ?? "—"}
 																</span>
 															</TableCell>
-															<TableCell className="text-right">
-																<button
-																	type="button"
-																	className={cn(
-																		buttonVariants({
-																			variant: "outline",
-																			size: "sm",
-																		}),
-																	)}
-																	disabled={
-																		updateEmployeeRoleState.isLoading ||
-																		!selectedRoleId ||
-																		selectedRoleId === emp.role_id
-																	}
-																	onClick={async () => {
-																		if (!selectedRoleId) return;
-																		await updateEmployeeRole({
-																			businessId,
-																			employeeId: emp.id,
-																			body: { role_id: selectedRoleId },
-																		}).unwrap();
-																	}}
-																>
-																	Save
-																</button>
-															</TableCell>
+															{canMutateOwners ? (
+																<TableCell className="text-right">
+																	<button
+																		type="button"
+																		className={cn(
+																			buttonVariants({
+																				variant: "outline",
+																				size: "sm",
+																			}),
+																		)}
+																		disabled={
+																			updateEmployeeRoleState.isLoading ||
+																			!selectedRoleId ||
+																			selectedRoleId === emp.role_id
+																		}
+																		onClick={async () => {
+																			if (!selectedRoleId) return;
+																			await updateEmployeeRole({
+																				businessId,
+																				employeeId: emp.id,
+																				body: { role_id: selectedRoleId },
+																			}).unwrap();
+																		}}
+																	>
+																		Save
+																	</button>
+																</TableCell>
+															) : null}
 														</TableRow>
 													);
 												})

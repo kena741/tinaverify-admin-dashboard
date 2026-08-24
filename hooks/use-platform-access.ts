@@ -6,6 +6,7 @@ import {
 	canAccessSystemAdminPath,
 	firstAllowedSystemAdminPath,
 	hasAnyPermission,
+	isCustomerSupportRole,
 	type PlatformPermissionSet,
 } from "@/lib/platform-access";
 import { formatPlatformLabel } from "@/lib/userDisplay";
@@ -103,12 +104,19 @@ export function usePlatformAccess() {
 		return firstAllowedSystemAdminPath(permissions);
 	}, [systemAdmin, permissions]);
 
+	const isCustomerSupport = isCustomerSupportRole(roleName);
+	/** Owner/business mutations support should not perform (role, delete, deactivate). */
+	const canMutateOwners =
+		systemAdmin && (permissions === "all" || !isCustomerSupport);
+
 	return {
 		isSystemAdmin: systemAdmin,
 		permissions,
 		isLoading,
 		roleName,
 		roleLabel,
+		isCustomerSupport,
+		canMutateOwners,
 		can,
 		canPath,
 		homePath,

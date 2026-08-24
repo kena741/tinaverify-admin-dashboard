@@ -94,3 +94,16 @@ export function firstAllowedSystemAdminPath(
 	}
 	return "/admin/profile";
 }
+
+/** Platform role name check for Customer Support (and close variants). */
+export function isCustomerSupportRole(
+	roleName: string | null | undefined,
+): boolean {
+	if (!roleName) return false;
+	const n = roleName.trim().toLowerCase().replace(/[_-]+/g, " ");
+	return (
+		n.includes("customer support") ||
+		n === "support" ||
+		n.startsWith("support ")
+	);
+}
