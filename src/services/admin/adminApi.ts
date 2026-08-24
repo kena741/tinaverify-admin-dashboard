@@ -32,16 +32,30 @@ export const adminApi = createApi({
 		/** `GET /api/v1/admin/audit-logs` */
 		listAdminAuditLogs: builder.query<
 			AuditLogOutput[],
-			{ limit?: number; offset?: number } | void
+			{
+				limit?: number;
+				offset?: number;
+				startDate?: string | null;
+				endDate?: string | null;
+				action?: string | null;
+				adminId?: string | null;
+			} | void
 		>({
-			query: (arg) => ({
-				url: "/api/v1/admin/audit-logs",
-				params: {
+			query: (arg) => {
+				const params: Record<string, string | number> = {
 					limit: arg?.limit ?? 50,
 					offset: arg?.offset ?? 0,
-				},
-				headers: bearerHeaders(),
-			}),
+				};
+				if (arg?.startDate) params.start_date = arg.startDate;
+				if (arg?.endDate) params.end_date = arg.endDate;
+				if (arg?.action) params.action = arg.action;
+				if (arg?.adminId) params.admin_id = arg.adminId;
+				return {
+					url: "/api/v1/admin/audit-logs",
+					params,
+					headers: bearerHeaders(),
+				};
+			},
 			providesTags: (result) =>
 				result
 					? [
