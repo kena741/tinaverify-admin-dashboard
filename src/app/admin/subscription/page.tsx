@@ -300,14 +300,13 @@ export default function SubscriptionPage() {
 		setGrantConfirmOpen(true);
 	};
 
-	// ponytail: reference image is a UI gate only — grant-credits API is JSON `{ credits }` today
 	const onConfirmGrantCredits = async (referenceImage: File) => {
 		if (!businessId) return;
 		const n = Number.parseInt(grantCreditsInput.trim(), 10);
 		try {
 			const out = await grantSubscriptionCredits({
 				businessId,
-				body: { credits: n },
+				body: { credits: n, file: referenceImage },
 			}).unwrap();
 			setGrantSuccess(out);
 			setGrantCreditsInput("");
@@ -338,7 +337,6 @@ export default function SubscriptionPage() {
 		setAssignConfirmOpen(true);
 	};
 
-	// ponytail: reference image is a UI gate only — assign API has no image field today
 	const onConfirmManualAssign = async (referenceImage: File) => {
 		if (!businessId || !manualPlanId) return;
 		try {
@@ -347,6 +345,7 @@ export default function SubscriptionPage() {
 					business_id: businessId,
 					plan_id: manualPlanId,
 					amount: manualAmountParsed,
+					file: referenceImage,
 				},
 			}).unwrap();
 			setManualSuccess(out);

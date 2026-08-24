@@ -111,20 +111,26 @@ export const adminApi = createApi({
 			},
 		}),
 
-		/** `POST /api/v1/admin/subscriptions` */
+		/** `POST /api/v1/admin/subscriptions` — multipart: `business_id`, `plan_id`, `amount?`, `file` */
 		adminAssignSubscription: builder.mutation<
 			SubscriptionOutput,
 			{ body: AdminManualSubscriptionRequest }
 		>({
-			query: ({ body }) => ({
-				url: "/api/v1/admin/subscriptions",
-				method: "POST",
-				body,
-				headers: {
-					"Content-Type": "application/json",
-					...bearerHeaders(),
-				},
-			}),
+			query: ({ body }) => {
+				const formData = new FormData();
+				formData.append("business_id", body.business_id);
+				formData.append("plan_id", body.plan_id);
+				if (body.amount != null) {
+					formData.append("amount", String(body.amount));
+				}
+				formData.append("file", body.file);
+				return {
+					url: "/api/v1/admin/subscriptions",
+					method: "POST",
+					body: formData,
+					headers: bearerHeaders(),
+				};
+			},
 			invalidatesTags: [{ type: "AuditLog", id: "LIST" }],
 			async onQueryStarted({ body }, { dispatch, queryFulfilled }) {
 				try {

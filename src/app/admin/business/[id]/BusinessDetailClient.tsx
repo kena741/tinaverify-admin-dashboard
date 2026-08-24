@@ -368,12 +368,11 @@ export default function BusinessDetailClient({
 		setGrantConfirmOpen(true);
 	}
 
-	// ponytail: reference image is a UI gate only — grant-credits API is JSON `{ credits }` today
 	async function onConfirmGrantCredits(referenceImage: File) {
 		try {
 			const out = await grantSubscriptionCredits({
 				businessId,
-				body: { credits: grantCreditsParsed },
+				body: { credits: grantCreditsParsed, file: referenceImage },
 			}).unwrap();
 			setGrantCreditsInput("");
 			setGrantConfirmOpen(false);
@@ -409,7 +408,6 @@ export default function BusinessDetailClient({
 		setAssignConfirmOpen(true);
 	}
 
-	// ponytail: reference image is a UI gate only — assign API has no image field today
 	async function onConfirmManualAssign(referenceImage: File) {
 		if (!manualPlanId) return;
 		try {
@@ -417,6 +415,7 @@ export default function BusinessDetailClient({
 				body: {
 					business_id: businessId,
 					plan_id: manualPlanId,
+					file: referenceImage,
 				},
 			}).unwrap();
 			setAssignConfirmOpen(false);

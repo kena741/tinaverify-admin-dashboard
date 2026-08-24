@@ -393,9 +393,11 @@ export type SubscriptionCheckoutResponse = {
 	tx_ref: string;
 };
 
-/** OpenAPI `AdminGrantCreditsSchema` — body for `POST /api/v1/subscriptions/grant-credits` */
+/** OpenAPI multipart body for `POST /api/v1/subscriptions/grant-credits` */
 export type AdminGrantCreditsRequest = {
 	credits: number;
+	/** Reference receipt / proof image (form field `file`). */
+	file: File;
 };
 
 /** OpenAPI `AdminBusinessCreateSchema` — `POST /api/v1/admin/businesses` */
@@ -405,11 +407,13 @@ export type AdminBusinessCreateRequest = {
 	tin_number?: string | null;
 };
 
-/** OpenAPI `AdminManualSubscriptionSchema` — `POST /api/v1/admin/subscriptions` */
+/** OpenAPI multipart body for `POST /api/v1/admin/subscriptions` */
 export type AdminManualSubscriptionRequest = {
 	business_id: UUID;
 	plan_id: UUID;
 	amount?: number | null;
+	/** Reference receipt / proof image (form field `file`). */
+	file: File;
 };
 
 /** OpenAPI `UpdateSuperuserSchema` — `PATCH /api/v1/admin/users/{user_id}/superuser` */

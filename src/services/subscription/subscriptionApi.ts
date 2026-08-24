@@ -186,22 +186,24 @@ export const subscriptionApi = createApi({
 
 		/**
 		 * `POST /api/v1/subscriptions/grant-credits`
-		 * Body: `AdminGrantCreditsRequest` per `AdminGrantCreditsSchema`.
+		 * Multipart: `credits`, `file`.
 		 */
 		grantSubscriptionCredits: builder.mutation<
 			SubscriptionOutput,
 			{ businessId: string; body: AdminGrantCreditsRequest }
 		>({
-			query: ({ businessId, body }) => ({
-				url: "/api/v1/subscriptions/grant-credits",
-				method: "POST",
-				params: { business_id: businessId },
-				body,
-				headers: {
-					"Content-Type": "application/json",
-					...bearerHeaders(),
-				},
-			}),
+			query: ({ businessId, body }) => {
+				const formData = new FormData();
+				formData.append("credits", String(body.credits));
+				formData.append("file", body.file);
+				return {
+					url: "/api/v1/subscriptions/grant-credits",
+					method: "POST",
+					params: { business_id: businessId },
+					body: formData,
+					headers: bearerHeaders(),
+				};
+			},
 			invalidatesTags: (_result, _err, { businessId }) => [
 				{ type: "Subscription" as const, id: businessId },
 				{ type: "SubscriptionHistory" as const, id: businessId },
