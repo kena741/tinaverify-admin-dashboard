@@ -5,65 +5,63 @@ on:
     branches:
       - staging
       - production
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Environment to deploy
+        required: true
+        type: choice
+        options:
+          - staging
+          - production
 
 concurrency:
-  group: cloud-run-${{ github.ref_name }}
+  group: cloud-run-${{ github.event_name == 'workflow_dispatch' && inputs.target || github.ref_name }}
   cancel-in-progress: true
 
 permissions:
   contents: read
-  id-token: write
 
 jobs:
   deploy:
-    name: Deploy (${{ github.ref_name }})
+    name: Deploy (${{ github.event_name == 'workflow_dispatch' && inputs.target || github.ref_name }})
     runs-on: ubuntu-latest
-    environment: ${{ github.ref_name }}
+    environment: ${{ github.event_name == 'workflow_dispatch' && inputs.target || github.ref_name }}
     env:
-      SERVICE_NAME: ${{ github.ref_name == 'production' && 'tinaverify-admin' || 'tinaverify-admin-staging' }}
-      GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
-      GCP_REGION: ${{ vars.GCP_REGION }}
-      CLOUD_RUN_REGION: europe-west4
-      ARTIFACT_REGISTRY_REPO: ${{ vars.ARTIFACT_REGISTRY_REPO }}
-      IMAGE_NAME: tinaverify-admin
+      TARGET: ${{ github.event_name == 'workflow_dispatch' && inputs.target || github.ref_name }}
+      GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID || 'zulu-dine-492112' }}
       NEXT_PUBLIC_BACKEND_BASE_URL: ${{ secrets.NEXT_PUBLIC_BACKEND_BASE_URL }}
-      DOCKER_DEFAULT_PLATFORM: linux/amd64
     steps:
       - name: Validate configuration
         run: |
-          test -n "${GCP_PROJECT_ID}" || (echo "Missing secret GCP_PROJECT_ID" && exit 1)
-          test -n "${GCP_REGION}" || (echo "Missing repo variable GCP_REGION" && exit 1)
-          test -n "${ARTIFACT_REGISTRY_REPO}" || (echo "Missing repo variable ARTIFACT_REGISTRY_REPO" && exit 1)
-          test -n "${NEXT_PUBLIC_BACKEND_BASE_URL}" || (echo "Missing environment secret NEXT_PUBLIC_BACKEND_BASE_URL (per staging/production)" && exit 1)
+          test -n "${{ secrets.GCP_SA_KEY }}" || (echo "Missing secret GCP_SA_KEY (JSON key for github-actions-tinaverify@zulu-dine-492112.iam.gserviceaccount.com)" && exit 1)
+          test -n "${NEXT_PUBLIC_BACKEND_BASE_URL}" || (echo "Missing environment secret NEXT_PUBLIC_BACKEND_BASE_URL for ${TARGET}" && exit 1)
 
       - uses: actions/checkout@v4
 
       - id: auth
         uses: google-github-actions/auth@v2
         with:
-          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
-          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
-          project_id: ${{ secrets.GCP_PROJECT_ID }}
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+          project_id: ${{ env.GCP_PROJECT_ID }}
 
       - uses: google-github-actions/setup-gcloud@v2
 
-      - name: Configure Docker for Artifact Registry
-        run: gcloud auth configure-docker "${GCP_REGION}-docker.pkg.dev" --quiet
-
-      - name: Set image reference
+      - name: Build and deploy via Cloud Build
         run: |
-          echo "CLOUD_RUN_IMAGE=${GCP_REGION}-docker.pkg.dev/${GCP_PROJECT_ID}/${ARTIFACT_REGISTRY_REPO}/${IMAGE_NAME}:${GITHUB_SHA}" >> "$GITHUB_ENV"
+          if [ "${TARGET}" = "production" ]; then
+            CONFIG=cloudbuild-production.yaml
+            TAG="${GITHUB_SHA::7}"
+            SERVICE=tinaverify-admin
+            IMAGE="europe-west3-docker.pkg.dev/${GCP_PROJECT_ID}/zuludine-frontend/zuludine-fe:${TAG}"
+          else
+            CONFIG=cloudbuild-staging.yaml
+            TAG="staging-${GITHUB_SHA::7}"
+            SERVICE=tinaverify-admin-staging
+            IMAGE="europe-west3-docker.pkg.dev/${GCP_PROJECT_ID}/zuludine-frontend/zuludine-fe:${TAG}"
+          fi
 
-      - name: Build and push (Docker Compose)
-        run: |
-          docker compose build --pull
-          docker compose push
-
-      - name: Deploy to Cloud Run
-        run: |
-          gcloud run deploy "${SERVICE_NAME}" \
-            --image "${CLOUD_RUN_IMAGE}" \
-            --region "${CLOUD_RUN_REGION}" \
-            --platform managed \
-            --allow-unauthenticated \
-            --quiet
+          gcloud builds submit \
+            --project="${GCP_PROJECT_ID}" \
+            --config="${CONFIG}" \
+            --substitutions="_IMAGE=${IMAGE},_SERVICE=${SERVICE},_REGION=europe-west4,_NEXT_PUBLIC_BACKEND_BASE_URL=${NEXT_PUBLIC_BACKEND_BASE_URL},_NEXT_PUBLIC_ADMIN_GRANT_CREDITS=true,_NEXT_PUBLIC_ADMIN_BUSINESS_SMS=false"

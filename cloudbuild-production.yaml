@@ -1,0 +1,49 @@
+# Build + deploy TinaVerify admin (production) via Cloud Build.
+# Trigger: push to `production` (or: gcloud builds submit --config=cloudbuild-production.yaml)
+
+substitutions:
+  _IMAGE: europe-west3-docker.pkg.dev/zulu-dine-492112/zuludine-frontend/zuludine-fe:latest
+  _SERVICE: tinaverify-admin
+  _REGION: europe-west4
+  _NEXT_PUBLIC_BACKEND_BASE_URL: https://zuludine-backend-prod-562272610794.europe-west3.run.app
+  _NEXT_PUBLIC_ADMIN_GRANT_CREDITS: "true"
+  _NEXT_PUBLIC_ADMIN_BUSINESS_SMS: "false"
+
+steps:
+  - name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - --build-arg
+      - NEXT_PUBLIC_BACKEND_BASE_URL=${_NEXT_PUBLIC_BACKEND_BASE_URL}
+      - --build-arg
+      - NEXT_PUBLIC_ADMIN_GRANT_CREDITS=${_NEXT_PUBLIC_ADMIN_GRANT_CREDITS}
+      - --build-arg
+      - NEXT_PUBLIC_ADMIN_BUSINESS_SMS=${_NEXT_PUBLIC_ADMIN_BUSINESS_SMS}
+      - -t
+      - ${_IMAGE}
+      - .
+
+  - name: gcr.io/cloud-builders/docker
+    args:
+      - push
+      - ${_IMAGE}
+
+  - name: gcr.io/google.com/cloudsdktool/cloud-sdk
+    entrypoint: gcloud
+    args:
+      - run
+      - deploy
+      - ${_SERVICE}
+      - --image=${_IMAGE}
+      - --region=${_REGION}
+      - --platform=managed
+      - --allow-unauthenticated
+      - --quiet
+
+images:
+  - ${_IMAGE}
+
+timeout: 1200s
+options:
+  logging: CLOUD_LOGGING_ONLY
+  machineType: E2_HIGHCPU_8
