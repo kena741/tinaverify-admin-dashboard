@@ -5,7 +5,10 @@ import { Loader2Icon, XIcon } from "lucide-react";
 
 import { PageHeader } from "@/components/admin/page-header";
 import { useListAdminAuditLogsQuery } from "@/services/admin/adminApi";
-import { useGetUserByIdQuery, useListAllUsersQuery } from "@/services/auth/authApi";
+import {
+	useGetUserByIdQuery,
+	useListAllUsersQuery,
+} from "@/services/auth/authApi";
 import { useGetBusinessQuery } from "@/services/branch-management/branchManagementApi";
 import { useListPlatformStaffQuery } from "@/services/platform/platformApi";
 import type { AuditLogOutput } from "@/services/types";
@@ -258,15 +261,17 @@ function DetailEntries({
 }) {
 	if (!details || Object.keys(details).length === 0) {
 		return (
-			<p className="text-sm text-muted-foreground">No extra details recorded.</p>
+			<p className="text-sm text-muted-foreground">
+				No extra details recorded.
+			</p>
 		);
 	}
 	return (
-		<dl className="grid gap-3">
+		<dl className="divide-y divide-border rounded-lg border border-border bg-muted/20">
 			{Object.entries(details).map(([key, value]) => (
 				<div
 					key={key}
-					className="grid gap-1 rounded-lg border border-border bg-muted/20 px-3 py-2"
+					className="grid gap-1 px-3 py-3 sm:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] sm:gap-4"
 				>
 					<dt className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
 						{formatPlatformLabel(key)}
@@ -404,14 +409,18 @@ export default function AuditLogsPage() {
 				description="Who changed what, and when. Superuser-only trail of admin actions."
 			/>
 
-			<section aria-labelledby="audit-filters-heading" className="flex flex-col gap-3">
+			<section
+				aria-labelledby="audit-filters-heading"
+				className="flex flex-col gap-3"
+			>
 				<Card size="sm">
 					<CardHeader className="border-b">
 						<div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
 							<div>
 								<CardTitle id="audit-filters-heading">Find events</CardTitle>
 								<CardDescription>
-									Filter by date, admin, and action — then open a row for details.
+									Filter by date, admin, and action — then open a row for
+									details.
 								</CardDescription>
 							</div>
 							{filtersActive ? (
@@ -427,7 +436,11 @@ export default function AuditLogsPage() {
 						</div>
 					</CardHeader>
 					<CardContent className="flex flex-col gap-4 pt-4">
-						<div className="flex flex-wrap gap-2" role="group" aria-label="Date range">
+						<div
+							className="flex flex-wrap gap-2"
+							role="group"
+							aria-label="Date range"
+						>
 							{(
 								[
 									["all", "All time"],
@@ -632,14 +645,22 @@ export default function AuditLogsPage() {
 					<AlertTitle>Couldn’t load audit logs</AlertTitle>
 					<AlertDescription className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
 						<span>{getErrorMessage(error, "Request failed.")}</span>
-						<Button type="button" variant="outline" size="sm" onClick={() => refetch()}>
+						<Button
+							type="button"
+							variant="outline"
+							size="sm"
+							onClick={() => refetch()}
+						>
 							Try again
 						</Button>
 					</AlertDescription>
 				</Alert>
 			) : null}
 
-			<section aria-labelledby="audit-results-heading" className="flex flex-col gap-3">
+			<section
+				aria-labelledby="audit-results-heading"
+				className="flex flex-col gap-3"
+			>
 				<div className="flex flex-col gap-0.5">
 					<h2
 						id="audit-results-heading"
@@ -774,17 +795,17 @@ export default function AuditLogsPage() {
 					if (!open) setSelected(null);
 				}}
 			>
-				<SheetContent className="flex w-full flex-col gap-6 sm:max-w-md">
+				<SheetContent className="flex w-full flex-col gap-8 p-6 sm:max-w-md">
 					{selected ? (
 						<>
-							<SheetHeader>
+							<SheetHeader className="p-0">
 								<SheetTitle>{formatPlatformLabel(selected.action)}</SheetTitle>
 								<SheetDescription>
 									{formatWhen(selected.created_at)}
 									{selected.ip_address ? ` · ${selected.ip_address}` : ""}
 								</SheetDescription>
 							</SheetHeader>
-							<div className="flex flex-col gap-4 overflow-y-auto pb-6">
+							<div className="flex flex-col gap-8 overflow-y-auto pb-2">
 								<div className="grid gap-3">
 									<div>
 										<p className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
