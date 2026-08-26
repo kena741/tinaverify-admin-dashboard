@@ -321,7 +321,7 @@ export default function DashboardPage() {
 								Dashboard
 							</h1>
 							<p className="mt-1 max-w-xl text-sm leading-relaxed text-muted-foreground">
-								Period revenue, verification quality, and who is paying — from
+								Period revenue, verification quality, and who is paying from
 								live platform data.
 							</p>
 						</div>
