@@ -421,6 +421,87 @@ export type UpdateSuperuserRequest = {
 	is_superuser: boolean;
 };
 
+export type AssignSubscriptionAuditDetails = {
+	action_detail?: string;
+	business_id: string;
+	plan_id: string;
+	receipt_url?: string | null;
+};
+
+export type BannerAuditDetails = {
+	is_active?: boolean | null;
+	redirect_url?: string | null;
+	image_updated?: boolean | null;
+};
+
+export type BusinessCreationAuditDetails = {
+	action_detail?: string;
+	name: string;
+	owner_id: string;
+};
+
+export type BusinessStatusAuditDetails = {
+	old_is_active?: boolean | null;
+	new_is_active: boolean;
+	reason?: string | null;
+};
+
+export type ExchangeRateAuditDetails = {
+	old_rate?: number | null;
+	new_rate: number;
+};
+
+export type GrantCreditsAuditDetails = {
+	action_detail?: string;
+	business_id: string;
+	credits: number;
+	receipt_url?: string | null;
+};
+
+export type RoleAuditDetails = {
+	role_name: string;
+	action_detail?: string | null;
+	assigned_permissions?: string[] | null;
+	removed_permissions?: string[] | null;
+};
+
+export type SubscriptionPlanAuditDetails = {
+	action_detail?: string | null;
+	old_name?: string | null;
+	new_name?: string | null;
+	old_price?: number | null;
+	new_price?: number | null;
+	old_monthly_transaction_limit?: number | null;
+	new_monthly_transaction_limit?: number | null;
+	old_duration_days?: number | null;
+	new_duration_days?: number | null;
+};
+
+export type UpdateSuperuserAuditDetails = {
+	action_detail?: string;
+	is_superuser: boolean;
+};
+
+export type UserRegistrationAuditDetails = {
+	action_detail?: string;
+	email: string;
+	phone_number?: string | null;
+	is_superuser: boolean;
+};
+
+export type AuditLogDetails =
+	| AssignSubscriptionAuditDetails
+	| BannerAuditDetails
+	| BusinessCreationAuditDetails
+	| BusinessStatusAuditDetails
+	| ExchangeRateAuditDetails
+	| GrantCreditsAuditDetails
+	| RoleAuditDetails
+	| SubscriptionPlanAuditDetails
+	| UpdateSuperuserAuditDetails
+	| UserRegistrationAuditDetails
+	| Record<string, unknown>;
+
 /** OpenAPI `AuditLogOutputSchema` — `GET /api/v1/admin/audit-logs` */
 export type AuditLogOutput = {
 	id: UUID;
@@ -428,7 +509,7 @@ export type AuditLogOutput = {
 	action: string;
 	entity_type: string | null;
 	entity_id: UUID | null;
-	details: Record<string, unknown> | null;
+	details: AuditLogDetails | null;
 	ip_address: string | null;
 	created_at: string;
 };
