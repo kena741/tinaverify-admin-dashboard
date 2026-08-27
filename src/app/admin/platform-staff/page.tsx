@@ -4,10 +4,10 @@ import { useMemo, useState } from "react";
 import { KeyRoundIcon, PlusIcon, ShieldIcon, Trash2Icon, UsersIcon } from "lucide-react";
 
 import { PlatformRoleDetailSheet } from "@/components/admin/platform-role-detail-sheet";
-import type { PlatformRoleOutput, PlatformStaffOutput } from "@/services/types";
+import type { PlatformRoleOutput, PlatformStaffOutput, UserOutput } from "@/services/types";
 import { formatPlatformLabel, formatUserDisplayName } from "@/lib/userDisplay";
 import { cn } from "@/lib/utils";
-import { useGetUserByIdQuery } from "@/services/auth/authApi";
+import { useGetUserByIdQuery, useListAllUsersQuery } from "@/services/auth/authApi";
 import {
 	useAdminRegisterUserMutation,
 	useAdminUpdateSuperuserMutation,
@@ -202,6 +202,7 @@ export default function PlatformStaffPage() {
 		error: staffError,
 		refetch: refetchStaff,
 	} = useListPlatformStaffQuery();
+	const { data: users } = useListAllUsersQuery();
 
 	const [createRole, createRoleState] = useCreatePlatformRoleMutation();
 	const [createPermission, createPermissionState] =
@@ -263,6 +264,12 @@ export default function PlatformStaffPage() {
 		return map;
 	}, [roles]);
 
+	const usersById = useMemo(() => {
+		const map = new Map<string, UserOutput>();
+		for (const user of users ?? []) map.set(user.id, user);
+		return map;
+	}, [users]);
+
 	const activeRoles = useMemo(
 		() => (roles ?? []).filter((r) => r.is_active),
 		[roles],
@@ -304,16 +311,23 @@ export default function PlatformStaffPage() {
 		if (!q) return list;
 		return list.filter((s) => {
 			const role = rolesById.get(s.platform_role_id);
+			const user = usersById.get(s.user_id);
 			const hay = [
 				role?.name ?? "",
 				role ? formatPlatformLabel(role.name) : "",
 				s.user_id,
+				user ? formatUserDisplayName(user) : "",
+				user?.email ?? "",
+				user?.phone_number ?? "",
+				user?.username ?? "",
+				user?.user_information?.first_name ?? "",
+				user?.user_information?.last_name ?? "",
 			]
 				.join(" ")
 				.toLowerCase();
 			return hay.includes(q);
 		});
-	}, [staff, staffSearch, rolesById]);
+	}, [staff, staffSearch, rolesById, usersById]);
 
 	const selectedStaffRole = activeRoles.find((r) => r.id === staffRoleId);
 	const isAddingStaff =
@@ -714,14 +728,20 @@ export default function PlatformStaffPage() {
 						<ul className="grid gap-3 sm:grid-cols-2">
 							{filteredRoles.map((role) => (
 								<li key={role.id}>
-									<div className="group relative flex h-full flex-col gap-3 rounded-xl border border-border bg-card p-4 transition-colors hover:border-primary/40 hover:bg-accent/40">
-										<button
-											type="button"
-											className="absolute inset-0 rounded-xl focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-											onClick={() => setSelectedRoleId(role.id)}
-											aria-label={`Open ${role.name}`}
-										/>
-										<div className="relative z-10 flex items-start justify-between gap-2">
+									<div
+										role="button"
+										tabIndex={0}
+										className="group relative flex h-full cursor-pointer flex-col gap-3 rounded-xl border border-border bg-card p-4 transition-colors hover:border-primary/40 hover:bg-accent/40 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+										onClick={() => setSelectedRoleId(role.id)}
+										onKeyDown={(e) => {
+											if (e.key === "Enter" || e.key === " ") {
+												e.preventDefault();
+												setSelectedRoleId(role.id);
+											}
+										}}
+										aria-label={`View permissions for ${role.name}`}
+									>
+										<div className="flex items-start justify-between gap-2">
 											<div className="min-w-0">
 												<p className="font-medium text-foreground">
 													{formatPlatformLabel(role.name)}
@@ -734,13 +754,12 @@ export default function PlatformStaffPage() {
 												{role.is_active ? "Active" : "Inactive"}
 											</Badge>
 										</div>
-										<div className="relative z-10 mt-auto flex items-center justify-between gap-2 pt-1">
-											<span className="text-xs text-muted-foreground">View permissions</span>
+										<div className="mt-auto flex items-center justify-end gap-2 pt-1">
 											<Button
 												type="button"
 												variant="ghost"
 												size="icon-sm"
-												className="text-muted-foreground hover:text-destructive"
+												className="relative z-10 text-muted-foreground hover:text-destructive"
 												aria-label={`Delete ${role.name}`}
 												onClick={(e) => {
 													e.stopPropagation();

@@ -268,6 +268,7 @@ export const branchManagementApi = createApi({
 export const {
 	useListAllBusinessesQuery,
 	useGetBusinessQuery,
+	useLazyGetBusinessQuery,
 	useDeleteBusinessMutation,
 	useSetBusinessActiveMutation,
 	useListMyBusinessesQuery,
