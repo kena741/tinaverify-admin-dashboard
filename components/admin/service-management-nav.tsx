@@ -27,7 +27,7 @@ const serviceLinks: {
 	icon: LucideIcon;
 }[] = [
 	{ name: "Banners", href: "/admin/services/banners", icon: ImageIcon },
-	{ name: "Coupon", href: "/admin/services/coupons", icon: TicketIcon },
+	// { name: "Coupon", href: "/admin/services/coupons", icon: TicketIcon },
 	{ name: "Referrals", href: "/admin/referrals", icon: Share2Icon },
 ];
 

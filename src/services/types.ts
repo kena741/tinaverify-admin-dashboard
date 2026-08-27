@@ -673,6 +673,7 @@ export type AnalyticsSummaryOutput = {
 	/** Sum of verified transaction amounts for the selected period. */
 	total_verified_amount: string | number;
 	total_failed_transactions: number | string;
+	total_fake_transactions: number | string;
 };
 
 /** `GET /api/v1/analytics/user-acquisition` */

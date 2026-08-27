@@ -515,7 +515,7 @@ export default function SubscriptionPage() {
 						) : (
 							<div className="flex flex-col gap-1">
 								<p className="text-muted-foreground">
-									No active subscription for this business — usage is
+									No active subscription for this business. Usage is
 									unavailable until they have a plan.
 								</p>
 								{activeSubscription ? (
@@ -557,8 +557,7 @@ export default function SubscriptionPage() {
 							className="flex flex-col gap-4 outline-none"
 						>
 							<p className="text-sm text-muted-foreground">
-								Check out through Chapa at the plan&apos;s configured list price.
-								No manual amount — pick a plan and continue.
+								Pick a plan and check out at the plan&apos;s configured list price.
 							</p>
 							{plansError ? (
 								<Alert variant="destructive">
@@ -636,8 +635,7 @@ export default function SubscriptionPage() {
 							className="flex flex-col gap-4 outline-none"
 						>
 							<p className="text-sm text-muted-foreground">
-								Enter the payment amount only — no plan is required. The API opens
-								checkout for this business at your chosen amount.
+								Enter a custom amount to check out at without selecting a plan. This is useful for one-off payments or special cases.
 							</p>
 							<FieldGroup>
 								<Field>

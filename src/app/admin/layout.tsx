@@ -124,7 +124,7 @@ export default function AdminLayout({
 					<div className="flex-1" />
 					<div className="flex items-center gap-1">
 						<ModeToggle />
-						<div className="relative">
+						{/* <div className="relative">
 							<Button
 								type="button"
 								variant="ghost"
@@ -190,7 +190,7 @@ export default function AdminLayout({
 									</div>
 								</div>
 							)}
-						</div>
+						</div> */}
 
 						<Link
 							href="/admin/profile"
