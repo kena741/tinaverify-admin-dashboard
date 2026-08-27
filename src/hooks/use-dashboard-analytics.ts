@@ -77,6 +77,11 @@ export function useDashboardAnalytics(range: DashboardAnalyticsRange) {
 		[summary],
 	);
 
+	const totalFakeTransactions = useMemo(
+		() => parseAnalyticsCount(summary?.total_fake_transactions),
+		[summary],
+	);
+
 	const successRate = useMemo(() => {
 		const total = totalVerifiedTransactions + totalFailedTransactions;
 		if (total === 0) return 0;
@@ -118,6 +123,7 @@ export function useDashboardAnalytics(range: DashboardAnalyticsRange) {
 		totalVerifiedAmount,
 		totalVerifiedTransactions,
 		totalFailedTransactions,
+		totalFakeTransactions,
 		successRate,
 		isLoading: systemAdmin && customRangeValid && (isLoading || isFetching),
 		error: errorMessage,

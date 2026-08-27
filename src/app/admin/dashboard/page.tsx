@@ -196,6 +196,7 @@ export default function DashboardPage() {
 		totalVerifiedAmount,
 		totalVerifiedTransactions,
 		totalFailedTransactions,
+		totalFakeTransactions,
 		successRate,
 		isLoading,
 		error,
@@ -210,16 +211,14 @@ export default function DashboardPage() {
 		customEnd: preset === "custom" ? customEnd : undefined,
 	});
 
-	const rangeReady = isSystemAdmin && customRangeValid && !!startDate && !!endDate;
+	const rangeReady =
+		isSystemAdmin && customRangeValid && !!startDate && !!endDate;
 
 	const {
 		data: acquisition,
 		isLoading: acquisitionLoading,
 		isFetching: acquisitionFetching,
-	} = useGetUserAcquisitionQuery(
-		{ startDate, endDate },
-		{ skip: !rangeReady },
-	);
+	} = useGetUserAcquisitionQuery({ startDate, endDate }, { skip: !rangeReady });
 
 	const {
 		data: paymentVolume,
@@ -240,10 +239,7 @@ export default function DashboardPage() {
 		data: creditUsage,
 		isLoading: creditLoading,
 		isFetching: creditFetching,
-	} = useGetCreditUsageQuery(
-		{ limit: creditLimit },
-		{ skip: !isSystemAdmin },
-	);
+	} = useGetCreditUsageQuery({ limit: creditLimit }, { skip: !isSystemAdmin });
 
 	const periodLabelText = periodLabel(preset, customStart, customEnd);
 	const hasSummary = Boolean(summary) && !error;
@@ -326,7 +322,7 @@ export default function DashboardPage() {
 							</p>
 						</div>
 						{isSystemAdmin ? (
-							<div className="flex flex-wrap items-end gap-2 rounded-xl border border-border bg-card p-3 shadow-xs">
+							<div>
 								<Field className="w-38 gap-1">
 									<FieldLabel
 										htmlFor="dashboard-range"
@@ -421,18 +417,12 @@ export default function DashboardPage() {
 				) : null}
 			</header>
 
-			<section
-				aria-labelledby="closeout-heading"
-				className="admin-brand-band"
-			>
+			<section aria-labelledby="closeout-heading" className="admin-brand-band">
 				<div className="flex flex-col gap-6 p-6 sm:p-8 lg:flex-row lg:items-stretch lg:justify-between lg:gap-10">
-					<div className="flex min-w-0 flex-1 flex-col justify-between gap-4">
-						<div className="flex flex-col gap-2">
-							<p id="closeout-heading" className="admin-brand-band-label">
-								Period revenue
-							</p>
-							<p className="admin-brand-band-muted">{periodLabelText}</p>
-						</div>
+					<div className="flex min-w-0 flex-1 flex-col gap-3">
+						<p id="closeout-heading" className="admin-brand-band-label">
+							Period revenue
+						</p>
 						{isLoading ? (
 							<div className="flex flex-col gap-2">
 								<Skeleton className="admin-brand-band-skeleton h-12 w-48" />
@@ -446,7 +436,7 @@ export default function DashboardPage() {
 								<p className="admin-brand-band-muted">
 									Collected subscription payments in the selected window
 								</p>
-								<p className="mt-1 font-mono text-xs tabular-nums text-primary-foreground/75">
+								<p className="mt-1 flex flex-wrap gap-x-4 gap-y-1 font-mono text-sm font-medium tabular-nums text-primary-foreground">
 									API {formatRevenueAmount(periodRevenueApi)} · Manual{" "}
 									{formatRevenueAmount(periodRevenueManual)}
 								</p>
@@ -463,14 +453,16 @@ export default function DashboardPage() {
 
 					<div className="admin-brand-band-divider" />
 
-					<div className="grid flex-1 grid-cols-2 gap-x-6 gap-y-5">
+					<div className="grid flex-1 grid-cols-3 gap-x-6 gap-y-5">
 						<LedgerStat
 							label="Verified amount"
 							loading={isLoading}
 							value={
 								statsReady ? formatRevenueAmount(totalVerifiedAmount) : null
 							}
-							hint={statsReady ? "Receipt volume, not subscriptions" : undefined}
+							hint={
+								statsReady ? "Receipt volume, not subscriptions" : undefined
+							}
 						/>
 						<LedgerStat
 							label="Success rate"
@@ -488,19 +480,21 @@ export default function DashboardPage() {
 							label="Verified txns"
 							loading={isLoading}
 							value={
-								statsReady
-									? totalVerifiedTransactions.toLocaleString()
-									: null
+								statsReady ? totalVerifiedTransactions.toLocaleString() : null
 							}
 							hint={statsReady ? "In selected period" : undefined}
 						/>
 						<LedgerStat
-							label="Failed / fake"
+							label="Fake"
+							loading={isLoading}
+							value={statsReady ? totalFakeTransactions.toLocaleString() : null}
+							hint={statsReady ? "In selected period" : undefined}
+						/>
+						<LedgerStat
+							label="Failed"
 							loading={isLoading}
 							value={
-								statsReady
-									? totalFailedTransactions.toLocaleString()
-									: null
+								statsReady ? totalFailedTransactions.toLocaleString() : null
 							}
 							hint={statsReady ? "In selected period" : undefined}
 						/>
@@ -508,7 +502,10 @@ export default function DashboardPage() {
 				</div>
 			</section>
 
-			<section aria-labelledby="footprint-heading" className="flex flex-col gap-3">
+			<section
+				aria-labelledby="footprint-heading"
+				className="flex flex-col gap-3"
+			>
 				<div className="flex items-baseline justify-between gap-3">
 					<h2
 						id="footprint-heading"
@@ -526,17 +523,13 @@ export default function DashboardPage() {
 					<FootprintCell
 						label="Registered businesses"
 						loading={isLoading}
-						value={
-							statsReady ? formatCount(summary?.total_businesses) : null
-						}
+						value={statsReady ? formatCount(summary?.total_businesses) : null}
 					/>
 					<FootprintCell
 						label="Paying businesses"
 						loading={isLoading}
 						value={
-							statsReady
-								? formatCount(summary?.total_paying_businesses)
-								: null
+							statsReady ? formatCount(summary?.total_paying_businesses) : null
 						}
 						border
 					/>
@@ -579,8 +572,8 @@ export default function DashboardPage() {
 					</div>
 					{!acquisitionBusy && acquisition ? (
 						<p className="font-mono text-xs text-muted-foreground tabular-nums">
-							{acquisitionTotal.toLocaleString()} new · {acquisition.granularity}{" "}
-							buckets
+							{acquisitionTotal.toLocaleString()} new ·{" "}
+							{acquisition.granularity} buckets
 						</p>
 					) : null}
 				</div>
@@ -684,7 +677,10 @@ export default function DashboardPage() {
 				</Card>
 			</section>
 
-			<section aria-labelledby="compare-heading" className="flex flex-col gap-3">
+			<section
+				aria-labelledby="compare-heading"
+				className="flex flex-col gap-3"
+			>
 				<div className="flex flex-col gap-0.5">
 					<h2
 						id="compare-heading"
@@ -705,8 +701,8 @@ export default function DashboardPage() {
 								<div className="flex flex-col gap-1">
 									<CardTitle>Payment volume</CardTitle>
 									<CardDescription>
-										Volume in ~5-day buckets for the selected window (defaults to
-										the last 30 days on the API).
+										Volume in ~5-day buckets for the selected window (defaults
+										to the last 30 days on the API).
 									</CardDescription>
 								</div>
 								{!volumeBusy && hasVolumePlot ? (
