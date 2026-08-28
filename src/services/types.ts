@@ -283,7 +283,7 @@ export type PermissionCreateRequest = {
 	action: string;
 };
 
-/** OpenAPI `PermissionResponseSchema` */
+/** OpenAPI `PermissionResponseSchema` — `GET /api/v1/permissions/{permission_id}` */
 export type PermissionOutput = {
 	id: UUID;
 	action: string;

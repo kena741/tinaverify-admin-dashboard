@@ -9,6 +9,7 @@ import { RoleDetailSheet } from "@/components/admin/role-detail-sheet";
 import {
 	useCreatePermissionMutation,
 	useCreateRoleMutation,
+	useDeletePermissionMutation,
 	useDeleteRoleMutation,
 	useListPermissionsQuery,
 	useListRolesQuery,
@@ -92,6 +93,7 @@ export function RolesAdminPanel({ embedded = false }: { embedded?: boolean }) {
 	const [createRole, createRoleState] = useCreateRoleMutation();
 	const [createPermission, createPermissionState] = useCreatePermissionMutation();
 	const [deleteRole, deleteRoleState] = useDeleteRoleMutation();
+	const [deletePermission, deletePermissionState] = useDeletePermissionMutation();
 
 	const [roleSearch, setRoleSearch] = useState("");
 	const [rolePendingDelete, setRolePendingDelete] = useState<{
@@ -100,6 +102,11 @@ export function RolesAdminPanel({ embedded = false }: { embedded?: boolean }) {
 	} | null>(null);
 	const [deleteRoleError, setDeleteRoleError] = useState("");
 	const [permissionSearch, setPermissionSearch] = useState("");
+	const [permissionPendingDelete, setPermissionPendingDelete] = useState<{
+		id: string;
+		action: string;
+	} | null>(null);
+	const [deletePermissionError, setDeletePermissionError] = useState("");
 	const [addRoleOpen, setAddRoleOpen] = useState(false);
 	const [addPermissionOpen, setAddPermissionOpen] = useState(false);
 	const [roleName, setRoleName] = useState("");
@@ -173,6 +180,21 @@ export function RolesAdminPanel({ embedded = false }: { embedded?: boolean }) {
 			setRolePendingDelete(null);
 		} catch (err) {
 			setDeleteRoleError(getErrorMessage(err, "Failed to delete role."));
+		}
+	};
+
+	const handleDeletePermissionConfirm = async () => {
+		if (!permissionPendingDelete) return;
+		setDeletePermissionError("");
+		try {
+			await deletePermission({
+				permissionId: permissionPendingDelete.id,
+			}).unwrap();
+			setPermissionPendingDelete(null);
+		} catch (err) {
+			setDeletePermissionError(
+				getErrorMessage(err, "Failed to delete permission."),
+			);
 		}
 	};
 
@@ -348,13 +370,16 @@ export function RolesAdminPanel({ embedded = false }: { embedded?: boolean }) {
 							<TableHeader>
 								<TableRow>
 									<TableHead>Action</TableHead>
+									<TableHead className="w-[4.5rem] text-right">
+										<span className="sr-only">Actions</span>
+									</TableHead>
 								</TableRow>
 							</TableHeader>
 							<TableBody>
 								{filteredPermissions.length === 0 ? (
 									<TableRow>
 										<TableCell
-											colSpan={1}
+											colSpan={2}
 											className="py-10 text-center text-muted-foreground"
 										>
 											{permissionSearch.trim()
@@ -367,6 +392,24 @@ export function RolesAdminPanel({ embedded = false }: { embedded?: boolean }) {
 										<TableRow key={permission.id}>
 											<TableCell className="font-medium">
 												{permission.action}
+											</TableCell>
+											<TableCell className="text-right">
+												<Button
+													type="button"
+													variant="ghost"
+													size="icon-sm"
+													className="text-muted-foreground hover:text-destructive"
+													aria-label={`Delete ${permission.action}`}
+													onClick={() => {
+														setDeletePermissionError("");
+														setPermissionPendingDelete({
+															id: permission.id,
+															action: permission.action,
+														});
+													}}
+												>
+													<Trash2Icon aria-hidden />
+												</Button>
 											</TableCell>
 										</TableRow>
 									))
@@ -563,6 +606,58 @@ export function RolesAdminPanel({ embedded = false }: { embedded?: boolean }) {
 								</>
 							) : (
 								"Delete role"
+							)}
+						</AlertDialogAction>
+					</AlertDialogFooter>
+				</AlertDialogContent>
+			</AlertDialog>
+
+			<AlertDialog
+				open={permissionPendingDelete !== null}
+				onOpenChange={(open) => {
+					if (!open) {
+						setPermissionPendingDelete(null);
+						setDeletePermissionError("");
+					}
+				}}
+			>
+				<AlertDialogContent>
+					<AlertDialogHeader>
+						<AlertDialogTitle>Delete permission?</AlertDialogTitle>
+						<AlertDialogDescription>
+							You are about to permanently delete{" "}
+							<strong>{permissionPendingDelete?.action}</strong>. It will be
+							removed from all roles that use it. This cannot be undone.
+						</AlertDialogDescription>
+					</AlertDialogHeader>
+					{deletePermissionError ? (
+						<Alert variant="destructive">
+							<AlertDescription>{deletePermissionError}</AlertDescription>
+						</Alert>
+					) : null}
+					<AlertDialogFooter>
+						<AlertDialogCancel disabled={deletePermissionState.isLoading}>
+							Cancel
+						</AlertDialogCancel>
+						<AlertDialogAction
+							className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+							disabled={deletePermissionState.isLoading}
+							onClick={(e) => {
+								e.preventDefault();
+								void handleDeletePermissionConfirm();
+							}}
+						>
+							{deletePermissionState.isLoading ? (
+								<>
+									<Loader2Icon
+										data-icon="inline-start"
+										className="animate-spin"
+										aria-hidden
+									/>
+									Deleting…
+								</>
+							) : (
+								"Delete permission"
 							)}
 						</AlertDialogAction>
 					</AlertDialogFooter>
