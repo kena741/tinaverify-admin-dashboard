@@ -58,7 +58,8 @@ function getErrorMessage(error: unknown, fallback: string): string {
 	return fallback;
 }
 
-function formatWhen(iso: string): string {
+function formatWhen(iso: string | null | undefined): string {
+	if (!iso) return "—";
 	const d = new Date(iso);
 	if (Number.isNaN(d.getTime())) return iso;
 	return d.toLocaleString(undefined, {
@@ -214,9 +215,9 @@ export default function FinanceTransactionsPage() {
 											</TableCell>
 											<TableCell
 												className="max-w-36 truncate font-mono text-xs"
-												title={row.tx_ref}
+												title={row.tx_ref ?? undefined}
 											>
-												{row.tx_ref}
+												{row.tx_ref ?? "—"}
 											</TableCell>
 											<TableCell
 												className="max-w-36 truncate font-mono text-xs text-muted-foreground"
@@ -234,7 +235,7 @@ export default function FinanceTransactionsPage() {
 															if (!url) return;
 															setReceiptPreview({
 																url,
-																label: row.name ?? row.tx_ref,
+																label: row.name ?? row.tx_ref ?? "Receipt",
 															});
 														}}
 													>

@@ -32,6 +32,17 @@ export type RegisterUserRequest = {
 	referral_code?: string | null;
 };
 
+/** OpenAPI `AdminUserRegisterSchema` — body for `POST /api/v1/admin/users/register` */
+export type AdminUserRegisterRequest = {
+	phone_number: string;
+	password: string;
+	username?: string | null;
+	email?: string | null;
+	user_information?: UserInformationInput | null;
+	referral_code?: string | null;
+	is_superuser?: boolean;
+};
+
 /** OpenAPI `UserUpdateSchema` — body for `PATCH /api/v1/users/{user_id}` */
 export type UserUpdateRequest = {
 	phone_number?: string | null;
@@ -397,7 +408,7 @@ export type SubscriptionCheckoutResponse = {
 export type AdminGrantCreditsRequest = {
 	credits: number;
 	/** Reference receipt / proof image (form field `file`). */
-	file: File;
+	file?: File | null;
 };
 
 /** OpenAPI `AdminBusinessCreateSchema` — `POST /api/v1/admin/businesses` */
@@ -413,7 +424,7 @@ export type AdminManualSubscriptionRequest = {
 	plan_id: UUID;
 	amount?: number | null;
 	/** Reference receipt / proof image (form field `file`). */
-	file: File;
+	file?: File | null;
 };
 
 /** OpenAPI `UpdateSuperuserSchema` — `PATCH /api/v1/admin/users/{user_id}/superuser` */
@@ -587,17 +598,17 @@ export type TransactionLogStatus =
 /** OpenAPI `TransactionLogOutputSchema` — Chapa / manual payment logs */
 export type TransactionLogOutput = {
 	id: UUID;
-	tx_ref: string;
-	name: string | null;
+	tx_ref?: string | null;
+	name?: string | null;
 	amount: number | string;
-	reference: string | null;
+	reference?: string | null;
 	status: string;
-	payment_method: string | null;
-	phone_number: string | null;
-	currency: string | null;
-	receipt_url: string | null;
-	created_at: string;
-	updated_at: string;
+	payment_method?: string | null;
+	phone_number?: string | null;
+	currency: string;
+	receipt_url?: string | null;
+	created_at?: string | null;
+	updated_at?: string | null;
 };
 
 // -----------------------------
@@ -703,27 +714,29 @@ export type CommissionRateUpdateRequest = {
 };
 
 // -----------------------------
-// SMS (GeezSMS)
+// SMS
 // -----------------------------
 
-/** Body for `POST /api/v1/sms/geezsms/send` */
-export type SendCustomSmsRequest = {
+/** OpenAPI `AdminSendSMSPayload` — body for `POST /api/v1/sms/send` */
+export type AdminSendSmsRequest = {
 	phone: string;
 	message: string;
 };
 
-/** Response from custom SMS send */
-export type SendCustomSmsResponse = {
-	status?: string;
-	message?: string;
-	api_log_id?: string;
-};
+/** @deprecated Use `AdminSendSmsRequest` */
+export type SendCustomSmsRequest = AdminSendSmsRequest;
+
+/** Response from `POST /api/v1/sms/send` */
+export type AdminSendSmsResponse = Record<string, unknown>;
+
+/** @deprecated Use `AdminSendSmsResponse` */
+export type SendCustomSmsResponse = AdminSendSmsResponse;
 
 // -----------------------------
 // Analytics
 // -----------------------------
 
-/** `GET /api/v1/analytics/summary` — platform KPIs (admin only). */
+/** OpenAPI `PaymentMethodBreakdown` / revenue bucket in `RevenueBreakdown` */
 export type AnalyticsRevenueBucket = {
 	total: string | number;
 	api: string | number;
