@@ -172,7 +172,9 @@ export const subscriptionApi = createApi({
 			query: ({ businessId, body }) => {
 				const formData = new FormData();
 				formData.append("credits", String(body.credits));
-				formData.append("file", body.file);
+				if (body.file) {
+					formData.append("file", body.file);
+				}
 				return {
 					url: "/api/v1/subscriptions/grant-credits",
 					method: "POST",

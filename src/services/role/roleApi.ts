@@ -58,6 +58,31 @@ export const roleApi = createApi({
 			invalidatesTags: [{ type: "Permission", id: "LIST" }],
 		}),
 
+		/** `GET /api/v1/permissions/{permission_id}` */
+		getPermission: builder.query<PermissionOutput, { permissionId: string }>({
+			query: ({ permissionId }) => ({
+				url: `/api/v1/permissions/${permissionId}`,
+				headers: bearerHeaders(),
+			}),
+			providesTags: (_result, _err, { permissionId }) => [
+				{ type: "Permission" as const, id: permissionId },
+			],
+		}),
+
+		/** `DELETE /api/v1/permissions/{permission_id}` */
+		deletePermission: builder.mutation<void, { permissionId: string }>({
+			query: ({ permissionId }) => ({
+				url: `/api/v1/permissions/${permissionId}`,
+				method: "DELETE",
+				headers: bearerHeaders(),
+			}),
+			invalidatesTags: (_result, _err, { permissionId }) => [
+				{ type: "Permission" as const, id: "LIST" },
+				{ type: "Permission" as const, id: permissionId },
+				{ type: "RolePermissions" as const },
+			],
+		}),
+
 		/** `GET /api/v1/roles/admin` */
 		listRoles: builder.query<RoleOutput[], void>({
 			query: () => ({
@@ -156,6 +181,8 @@ export const roleApi = createApi({
 export const {
 	useListPermissionsQuery,
 	useCreatePermissionMutation,
+	useGetPermissionQuery,
+	useDeletePermissionMutation,
 	useListRolesQuery,
 	useCreateRoleMutation,
 	useGetRoleQuery,

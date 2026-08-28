@@ -4,7 +4,7 @@ import { createApi } from "@reduxjs/toolkit/query/react";
 
 import { getStoredAccessToken } from "../authTokens";
 import { backendBaseQuery } from "../baseQuery";
-import type { SendCustomSmsRequest, SendCustomSmsResponse } from "../types";
+import type { AdminSendSmsRequest, AdminSendSmsResponse } from "../types";
 
 function bearerHeaders(accessToken?: string | null) {
 	const token =
@@ -20,13 +20,13 @@ export const smsApi = createApi({
 	reducerPath: "smsApi",
 	baseQuery: backendBaseQuery,
 	endpoints: (builder) => ({
-		/** `POST /api/v1/sms/geezsms/send` — send a custom SMS via GeezSMS */
+		/** `POST /api/v1/sms/send` — send an SMS to a phone number (admin only) */
 		sendCustomSms: builder.mutation<
-			SendCustomSmsResponse,
-			{ body: SendCustomSmsRequest }
+			AdminSendSmsResponse,
+			{ body: AdminSendSmsRequest }
 		>({
 			query: ({ body }) => ({
-				url: "/api/v1/sms/geezsms/send",
+				url: "/api/v1/sms/send",
 				method: "POST",
 				body,
 				headers: {

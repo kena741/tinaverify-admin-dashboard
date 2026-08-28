@@ -90,10 +90,12 @@ export function SendBusinessSmsDialog({
 
 		try {
 			const result = await sendSms({ body: { phone, message: text } }).unwrap();
+			const status =
+				typeof result.status === "string" ? result.status : undefined;
 			setSuccessMessage(
-				result.status === "ok" || !result.status
+				status === "ok" || !status
 					? "SMS sent successfully."
-					: `SMS sent (${result.status}).`,
+					: `SMS sent (${status}).`,
 			);
 			setMessage("");
 		} catch (err) {

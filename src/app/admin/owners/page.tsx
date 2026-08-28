@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { format } from "date-fns";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import {
 	ArrowDownIcon,
 	ArrowUpIcon,
@@ -10,7 +10,7 @@ import {
 	ChevronRightIcon,
 } from "lucide-react";
 
-import { useGetUserByIdQuery } from "@/services/auth/authApi";
+import { useListAllUsersQuery } from "@/services/auth/authApi";
 import { AdminCreateBusinessDialog } from "@/components/admin/admin-create-business-dialog";
 import { AdminCreateUserDialog } from "@/components/admin/admin-create-user-dialog";
 import { useListAllBusinessesQuery } from "@/services/branch-management/branchManagementApi";
@@ -19,6 +19,7 @@ import { useListSubscriptionPlansQuery } from "@/services/subscription-plan/subs
 import type {
 	AdminSubscriptionOutput,
 	BusinessOutput,
+	UserOutput,
 } from "@/services/types";
 import {
 	buildLatestBusinessSubscriptionRows,
@@ -240,6 +241,35 @@ export default function TransactionsPage() {
 	const [createUserOpen, setCreateUserOpen] = useState(false);
 	const [createBusinessOpen, setCreateBusinessOpen] = useState(false);
 
+	const filterResetKey = useMemo(
+		() =>
+			[
+				planId,
+				statusFilter,
+				searchTerm,
+				pageSize,
+				dateFrom,
+				dateTo,
+				bizCountFilter,
+				minAmount,
+			].join("\0"),
+		[
+			planId,
+			statusFilter,
+			searchTerm,
+			pageSize,
+			dateFrom,
+			dateTo,
+			bizCountFilter,
+			minAmount,
+		],
+	);
+	const [prevFilterResetKey, setPrevFilterResetKey] = useState(filterResetKey);
+	if (prevFilterResetKey !== filterResetKey) {
+		setPrevFilterResetKey(filterResetKey);
+		setPage(1);
+	}
+
 	const { data: businesses, isLoading: businessesLoading } =
 		useListAllBusinessesQuery();
 	const { data: plans } = useListSubscriptionPlansQuery();
@@ -247,10 +277,16 @@ export default function TransactionsPage() {
 	const {
 		data: statsTransactions,
 		isLoading: statsLoading,
-		isFetching,
 		error,
 		refetch,
 	} = useListAdminSubscriptionTransactionsQuery();
+	const { data: users, isLoading: usersLoading } = useListAllUsersQuery();
+
+	const usersById = useMemo(() => {
+		const map = new Map<string, UserOutput>();
+		for (const user of users ?? []) map.set(user.id, user);
+		return map;
+	}, [users]);
 
 	const ownerIdByBusinessId = useMemo(() => {
 		const map = new Map<string, string>();
@@ -312,9 +348,9 @@ export default function TransactionsPage() {
 
 		const q = searchTerm.trim().toLowerCase();
 		if (q) {
-			// ponytail: search businesses/plans only; owner names hydrate per-row via getUserById
 			businessRows = businessRows.filter((row) => {
 				const ownerId = ownerIdByBusinessId.get(row.business_id);
+				const owner = ownerId ? usersById.get(ownerId) : undefined;
 				const ownerBizNames = ownerId
 					? (businessesByOwnerId.get(ownerId) ?? [])
 							.map((b) => b.name)
@@ -329,6 +365,10 @@ export default function TransactionsPage() {
 					row.business_id,
 					ownerBizNames,
 					ownerId,
+					owner ? formatUserDisplayName(owner) : "",
+					owner?.email,
+					owner?.phone_number,
+					owner?.username,
 				]
 					.filter(Boolean)
 					.join(" ")
@@ -397,6 +437,7 @@ export default function TransactionsPage() {
 		searchTerm,
 		ownerIdByBusinessId,
 		businessesByOwnerId,
+		usersById,
 		bizCountFilter,
 		minAmount,
 		dateFrom,
@@ -445,19 +486,6 @@ export default function TransactionsPage() {
 		setPage(1);
 	}
 
-	useEffect(() => {
-		setPage(1);
-	}, [
-		planId,
-		statusFilter,
-		searchTerm,
-		pageSize,
-		dateFrom,
-		dateTo,
-		bizCountFilter,
-		minAmount,
-	]);
-
 	const summarySnapshot = useMemo((): PlatformSubscriptionSummary | null => {
 		if (businessesLoading || statsLoading) return null;
 		if (!businesses) return null;
@@ -485,10 +513,7 @@ export default function TransactionsPage() {
 					? "1 business"
 					: "2 businesses";
 
-	const listBusy =
-		statusFilter === "unsubscribed"
-			? businessesLoading || statsLoading
-			: statsLoading || isFetching || businessesLoading;
+	const listBusy = businessesLoading || statsLoading;
 
 	return (
 		<div className="mx-auto flex w-full max-w-6xl flex-col gap-6 pb-8">
@@ -693,7 +718,7 @@ export default function TransactionsPage() {
 									</FieldLabel>
 									<Input
 										type="search"
-										placeholder="Business, TIN, or plan…"
+										placeholder="Owner, business, TIN, or plan…"
 										value={searchTerm}
 										onChange={(e) => {
 											setSearchTerm(e.target.value);
@@ -938,6 +963,10 @@ export default function TransactionsPage() {
 												key={ownerId ?? row.id}
 												row={row}
 												ownerId={ownerId}
+												owner={
+													ownerId ? usersById.get(ownerId) : undefined
+												}
+												usersLoading={usersLoading}
 												ownerBusinesses={ownerBusinesses}
 												onSelect={() =>
 													router.push(`/admin/business/${row.business_id}`)
@@ -1018,23 +1047,18 @@ export default function TransactionsPage() {
 function OwnerRow({
 	row,
 	ownerId,
+	owner,
+	usersLoading,
 	ownerBusinesses,
 	onSelect,
 }: {
 	row: AdminSubscriptionOutput;
 	ownerId: string | undefined;
+	owner: UserOutput | undefined;
+	usersLoading: boolean;
 	ownerBusinesses: BusinessOutput[];
 	onSelect: () => void;
 }) {
-	const {
-		data: owner,
-		isLoading: ownerLoading,
-		isError: ownerError,
-	} = useGetUserByIdQuery(
-		{ userId: ownerId ?? "" },
-		{ skip: !ownerId },
-	);
-
 	const count = ownerBusinesses.length;
 	const namesSummary = formatBusinessNames(ownerBusinesses);
 	const displayName = owner ? formatUserDisplayName(owner) : null;
@@ -1046,6 +1070,7 @@ function OwnerRow({
 			? namesSummary
 			: "owner";
 	const dateLabel = formatSubscriptionDate(row.started_at ?? row.created_at);
+	const ownerPending = Boolean(ownerId && usersLoading && !owner);
 
 	return (
 		<TableRow
@@ -1064,7 +1089,7 @@ function OwnerRow({
 			<TableCell>
 				{!ownerId ? (
 					<span className="text-muted-foreground">No owner linked</span>
-				) : ownerLoading ? (
+				) : ownerPending ? (
 					<div className="flex flex-col gap-1">
 						<Skeleton className="h-4 w-28" />
 						<Skeleton className="h-3 w-24" />
@@ -1085,9 +1110,7 @@ function OwnerRow({
 					</div>
 				) : (
 					<div className="flex flex-col gap-0.5">
-						<span className="text-muted-foreground">
-							{ownerError ? "Owner lookup failed" : "Unknown owner"}
-						</span>
+						<span className="text-muted-foreground">Unknown owner</span>
 						<span
 							className="font-mono text-xs text-muted-foreground"
 							title={ownerId}

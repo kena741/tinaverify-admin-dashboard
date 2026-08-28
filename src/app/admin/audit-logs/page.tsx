@@ -9,8 +9,12 @@ import {
 	useGetUserByIdQuery,
 	useListAllUsersQuery,
 } from "@/services/auth/authApi";
-import { useGetBusinessQuery } from "@/services/branch-management/branchManagementApi";
+import {
+	useGetBusinessQuery,
+	useLazyGetBusinessQuery,
+} from "@/services/branch-management/branchManagementApi";
 import { useListPlatformStaffQuery } from "@/services/platform/platformApi";
+import { useListAdminSubscriptionTransactionsQuery } from "@/services/subscription/subscriptionApi";
 import type { AuditLogOutput } from "@/services/types";
 import { formatPlatformLabel, formatUserDisplayName } from "@/lib/userDisplay";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -137,7 +141,36 @@ function detailString(
 	key: string,
 ): string | null {
 	const value = details?.[key];
-	return typeof value === "string" && value.trim() ? value.trim() : null;
+	if (typeof value === "string" && value.trim()) return value.trim();
+	return typeof value === "number" ? String(value) : null;
+}
+
+function isHttpUrl(value: string): boolean {
+	try {
+		const url = new URL(value);
+		return url.protocol === "http:" || url.protocol === "https:";
+	} catch {
+		return false;
+	}
+}
+
+function DetailValue({ value }: { value: unknown }) {
+	if (typeof value === "string" && isHttpUrl(value)) {
+		return (
+			<a
+				href={value}
+				target="_blank"
+				rel="noopener noreferrer"
+				className="text-brand-ink underline-offset-2 hover:underline"
+			>
+				Link
+			</a>
+		);
+	}
+	if (typeof value === "string" || typeof value === "number") {
+		return <>{String(value)}</>;
+	}
+	return <>{JSON.stringify(value, null, 2)}</>;
 }
 
 function AuditAdminCell({
@@ -256,9 +289,25 @@ function AuditEntityCell({ row }: { row: AuditLogOutput }) {
 
 function DetailEntries({
 	details,
+	businessName,
+	businessLoading,
 }: {
-	details: Record<string, unknown> | null;
+	details: AuditLogOutput["details"];
+	businessName?: string;
+	businessLoading: boolean;
 }) {
+	const entries = details ? Object.entries(details) : [];
+	const ownerId = detailString(details, "owner_id");
+	const planId = detailString(details, "plan_id");
+	const { data: owner, isLoading: ownerLoading } = useGetUserByIdQuery(
+		{ userId: ownerId ?? "" },
+		{ skip: !ownerId },
+	);
+	const { data: subscriptions, isLoading: planLoading } =
+		useListAdminSubscriptionTransactionsQuery({ planId }, { skip: !planId });
+	const plan = subscriptions?.find(
+		(subscription) => subscription.plan_id === planId,
+	)?.plan;
 	if (!details || Object.keys(details).length === 0) {
 		return (
 			<p className="text-sm text-muted-foreground">
@@ -268,21 +317,34 @@ function DetailEntries({
 	}
 	return (
 		<dl className="divide-y divide-border rounded-lg border border-border bg-muted/20">
-			{Object.entries(details).map(([key, value]) => (
-				<div
-					key={key}
-					className="grid gap-1 px-3 py-3 sm:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] sm:gap-4"
-				>
-					<dt className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
-						{formatPlatformLabel(key)}
-					</dt>
-					<dd className="font-mono text-sm break-all text-foreground">
-						{typeof value === "string" || typeof value === "number"
-							? String(value)
-							: JSON.stringify(value, null, 2)}
-					</dd>
-				</div>
-			))}
+			{entries.map(([key, value]) => {
+				const resolvedValue =
+					key === "business_id"
+						? (businessName ??
+							(businessLoading ? "Loading business…" : value))
+						: key === "owner_id"
+							? owner
+								? formatUserDisplayName(owner)
+								: ownerLoading
+									? "Loading user…"
+									: value
+							: key === "plan_id"
+								? (plan?.name ?? (planLoading ? "Loading plan…" : value))
+								: value;
+				return (
+					<div
+						key={key}
+						className="grid gap-1 px-3 py-3 sm:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] sm:gap-4"
+					>
+						<dt className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
+							{formatPlatformLabel(key)}
+						</dt>
+						<dd className="font-mono text-sm break-all text-foreground">
+							<DetailValue value={resolvedValue} />
+						</dd>
+					</div>
+				);
+			})}
 		</dl>
 	);
 }
@@ -296,6 +358,12 @@ export default function AuditLogsPage() {
 	const [actionFilter, setActionFilter] = useState(ACTION_ALL);
 	const [actionCustom, setActionCustom] = useState("");
 	const [selected, setSelected] = useState<AuditLogOutput | null>(null);
+	const [selectedBusiness, setSelectedBusiness] = useState<{
+		id: string;
+		name: string;
+	}>();
+	const [fetchBusiness, { isLoading: selectedBusinessLoading }] =
+		useLazyGetBusinessQuery();
 
 	const { data: staff } = useListPlatformStaffQuery();
 	const { data: users } = useListAllUsersQuery();
@@ -331,6 +399,16 @@ export default function AuditLogsPage() {
 	const rows = data ?? [];
 	const canPrev = offset > 0;
 	const canNext = rows.length >= PAGE_SIZE;
+
+	function selectAuditRow(row: AuditLogOutput) {
+		setSelected(row);
+		const businessId = detailString(row.details, "business_id");
+		if (!businessId) return;
+		void fetchBusiness({ businessId })
+			.unwrap()
+			.then((business) => setSelectedBusiness({ id: business.id, name: business.name }))
+			.catch(() => undefined);
+	}
 
 	const adminOptions = useMemo(() => {
 		const ids = new Set<string>();
@@ -718,11 +796,11 @@ export default function AuditLogsPage() {
 											<TableRow
 												key={row.id}
 												className="cursor-pointer transition-colors duration-150"
-												onClick={() => setSelected(row)}
+												onClick={() => selectAuditRow(row)}
 												onKeyDown={(e) => {
 													if (e.key === "Enter" || e.key === " ") {
 														e.preventDefault();
-														setSelected(row);
+														selectAuditRow(row);
 													}
 												}}
 												tabIndex={0}
@@ -831,7 +909,11 @@ export default function AuditLogsPage() {
 									<p className="mb-2 text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
 										Details
 									</p>
-									<DetailEntries details={selected.details} />
+									<DetailEntries
+										details={selected.details}
+										businessName={selectedBusiness?.name}
+										businessLoading={selectedBusinessLoading}
+									/>
 								</div>
 							</div>
 						</>

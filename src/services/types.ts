@@ -32,6 +32,17 @@ export type RegisterUserRequest = {
 	referral_code?: string | null;
 };
 
+/** OpenAPI `AdminUserRegisterSchema` — body for `POST /api/v1/admin/users/register` */
+export type AdminUserRegisterRequest = {
+	phone_number: string;
+	password: string;
+	username?: string | null;
+	email?: string | null;
+	user_information?: UserInformationInput | null;
+	referral_code?: string | null;
+	is_superuser?: boolean;
+};
+
 /** OpenAPI `UserUpdateSchema` — body for `PATCH /api/v1/users/{user_id}` */
 export type UserUpdateRequest = {
 	phone_number?: string | null;
@@ -272,7 +283,7 @@ export type PermissionCreateRequest = {
 	action: string;
 };
 
-/** OpenAPI `PermissionResponseSchema` */
+/** OpenAPI `PermissionResponseSchema` — `GET /api/v1/permissions/{permission_id}` */
 export type PermissionOutput = {
 	id: UUID;
 	action: string;
@@ -397,7 +408,7 @@ export type SubscriptionCheckoutResponse = {
 export type AdminGrantCreditsRequest = {
 	credits: number;
 	/** Reference receipt / proof image (form field `file`). */
-	file: File;
+	file?: File | null;
 };
 
 /** OpenAPI `AdminBusinessCreateSchema` — `POST /api/v1/admin/businesses` */
@@ -413,13 +424,94 @@ export type AdminManualSubscriptionRequest = {
 	plan_id: UUID;
 	amount?: number | null;
 	/** Reference receipt / proof image (form field `file`). */
-	file: File;
+	file?: File | null;
 };
 
 /** OpenAPI `UpdateSuperuserSchema` — `PATCH /api/v1/admin/users/{user_id}/superuser` */
 export type UpdateSuperuserRequest = {
 	is_superuser: boolean;
 };
+
+export type AssignSubscriptionAuditDetails = {
+	action_detail?: string;
+	business_id: string;
+	plan_id: string;
+	receipt_url?: string | null;
+};
+
+export type BannerAuditDetails = {
+	is_active?: boolean | null;
+	redirect_url?: string | null;
+	image_updated?: boolean | null;
+};
+
+export type BusinessCreationAuditDetails = {
+	action_detail?: string;
+	name: string;
+	owner_id: string;
+};
+
+export type BusinessStatusAuditDetails = {
+	old_is_active?: boolean | null;
+	new_is_active: boolean;
+	reason?: string | null;
+};
+
+export type ExchangeRateAuditDetails = {
+	old_rate?: number | null;
+	new_rate: number;
+};
+
+export type GrantCreditsAuditDetails = {
+	action_detail?: string;
+	business_id: string;
+	credits: number;
+	receipt_url?: string | null;
+};
+
+export type RoleAuditDetails = {
+	role_name: string;
+	action_detail?: string | null;
+	assigned_permissions?: string[] | null;
+	removed_permissions?: string[] | null;
+};
+
+export type SubscriptionPlanAuditDetails = {
+	action_detail?: string | null;
+	old_name?: string | null;
+	new_name?: string | null;
+	old_price?: number | null;
+	new_price?: number | null;
+	old_monthly_transaction_limit?: number | null;
+	new_monthly_transaction_limit?: number | null;
+	old_duration_days?: number | null;
+	new_duration_days?: number | null;
+};
+
+export type UpdateSuperuserAuditDetails = {
+	action_detail?: string;
+	is_superuser: boolean;
+};
+
+export type UserRegistrationAuditDetails = {
+	action_detail?: string;
+	email: string;
+	phone_number?: string | null;
+	is_superuser: boolean;
+};
+
+export type AuditLogDetails =
+	| AssignSubscriptionAuditDetails
+	| BannerAuditDetails
+	| BusinessCreationAuditDetails
+	| BusinessStatusAuditDetails
+	| ExchangeRateAuditDetails
+	| GrantCreditsAuditDetails
+	| RoleAuditDetails
+	| SubscriptionPlanAuditDetails
+	| UpdateSuperuserAuditDetails
+	| UserRegistrationAuditDetails
+	| Record<string, unknown>;
 
 /** OpenAPI `AuditLogOutputSchema` — `GET /api/v1/admin/audit-logs` */
 export type AuditLogOutput = {
@@ -428,7 +520,7 @@ export type AuditLogOutput = {
 	action: string;
 	entity_type: string | null;
 	entity_id: UUID | null;
-	details: Record<string, unknown> | null;
+	details: AuditLogDetails | null;
 	ip_address: string | null;
 	created_at: string;
 };
@@ -506,17 +598,17 @@ export type TransactionLogStatus =
 /** OpenAPI `TransactionLogOutputSchema` — Chapa / manual payment logs */
 export type TransactionLogOutput = {
 	id: UUID;
-	tx_ref: string;
-	name: string | null;
+	tx_ref?: string | null;
+	name?: string | null;
 	amount: number | string;
-	reference: string | null;
+	reference?: string | null;
 	status: string;
-	payment_method: string | null;
-	phone_number: string | null;
-	currency: string | null;
-	receipt_url: string | null;
-	created_at: string;
-	updated_at: string;
+	payment_method?: string | null;
+	phone_number?: string | null;
+	currency: string;
+	receipt_url?: string | null;
+	created_at?: string | null;
+	updated_at?: string | null;
 };
 
 // -----------------------------
@@ -622,27 +714,29 @@ export type CommissionRateUpdateRequest = {
 };
 
 // -----------------------------
-// SMS (GeezSMS)
+// SMS
 // -----------------------------
 
-/** Body for `POST /api/v1/sms/geezsms/send` */
-export type SendCustomSmsRequest = {
+/** OpenAPI `AdminSendSMSPayload` — body for `POST /api/v1/sms/send` */
+export type AdminSendSmsRequest = {
 	phone: string;
 	message: string;
 };
 
-/** Response from custom SMS send */
-export type SendCustomSmsResponse = {
-	status?: string;
-	message?: string;
-	api_log_id?: string;
-};
+/** @deprecated Use `AdminSendSmsRequest` */
+export type SendCustomSmsRequest = AdminSendSmsRequest;
+
+/** Response from `POST /api/v1/sms/send` */
+export type AdminSendSmsResponse = Record<string, unknown>;
+
+/** @deprecated Use `AdminSendSmsResponse` */
+export type SendCustomSmsResponse = AdminSendSmsResponse;
 
 // -----------------------------
 // Analytics
 // -----------------------------
 
-/** `GET /api/v1/analytics/summary` — platform KPIs (admin only). */
+/** OpenAPI `PaymentMethodBreakdown` / revenue bucket in `RevenueBreakdown` */
 export type AnalyticsRevenueBucket = {
 	total: string | number;
 	api: string | number;

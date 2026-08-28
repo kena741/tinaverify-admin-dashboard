@@ -8,9 +8,9 @@ import { subscriptionApi } from "../subscription/subscriptionApi";
 import type {
 	AdminBusinessCreateRequest,
 	AdminManualSubscriptionRequest,
+	AdminUserRegisterRequest,
 	AuditLogOutput,
 	BusinessOutput,
-	RegisterUserRequest,
 	SubscriptionOutput,
 	UpdateSuperuserRequest,
 	UserOutput,
@@ -69,7 +69,7 @@ export const adminApi = createApi({
 		}),
 
 		/** `POST /api/v1/admin/users/register` */
-		adminRegisterUser: builder.mutation<UserOutput, { body: RegisterUserRequest }>(
+		adminRegisterUser: builder.mutation<UserOutput, { body: AdminUserRegisterRequest }>(
 			{
 				query: ({ body }) => ({
 					url: "/api/v1/admin/users/register",
@@ -137,7 +137,9 @@ export const adminApi = createApi({
 				if (body.amount != null) {
 					formData.append("amount", String(body.amount));
 				}
-				formData.append("file", body.file);
+				if (body.file) {
+					formData.append("file", body.file);
+				}
 				return {
 					url: "/api/v1/admin/subscriptions",
 					method: "POST",
