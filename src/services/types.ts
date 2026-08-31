@@ -122,6 +122,16 @@ export type BusinessOutput = {
 	is_archived: boolean;
 };
 
+/** OpenAPI `PaginatedBusinessResponse` — `GET /api/v1/business` */
+export type PaginatedBusinessResponse = {
+	items: BusinessOutput[];
+	total_count: number;
+	page_number: number;
+	returned_count: number;
+	offset: number;
+	limit: number;
+};
+
 /** OpenAPI `BranchCreateSchema` — body for `POST /api/v1/branches` */
 export type BranchCreateRequest = {
 	business_id: UUID;
