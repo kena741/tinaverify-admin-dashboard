@@ -10,15 +10,18 @@ import {
 	ChevronRightIcon,
 } from "lucide-react";
 
-import { useListAllUsersQuery } from "@/services/auth/authApi";
+import { useListUsersQuery } from "@/services/auth/authApi";
 import { AdminCreateBusinessDialog } from "@/components/admin/admin-create-business-dialog";
 import { AdminCreateUserDialog } from "@/components/admin/admin-create-user-dialog";
-import { useListAllBusinessesQuery } from "@/services/branch-management/branchManagementApi";
+import { useListBusinessesQuery } from "@/services/branch-management/branchManagementApi";
+import { useAccumulatedPaginatedQuery } from "@/hooks/use-accumulated-paginated-query";
 import { useListAdminSubscriptionTransactionsQuery } from "@/services/subscription/subscriptionApi";
 import { useListSubscriptionPlansQuery } from "@/services/subscription-plan/subscriptionPlanApi";
 import type {
 	AdminSubscriptionOutput,
 	BusinessOutput,
+	PaginatedBusinessResponse,
+	PaginatedUserResponse,
 	UserOutput,
 } from "@/services/types";
 import {
@@ -270,8 +273,14 @@ export default function TransactionsPage() {
 		setPage(1);
 	}
 
-	const { data: businesses, isLoading: businessesLoading } =
-		useListAllBusinessesQuery();
+	const {
+		data: businesses,
+		isLoading: businessesLoading,
+		isFetchingMore: businessesFetchingMore,
+	} = useAccumulatedPaginatedQuery<BusinessOutput, PaginatedBusinessResponse>(
+		useListBusinessesQuery,
+		"owners-businesses",
+	);
 	const { data: plans } = useListSubscriptionPlansQuery();
 
 	const {
@@ -280,7 +289,14 @@ export default function TransactionsPage() {
 		error,
 		refetch,
 	} = useListAdminSubscriptionTransactionsQuery();
-	const { data: users, isLoading: usersLoading } = useListAllUsersQuery();
+	const {
+		data: users,
+		isFetchingMore: usersFetchingMore,
+		isComplete: usersComplete,
+	} = useAccumulatedPaginatedQuery<UserOutput, PaginatedUserResponse>(
+		useListUsersQuery,
+		"owners-users",
+	);
 
 	const usersById = useMemo(() => {
 		const map = new Map<string, UserOutput>();
@@ -966,7 +982,13 @@ export default function TransactionsPage() {
 												owner={
 													ownerId ? usersById.get(ownerId) : undefined
 												}
-												usersLoading={usersLoading}
+												usersPending={
+													Boolean(
+														ownerId &&
+															!usersById.get(ownerId) &&
+															!usersComplete,
+													)
+												}
 												ownerBusinesses={ownerBusinesses}
 												onSelect={() =>
 													router.push(`/admin/business/${row.business_id}`)
@@ -981,14 +1003,21 @@ export default function TransactionsPage() {
 
 					{!listBusy && totalItems > 0 ? (
 						<div className="flex flex-col gap-3 border-t border-border pt-4 sm:flex-row sm:items-center sm:justify-between">
-							<p className="font-mono text-xs tabular-nums text-muted-foreground">
-								{pageStart + 1}–
-								{Math.min(pageStart + pageSize, totalItems)} of {totalItems}{" "}
-								owner{totalItems === 1 ? "" : "s"}
-								{statusFilter !== "all"
-									? ` · ${getSubscriptionStatusFilterLabel(statusFilter)}`
-									: ""}
-							</p>
+							<div className="flex flex-col gap-1">
+								<p className="font-mono text-xs tabular-nums text-muted-foreground">
+									{pageStart + 1}–
+									{Math.min(pageStart + pageSize, totalItems)} of {totalItems}{" "}
+									owner{totalItems === 1 ? "" : "s"}
+									{statusFilter !== "all"
+										? ` · ${getSubscriptionStatusFilterLabel(statusFilter)}`
+										: ""}
+								</p>
+								{businessesFetchingMore || usersFetchingMore ? (
+									<p className="text-[11px] text-muted-foreground">
+										Loading more roster data…
+									</p>
+								) : null}
+							</div>
 							<div className="flex flex-wrap items-center gap-2">
 								<span className="text-[11px] text-muted-foreground">
 									Per page
@@ -1048,14 +1077,14 @@ function OwnerRow({
 	row,
 	ownerId,
 	owner,
-	usersLoading,
+	usersPending,
 	ownerBusinesses,
 	onSelect,
 }: {
 	row: AdminSubscriptionOutput;
 	ownerId: string | undefined;
 	owner: UserOutput | undefined;
-	usersLoading: boolean;
+	usersPending: boolean;
 	ownerBusinesses: BusinessOutput[];
 	onSelect: () => void;
 }) {
@@ -1070,7 +1099,7 @@ function OwnerRow({
 			? namesSummary
 			: "owner";
 	const dateLabel = formatSubscriptionDate(row.started_at ?? row.created_at);
-	const ownerPending = Boolean(ownerId && usersLoading && !owner);
+	const ownerPending = Boolean(ownerId && usersPending && !owner);
 
 	return (
 		<TableRow

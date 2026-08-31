@@ -2,6 +2,10 @@ import { createApi } from "@reduxjs/toolkit/query/react";
 import type { FetchBaseQueryError } from "@reduxjs/toolkit/query";
 import { getStoredAccessToken } from "../authTokens";
 import { backendBaseQuery } from "../baseQuery";
+import {
+	ADMIN_LIST_PAGE_SIZE,
+	fetchAllPaginatedItems,
+} from "../paginatedFetch";
 import type {
 	BranchCreateRequest,
 	BranchOutput,
@@ -9,6 +13,7 @@ import type {
 	BusinessOutput,
 	DeactivateBusinessRequest,
 	EmployeeOutput,
+	PaginatedBusinessResponse,
 	UpdateEmployeeRequest,
 } from "../types";
 
@@ -32,13 +37,56 @@ export const branchManagementApi = createApi({
 	baseQuery: backendBaseQuery,
 	tagTypes: ["Branch", "MyBusinesses", "Business", "Employee"],
 	endpoints: (builder) => ({
-		/** `GET /api/v1/business` */
-		listAllBusinesses: builder.query<BusinessOutput[], void>({
-			query: () => ({
+		/** `GET /api/v1/business` — one paginated slice. */
+		listBusinesses: builder.query<
+			PaginatedBusinessResponse,
+			{ offset?: number; limit?: number }
+		>({
+			query: ({ offset = 0, limit = ADMIN_LIST_PAGE_SIZE }) => ({
 				url: "/api/v1/business",
+				method: "GET",
+				params: { offset, limit },
 				headers: bearerHeaders(),
 			}),
-			providesTags: [{ type: "Business", id: "LIST" }],
+			providesTags: (result) =>
+				result
+					? [
+							{ type: "Business" as const, id: "LIST" },
+							...result.items.map((b) => ({
+								type: "Business" as const,
+								id: b.id,
+							})),
+						]
+					: [{ type: "Business" as const, id: "LIST" }],
+		}),
+
+		/**
+		 * `GET /api/v1/business` — loads every page sequentially in small batches.
+		 * Prefer `listBusinesses` + `useAccumulatedPaginatedQuery` for progressive UI.
+		 */
+		listAllBusinesses: builder.query<BusinessOutput[], void>({
+			async queryFn(_arg, _api, _extraOptions, baseQuery) {
+				return fetchAllPaginatedItems<BusinessOutput>(
+					baseQuery as (arg: {
+						url: string;
+						method?: string;
+						params?: Record<string, string | number>;
+						headers?: Record<string, string>;
+					}) => Promise<{ data?: unknown; error?: unknown }>,
+					"/api/v1/business",
+					bearerHeaders() as Record<string, string>,
+				);
+			},
+			providesTags: (result) =>
+				result
+					? [
+							{ type: "Business" as const, id: "LIST" },
+							...result.map((b) => ({
+								type: "Business" as const,
+								id: b.id,
+							})),
+						]
+					: [{ type: "Business" as const, id: "LIST" }],
 		}),
 
 		/** `GET /api/v1/business/{business_id}` */
@@ -266,6 +314,7 @@ export const branchManagementApi = createApi({
 });
 
 export const {
+	useListBusinessesQuery,
 	useListAllBusinessesQuery,
 	useGetBusinessQuery,
 	useLazyGetBusinessQuery,
