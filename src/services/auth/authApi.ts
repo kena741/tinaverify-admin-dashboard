@@ -2,6 +2,10 @@ import { createApi } from "@reduxjs/toolkit/query/react";
 import type { FetchBaseQueryError } from "@reduxjs/toolkit/query";
 import { backendBaseQuery } from "../baseQuery";
 import { getStoredAccessToken } from "../authTokens";
+import {
+	ADMIN_LIST_PAGE_SIZE,
+	fetchAllPaginatedItems,
+} from "../paginatedFetch";
 import type {
 	BranchOutput,
 	BusinessOutput,
@@ -69,89 +73,57 @@ export const authApi = createApi({
 			providesTags: [{ type: "MyBranch" as const, id: "ME" }],
 		}),
 
+		/** `GET /api/v1/users/all` — one paginated slice. */
+		listUsers: builder.query<
+			PaginatedUserResponse,
+			{ offset?: number; limit?: number }
+		>({
+			query: ({ offset = 0, limit = ADMIN_LIST_PAGE_SIZE }) => ({
+				url: "/api/v1/users/all",
+				method: "GET",
+				params: { offset, limit },
+				headers: bearerHeaders(),
+			}),
+			providesTags: (result) =>
+				result
+					? [
+							{ type: "User" as const, id: "LIST" },
+							...result.items.map((user) => ({
+								type: "User" as const,
+								id: user.id,
+							})),
+						]
+					: [{ type: "User" as const, id: "LIST" }],
+		}),
+
 		/**
-		 * `GET /api/v1/users/all` — pages until all users are loaded.
-		 * Used for admin owner lists (join onto business.owner_id).
-		 * Prefer getUserById when you only need a few users (e.g. platform staff).
+		 * `GET /api/v1/users/all` — loads every page sequentially in small batches.
+		 * Prefer `listUsers` + `useAccumulatedPaginatedQuery` for progressive UI.
 		 */
 		listAllUsers: builder.query<UserOutput[], void>({
 			async queryFn(_arg, _api, _extraOptions, baseQuery) {
-				const requestedLimit = 500;
-				const first = await baseQuery({
-					url: "/api/v1/users/all",
-					method: "GET",
-					params: { offset: 0, limit: requestedLimit },
-					headers: bearerHeaders(),
-				});
-				if (first.error) {
-					return { error: first.error as FetchBaseQueryError };
-				}
-				const firstPage = first.data as PaginatedUserResponse;
-				const firstBatch = Array.isArray(firstPage?.items)
-					? firstPage.items
-					: [];
-				if (firstBatch.length === 0) {
-					return { data: [] };
-				}
-
-				// ponytail: API may clamp limit below requested; use what we actually got
-				const pageSize = Math.max(
-					1,
-					Number(firstPage?.limit) ||
-						Number(firstPage?.returned_count) ||
-						firstBatch.length,
+				return fetchAllPaginatedItems<UserOutput>(
+					baseQuery as (arg: {
+						url: string;
+						method?: string;
+						params?: Record<string, string | number>;
+						headers?: Record<string, string>;
+					}) => Promise<{ data?: unknown; error?: unknown }>,
+					"/api/v1/users/all",
+					bearerHeaders() as Record<string, string>,
 				);
-				const total = Number(firstPage?.total_count);
-				const items: UserOutput[] = [...firstBatch];
-
-				if (Number.isFinite(total) && total > items.length) {
-					const offsets: number[] = [];
-					for (let offset = pageSize; offset < total; offset += pageSize) {
-						offsets.push(offset);
-					}
-					const pages = await Promise.all(
-						offsets.map((offset) =>
-							baseQuery({
-								url: "/api/v1/users/all",
-								method: "GET",
-								params: { offset, limit: pageSize },
-								headers: bearerHeaders(),
-							}),
-						),
-					);
-					for (const res of pages) {
-						if (res.error) {
-							return { error: res.error as FetchBaseQueryError };
-						}
-						const page = res.data as PaginatedUserResponse;
-						const batch = Array.isArray(page?.items) ? page.items : [];
-						items.push(...batch);
-					}
-				} else if (!Number.isFinite(total) && firstBatch.length >= pageSize) {
-					let offset = pageSize;
-					for (;;) {
-						const res = await baseQuery({
-							url: "/api/v1/users/all",
-							method: "GET",
-							params: { offset, limit: pageSize },
-							headers: bearerHeaders(),
-						});
-						if (res.error) {
-							return { error: res.error as FetchBaseQueryError };
-						}
-						const page = res.data as PaginatedUserResponse;
-						const batch = Array.isArray(page?.items) ? page.items : [];
-						if (batch.length === 0) break;
-						items.push(...batch);
-						if (batch.length < pageSize) break;
-						offset += pageSize;
-					}
-				}
-
-				return { data: items };
 			},
 			keepUnusedDataFor: 300,
-			providesTags: () => [{ type: "User" as const, id: "LIST" }],
+			providesTags: (result) =>
+				result
+					? [
+							{ type: "User" as const, id: "LIST" },
+							...result.map((user) => ({
+								type: "User" as const,
+								id: user.id,
+							})),
+						]
+					: [{ type: "User" as const, id: "LIST" }],
 		}),
 
 		/** `GET /api/v1/users/{user_id}` */
@@ -170,6 +142,7 @@ export const {
 	useReadMeQuery,
 	useListMyBusinessesQuery,
 	useGetMyBranchQuery,
+	useListUsersQuery,
 	useListAllUsersQuery,
 	useGetUserByIdQuery,
 } = authApi;

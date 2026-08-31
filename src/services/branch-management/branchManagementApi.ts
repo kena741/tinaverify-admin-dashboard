@@ -2,6 +2,10 @@ import { createApi } from "@reduxjs/toolkit/query/react";
 import type { FetchBaseQueryError } from "@reduxjs/toolkit/query";
 import { getStoredAccessToken } from "../authTokens";
 import { backendBaseQuery } from "../baseQuery";
+import {
+	ADMIN_LIST_PAGE_SIZE,
+	fetchAllPaginatedItems,
+} from "../paginatedFetch";
 import type {
 	BranchCreateRequest,
 	BranchOutput,
@@ -33,81 +37,45 @@ export const branchManagementApi = createApi({
 	baseQuery: backendBaseQuery,
 	tagTypes: ["Branch", "MyBusinesses", "Business", "Employee"],
 	endpoints: (builder) => ({
-		/** `GET /api/v1/business` — pages until all businesses are loaded. */
+		/** `GET /api/v1/business` — one paginated slice. */
+		listBusinesses: builder.query<
+			PaginatedBusinessResponse,
+			{ offset?: number; limit?: number }
+		>({
+			query: ({ offset = 0, limit = ADMIN_LIST_PAGE_SIZE }) => ({
+				url: "/api/v1/business",
+				method: "GET",
+				params: { offset, limit },
+				headers: bearerHeaders(),
+			}),
+			providesTags: (result) =>
+				result
+					? [
+							{ type: "Business" as const, id: "LIST" },
+							...result.items.map((b) => ({
+								type: "Business" as const,
+								id: b.id,
+							})),
+						]
+					: [{ type: "Business" as const, id: "LIST" }],
+		}),
+
+		/**
+		 * `GET /api/v1/business` — loads every page sequentially in small batches.
+		 * Prefer `listBusinesses` + `useAccumulatedPaginatedQuery` for progressive UI.
+		 */
 		listAllBusinesses: builder.query<BusinessOutput[], void>({
 			async queryFn(_arg, _api, _extraOptions, baseQuery) {
-				const requestedLimit = 500;
-				const first = await baseQuery({
-					url: "/api/v1/business",
-					method: "GET",
-					params: { offset: 0, limit: requestedLimit },
-					headers: bearerHeaders(),
-				});
-				if (first.error) {
-					return { error: first.error as FetchBaseQueryError };
-				}
-				const firstPage = first.data as PaginatedBusinessResponse;
-				const firstBatch = Array.isArray(firstPage?.items)
-					? firstPage.items
-					: [];
-				if (firstBatch.length === 0) {
-					return { data: [] };
-				}
-
-				const pageSize = Math.max(
-					1,
-					Number(firstPage?.limit) ||
-						Number(firstPage?.returned_count) ||
-						firstBatch.length,
+				return fetchAllPaginatedItems<BusinessOutput>(
+					baseQuery as (arg: {
+						url: string;
+						method?: string;
+						params?: Record<string, string | number>;
+						headers?: Record<string, string>;
+					}) => Promise<{ data?: unknown; error?: unknown }>,
+					"/api/v1/business",
+					bearerHeaders() as Record<string, string>,
 				);
-				const total = Number(firstPage?.total_count);
-				const items: BusinessOutput[] = [...firstBatch];
-
-				if (Number.isFinite(total) && total > items.length) {
-					const offsets: number[] = [];
-					for (let offset = pageSize; offset < total; offset += pageSize) {
-						offsets.push(offset);
-					}
-					const pages = await Promise.all(
-						offsets.map((offset) =>
-							baseQuery({
-								url: "/api/v1/business",
-								method: "GET",
-								params: { offset, limit: pageSize },
-								headers: bearerHeaders(),
-							}),
-						),
-					);
-					for (const res of pages) {
-						if (res.error) {
-							return { error: res.error as FetchBaseQueryError };
-						}
-						const page = res.data as PaginatedBusinessResponse;
-						const batch = Array.isArray(page?.items) ? page.items : [];
-						items.push(...batch);
-					}
-				} else if (!Number.isFinite(total) && firstBatch.length >= pageSize) {
-					let offset = pageSize;
-					for (;;) {
-						const res = await baseQuery({
-							url: "/api/v1/business",
-							method: "GET",
-							params: { offset, limit: pageSize },
-							headers: bearerHeaders(),
-						});
-						if (res.error) {
-							return { error: res.error as FetchBaseQueryError };
-						}
-						const page = res.data as PaginatedBusinessResponse;
-						const batch = Array.isArray(page?.items) ? page.items : [];
-						if (batch.length === 0) break;
-						items.push(...batch);
-						if (batch.length < pageSize) break;
-						offset += pageSize;
-					}
-				}
-
-				return { data: items };
 			},
 			providesTags: (result) =>
 				result
@@ -346,6 +314,7 @@ export const branchManagementApi = createApi({
 });
 
 export const {
+	useListBusinessesQuery,
 	useListAllBusinessesQuery,
 	useGetBusinessQuery,
 	useLazyGetBusinessQuery,
