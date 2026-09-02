@@ -562,6 +562,16 @@ export type SubscriptionBusinessOutput = {
 	tin_number: string | null;
 };
 
+/** Paginated wrapper some deployments return for `GET /api/v1/subscriptions/transactions`. */
+export type PaginatedAdminSubscriptionResponse = {
+	items: AdminSubscriptionOutput[];
+	total_count: number;
+	offset?: number;
+	limit?: number;
+	returned_count?: number;
+	page_number?: number;
+};
+
 /** OpenAPI `AdminSubscriptionOutputSchema` — `GET /api/v1/subscriptions/transactions` */
 export type AdminSubscriptionOutput = {
 	id: UUID;
