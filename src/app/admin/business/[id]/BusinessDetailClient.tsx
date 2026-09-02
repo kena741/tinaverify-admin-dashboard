@@ -63,7 +63,6 @@ import {
 import { useListBankAccountsQuery } from "../../../../services/bank-accounts/bankAccountsApi";
 import {
 	useGetActiveSubscriptionQuery,
-	useGetSubscriptionUsageQuery,
 	useGrantSubscriptionCreditsMutation,
 	useListAdminSubscriptionTransactionsQuery,
 } from "../../../../services/subscription/subscriptionApi";
@@ -86,8 +85,10 @@ import { usePlatformAccess } from "@/hooks/use-platform-access";
 import { ADMIN_FEATURE } from "@/lib/admin-feature-flags";
 import { cn } from "@/lib/utils";
 import {
+	asAdminSubscriptionRows,
 	getSubscriptionPlanLabel,
 	getSubscriptionStatusLabel,
+	subscriptionRowTimestamp,
 } from "@/lib/subscription-filters";
 import { formatPlatformLabel, formatUserDisplayName } from "@/lib/userDisplay";
 
@@ -276,12 +277,6 @@ export default function BusinessDetailClient({
 	} = useGetActiveSubscriptionQuery({ businessId }, { skip: missingBusinessId });
 
 	const {
-		data: subscriptionUsage,
-		error: subscriptionUsageError,
-		refetch: refetchSubscriptionUsage,
-	} = useGetSubscriptionUsageQuery({ businessId }, { skip: missingBusinessId });
-
-	const {
 		data: subscriptionHistory,
 		isLoading: subscriptionHistoryLoading,
 		isFetching: subscriptionHistoryFetching,
@@ -344,6 +339,20 @@ export default function BusinessDetailClient({
 		const items = subscriptionPlans ?? [];
 		return new Map(items.map((p) => [p.id, p] as const));
 	}, [subscriptionPlans]);
+
+	const subscriptionHistoryRows = useMemo(
+		() => asAdminSubscriptionRows(subscriptionHistory),
+		[subscriptionHistory],
+	);
+
+	const latestSubscriptionFromHistory = useMemo(() => {
+		if (subscriptionHistoryRows.length === 0) return null;
+		return subscriptionHistoryRows.reduce((latest, row) =>
+			subscriptionRowTimestamp(row) >= subscriptionRowTimestamp(latest)
+				? row
+				: latest,
+		);
+	}, [subscriptionHistoryRows]);
 
 	const employeeRows = employees ?? [];
 
@@ -509,14 +518,17 @@ export default function BusinessDetailClient({
 	}
 
 	const ownerDisplay = user ? formatUserDisplayName(user) : "Owner loading…";
-	const planName = activeSubscription?.plan_id
-		? getSubscriptionPlanLabel(
-				null,
-				subscriptionPlanById.get(activeSubscription.plan_id)?.name,
-			)
+	const planName = latestSubscriptionFromHistory
+		? getSubscriptionPlanLabel(latestSubscriptionFromHistory.plan)
 		: null;
-	const planPrice = activeSubscription?.plan_id
-		? (subscriptionPlanById.get(activeSubscription.plan_id)?.price ?? null)
+	const planPrice =
+		latestSubscriptionFromHistory?.amount == null
+			? (latestSubscriptionFromHistory?.plan?.price ?? null)
+			: latestSubscriptionFromHistory.amount.toLocaleString(undefined, {
+					maximumFractionDigits: 2,
+				});
+	const historyCredits = latestSubscriptionFromHistory
+		? latestSubscriptionFromHistory.credits_limit.toLocaleString()
 		: null;
 
 	return (
@@ -861,9 +873,7 @@ export default function BusinessDetailClient({
 							Credits
 						</p>
 						<p className="font-mono text-sm font-medium tabular-nums">
-							{subscriptionUsage
-								? `${subscriptionUsage.remaining_credits.toLocaleString()} / ${subscriptionUsage.credits_limit.toLocaleString()}`
-								: "—"}
+							{historyCredits ?? "—"}
 						</p>
 					</div>
 					<div className="col-span-2 flex flex-col gap-1.5 px-3 py-3 sm:col-span-1">
@@ -876,7 +886,7 @@ export default function BusinessDetailClient({
 					</div>
 				</div>
 
-				{(activeSubscriptionError || subscriptionUsageError) ? (
+				{activeSubscriptionError ? (
 					<div className="flex flex-col gap-2">
 						{activeSubscriptionError ? (
 							<Alert variant="destructive">
@@ -890,22 +900,6 @@ export default function BusinessDetailClient({
 										variant="outline"
 										size="sm"
 										onClick={() => refetchActiveSubscription()}
-									>
-										Retry
-									</Button>
-								</AlertDescription>
-							</Alert>
-						) : null}
-						{subscriptionUsageError ? (
-							<Alert variant="destructive">
-								<AlertTitle>Credits</AlertTitle>
-								<AlertDescription className="flex flex-wrap items-center gap-2">
-									<span>Could not load usage.</span>
-									<Button
-										type="button"
-										variant="outline"
-										size="sm"
-										onClick={() => refetchSubscriptionUsage()}
 									>
 										Retry
 									</Button>
@@ -1425,7 +1419,7 @@ export default function BusinessDetailClient({
 											</TableRow>
 										</TableHeader>
 										<TableBody>
-											{(subscriptionHistory ?? []).length === 0 ? (
+											{subscriptionHistoryRows.length === 0 ? (
 												<TableRow>
 													<TableCell
 														colSpan={9}
@@ -1435,7 +1429,7 @@ export default function BusinessDetailClient({
 													</TableCell>
 												</TableRow>
 											) : (
-												(subscriptionHistory ?? []).map(
+												subscriptionHistoryRows.map(
 													(row: AdminSubscriptionOutput) => (
 														<TableRow key={row.id}>
 															<TableCell className="font-medium">

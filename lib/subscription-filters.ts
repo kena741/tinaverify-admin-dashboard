@@ -1,8 +1,22 @@
 import type {
 	AdminSubscriptionOutput,
 	BusinessOutput,
+	PaginatedAdminSubscriptionResponse,
 	SubscriptionStatus,
 } from "@/services/types";
+
+export function asAdminSubscriptionRows(
+	data:
+		| AdminSubscriptionOutput[]
+		| PaginatedAdminSubscriptionResponse
+		| null
+		| undefined,
+): AdminSubscriptionOutput[] {
+	if (!data) return [];
+	if (Array.isArray(data)) return data;
+	if (Array.isArray(data.items)) return data.items;
+	return [];
+}
 
 export const BUSINESS_FILTER_ALL = "all";
 export const PLAN_FILTER_ALL = "all";

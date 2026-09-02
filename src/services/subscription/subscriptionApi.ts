@@ -83,6 +83,20 @@ export const subscriptionApi = createApi({
 				if (!hasFilter) return `${endpointName}(global)`;
 				return `${endpointName}(${businessId ?? ""}|${planId ?? ""}|${status ?? ""})`;
 			},
+			transformResponse: (response: unknown) => {
+				if (Array.isArray(response)) {
+					return response as AdminSubscriptionOutput[];
+				}
+				if (
+					typeof response === "object" &&
+					response !== null &&
+					"items" in response &&
+					Array.isArray((response as { items: unknown }).items)
+				) {
+					return (response as { items: AdminSubscriptionOutput[] }).items;
+				}
+				return [];
+			},
 			providesTags: [{ type: "SubscriptionTransactions" as const, id: "LIST" }],
 		}),
 
