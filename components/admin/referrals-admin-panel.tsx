@@ -1,7 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import { useMemo, useState } from "react";
 import {
+	BanknoteIcon,
 	Loader2Icon,
 	PercentIcon,
 	PlusIcon,
@@ -12,12 +14,28 @@ import {
 
 import { PageHeader } from "@/components/admin/page-header";
 import { StatCard } from "@/components/admin/stat-card";
+import { useListAllUsersQuery } from "@/services/auth/authApi";
+import { useListAllBusinessesQuery } from "@/services/branch-management/branchManagementApi";
 import {
 	useCreateReferralCampaignMutation,
 	useGetReferralCommissionRateQuery,
-	useGetReferralPerformanceQuery,
+	useListReferralPerformanceQuery,
+	useToggleReferralCodeStatusMutation,
 	useUpdateReferralCommissionRateMutation,
 } from "@/services/referrals/referralsApi";
+import type { ReferralPerformance, UserOutput } from "@/services/types";
+import { formatPlatformLabel, formatUserDisplayName } from "@/lib/userDisplay";
+import { cn } from "@/lib/utils";
+import {
+	AlertDialog,
+	AlertDialogAction,
+	AlertDialogCancel,
+	AlertDialogContent,
+	AlertDialogDescription,
+	AlertDialogFooter,
+	AlertDialogHeader,
+	AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -46,6 +64,8 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/components/ui/table";
+
+type CreatorFilter = "all" | "admin" | "user";
 
 function getErrorMessage(error: unknown, fallback: string): string {
 	if (
@@ -78,6 +98,28 @@ function formatCommissionPercent(rate: number): string {
 	return `${(rate * 100).toFixed(1).replace(/\.0$/, "")}%`;
 }
 
+function isUserGeneratedReferral(type: string): boolean {
+	const t = type.trim().toLowerCase();
+	return t === "user" || t === "personal";
+}
+
+function referralTypeLabel(type: string): string {
+	if (isUserGeneratedReferral(type)) return "User";
+	const t = type.trim().toLowerCase();
+	if (t === "campaign" || t === "admin") return "Admin";
+	return formatPlatformLabel(type) || "—";
+}
+
+function resolveUser(
+	createdBy: string,
+	usersById: Map<string, UserOutput>,
+	usersByUsername: Map<string, UserOutput>,
+): UserOutput | undefined {
+	const key = createdBy.trim();
+	if (!key) return undefined;
+	return usersById.get(key) ?? usersByUsername.get(key.toLowerCase());
+}
+
 type ReferralsAdminPanelProps = {
 	embedded?: boolean;
 };
@@ -89,7 +131,10 @@ export function ReferralsAdminPanel({ embedded = false }: ReferralsAdminPanelPro
 		isFetching,
 		error,
 		refetch,
-	} = useGetReferralPerformanceQuery();
+	} = useListReferralPerformanceQuery();
+
+	const { data: users } = useListAllUsersQuery();
+	const { data: businesses } = useListAllBusinessesQuery();
 
 	const {
 		data: commissionRateData,
@@ -101,6 +146,13 @@ export function ReferralsAdminPanel({ embedded = false }: ReferralsAdminPanelPro
 	const [createCampaign, createCampaignState] = useCreateReferralCampaignMutation();
 	const [updateCommissionRate, updateCommissionState] =
 		useUpdateReferralCommissionRateMutation();
+	const [toggleCodeStatus, toggleCodeStatusState] =
+		useToggleReferralCodeStatusMutation();
+	const [activatingCode, setActivatingCode] = useState<string | null>(null);
+
+	const [creatorFilter, setCreatorFilter] = useState<CreatorFilter>("all");
+	const [deactivateTarget, setDeactivateTarget] =
+		useState<ReferralPerformance | null>(null);
 
 	const [addOpen, setAddOpen] = useState(false);
 	const [campaignCode, setCampaignCode] = useState("");
@@ -111,23 +163,110 @@ export function ReferralsAdminPanel({ embedded = false }: ReferralsAdminPanelPro
 	const [commissionPercentInput, setCommissionPercentInput] = useState("");
 	const [commissionFormError, setCommissionFormError] = useState("");
 
-	useEffect(() => {
-		if (!embedded && commissionEditOpen && commissionRateData) {
-			setCommissionPercentInput(String(commissionRateData.commission_rate * 100));
+	const usersById = useMemo(() => {
+		const map = new Map<string, UserOutput>();
+		for (const user of users ?? []) map.set(user.id, user);
+		return map;
+	}, [users]);
+
+	const usersByUsername = useMemo(() => {
+		const map = new Map<string, UserOutput>();
+		for (const user of users ?? []) {
+			const username = user.username?.trim().toLowerCase();
+			if (username) map.set(username, user);
 		}
-	}, [embedded, commissionEditOpen, commissionRateData]);
+		return map;
+	}, [users]);
+
+	const businessIdByOwnerId = useMemo(() => {
+		const map = new Map<string, string>();
+		const grouped = new Map<string, { id: string; name: string }[]>();
+		for (const business of businesses ?? []) {
+			if (!business.owner_id) continue;
+			const list = grouped.get(business.owner_id) ?? [];
+			list.push({ id: business.id, name: business.name || "" });
+			grouped.set(business.owner_id, list);
+		}
+		for (const [ownerId, list] of grouped) {
+			list.sort((a, b) => a.name.localeCompare(b.name));
+			map.set(ownerId, list[0]!.id);
+		}
+		return map;
+	}, [businesses]);
+
+	function openCommissionEdit() {
+		if (commissionRateData) {
+			setCommissionPercentInput(
+				String(commissionRateData.commission_rate * 100),
+			);
+		}
+		setCommissionFormError("");
+		setCommissionEditOpen(true);
+	}
+
+	const filteredRows = useMemo(() => {
+		const rows = [...(performance ?? [])];
+		rows.sort((a, b) => {
+			if (b.total_revenue !== a.total_revenue) {
+				return b.total_revenue - a.total_revenue;
+			}
+			return a.code.localeCompare(b.code);
+		});
+		if (creatorFilter === "all") return rows;
+		return rows.filter((row) => {
+			const isUser = isUserGeneratedReferral(row.type);
+			return creatorFilter === "user" ? isUser : !isUser;
+		});
+	}, [performance, creatorFilter]);
 
 	const stats = useMemo(() => {
-		const rows = performance ?? [];
+		const rows = filteredRows;
 		return {
-			campaigns: rows.length,
+			codes: rows.length,
 			totalSignups: rows.reduce((sum, r) => sum + r.total_signups, 0),
 			activeSubscriptions: rows.reduce(
 				(sum, r) => sum + r.active_subscriptions,
 				0,
 			),
+			totalRevenue: rows.reduce((sum, r) => sum + r.total_revenue, 0),
 		};
+	}, [filteredRows]);
+
+	const filterCounts = useMemo(() => {
+		const rows = performance ?? [];
+		let admin = 0;
+		let user = 0;
+		for (const row of rows) {
+			if (isUserGeneratedReferral(row.type)) user += 1;
+			else admin += 1;
+		}
+		return { all: rows.length, admin, user };
 	}, [performance]);
+
+	async function handleActivate(code: string) {
+		setActivatingCode(code);
+		try {
+			await toggleCodeStatus({
+				code,
+				body: { is_active: true },
+			}).unwrap();
+		} finally {
+			setActivatingCode(null);
+		}
+	}
+
+	async function handleConfirmDeactivate() {
+		if (!deactivateTarget) return;
+		try {
+			await toggleCodeStatus({
+				code: deactivateTarget.code,
+				body: { is_active: false },
+			}).unwrap();
+			setDeactivateTarget(null);
+		} catch {
+			/* keep dialog open; mutation error surfaces via RTK */
+		}
+	}
 
 	const handleCreateCampaign = async (e: React.FormEvent) => {
 		e.preventDefault();
@@ -192,7 +331,8 @@ export function ReferralsAdminPanel({ embedded = false }: ReferralsAdminPanelPro
 							Referral performance
 						</h2>
 						<p className="text-sm text-muted-foreground">
-							Campaign signups and active subscriptions across the platform.
+							Admin campaigns and user referral codes, with creator, signups,
+							subscriptions, and revenue.
 						</p>
 					</div>
 					{addCampaignButton}
@@ -200,7 +340,7 @@ export function ReferralsAdminPanel({ embedded = false }: ReferralsAdminPanelPro
 			) : (
 				<PageHeader
 					title="Referrals"
-					description="Manage referral campaigns, track signups, and configure the commission rate awarded to referrers."
+					description="View all admin and user referral codes, who created them, and the signups, subscriptions, and revenue they generated."
 					actions={addCampaignButton}
 				/>
 			)}
@@ -223,7 +363,7 @@ export function ReferralsAdminPanel({ embedded = false }: ReferralsAdminPanelPro
 							type="button"
 							variant="outline"
 							size="sm"
-							onClick={() => setCommissionEditOpen(true)}
+							onClick={openCommissionEdit}
 							disabled={commissionLoading}
 						>
 							Edit rate
@@ -260,10 +400,43 @@ export function ReferralsAdminPanel({ embedded = false }: ReferralsAdminPanelPro
 				</Card>
 			) : null}
 
-			<div className="grid gap-4 sm:grid-cols-3">
+			<div
+				role="tablist"
+				aria-label="Filter by creator type"
+				className="flex w-fit flex-wrap gap-1 rounded-lg border border-border bg-muted/40 p-1"
+			>
+				{(
+					[
+						["all", "All", filterCounts.all],
+						["admin", "Admin", filterCounts.admin],
+						["user", "Users", filterCounts.user],
+					] as const
+				).map(([id, label, count]) => (
+					<button
+						key={id}
+						type="button"
+						role="tab"
+						aria-selected={creatorFilter === id}
+						onClick={() => setCreatorFilter(id)}
+						className={cn(
+							"h-8 rounded-md px-3 text-sm motion-safe:transition-colors",
+							creatorFilter === id
+								? "bg-background font-medium text-foreground shadow-xs"
+								: "text-muted-foreground hover:text-foreground",
+						)}
+					>
+						{label}
+						<span className="ml-1.5 font-mono text-xs tabular-nums text-muted-foreground">
+							{count}
+						</span>
+					</button>
+				))}
+			</div>
+
+			<div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
 				<StatCard
-					label="Campaigns"
-					value={isLoading ? null : stats.campaigns.toLocaleString()}
+					label="Referral codes"
+					value={isLoading ? null : stats.codes.toLocaleString()}
 					icon={TrendingUpIcon}
 					loading={isLoading}
 				/>
@@ -272,18 +445,38 @@ export function ReferralsAdminPanel({ embedded = false }: ReferralsAdminPanelPro
 					value={isLoading ? null : stats.totalSignups.toLocaleString()}
 					icon={UserPlusIcon}
 					loading={isLoading}
+					hint="Users who signed up with these codes"
 				/>
 				<StatCard
-					label="Active subscriptions"
+					label="Subscriptions"
 					value={isLoading ? null : stats.activeSubscriptions.toLocaleString()}
 					icon={UsersIcon}
 					loading={isLoading}
+					hint="Active subscriptions from referred users"
+				/>
+				<StatCard
+					label="Revenue"
+					value={
+						isLoading
+							? null
+							: stats.totalRevenue.toLocaleString(undefined, {
+									maximumFractionDigits: 2,
+								})
+					}
+					icon={BanknoteIcon}
+					loading={isLoading}
+					hint="Revenue from referred users"
 				/>
 			</div>
 
 			<Card className="shadow-sm">
 				<CardHeader className="flex flex-row items-center justify-between gap-4 space-y-0">
-					<CardTitle>Campaign performance</CardTitle>
+					<div className="flex flex-col gap-1">
+						<CardTitle>All referral codes</CardTitle>
+						<p className="text-sm text-muted-foreground">
+							Codes created by admins and users, with creator and performance.
+						</p>
+					</div>
 					{isFetching && !isLoading ? (
 						<span className="text-sm text-muted-foreground">Refreshing…</span>
 					) : null}
@@ -313,58 +506,188 @@ export function ReferralsAdminPanel({ embedded = false }: ReferralsAdminPanelPro
 							))}
 						</div>
 					) : (
-						<Table aria-label="Referral campaign performance">
-							<TableHeader>
-								<TableRow>
-									<TableHead>Code</TableHead>
-									<TableHead>Description</TableHead>
-									<TableHead>Status</TableHead>
-									<TableHead className="text-right">Total signups</TableHead>
-									<TableHead className="text-right">
-										Active subscriptions
-									</TableHead>
-								</TableRow>
-							</TableHeader>
-							<TableBody>
-								{(performance ?? []).length === 0 ? (
+						<div className="overflow-x-auto">
+							<Table aria-label="All referral codes">
+								<TableHeader>
 									<TableRow>
-										<TableCell
-											colSpan={5}
-											className="py-10 text-center text-muted-foreground"
-										>
-											No referral campaigns yet. Add one to get started.
-										</TableCell>
+										<TableHead>Code</TableHead>
+										<TableHead>Created by</TableHead>
+										<TableHead>Type</TableHead>
+										<TableHead>Status</TableHead>
+										<TableHead className="text-right">Signups</TableHead>
+										<TableHead className="text-right">Subscriptions</TableHead>
+										<TableHead className="text-right">Revenue</TableHead>
+										<TableHead className="w-28">
+											<span className="sr-only">Actions</span>
+										</TableHead>
 									</TableRow>
-								) : (
-									(performance ?? []).map((row) => (
-										<TableRow key={row.code}>
-											<TableCell className="font-mono font-medium">
-												{row.code}
-											</TableCell>
-											<TableCell className="max-w-[20rem] truncate">
-												{row.description}
-											</TableCell>
-											<TableCell>
-												{row.is_active ? (
-													<Badge variant="default">Active</Badge>
-												) : (
-													<Badge variant="secondary">Inactive</Badge>
-												)}
-											</TableCell>
-											<TableCell className="text-right tabular-nums">
-												{row.total_signups.toLocaleString()}
-											</TableCell>
-											<TableCell className="text-right tabular-nums">
-												{row.active_subscriptions.toLocaleString()}
+								</TableHeader>
+								<TableBody>
+									{filteredRows.length === 0 ? (
+										<TableRow>
+											<TableCell
+												colSpan={8}
+												className="py-10 text-center text-muted-foreground"
+											>
+												{creatorFilter === "all"
+													? "No referral codes yet. Add a campaign to get started."
+													: `No ${creatorFilter === "user" ? "user" : "admin"} referral codes.`}
 											</TableCell>
 										</TableRow>
-									))
-								)}
-							</TableBody>
-						</Table>
+									) : (
+										filteredRows.map((row) => {
+											const creator = resolveUser(
+												row.created_by,
+												usersById,
+												usersByUsername,
+											);
+											const displayName = creator
+												? formatUserDisplayName(creator)
+												: row.created_by || "—";
+											const ownerBusinessId = creator
+												? businessIdByOwnerId.get(creator.id)
+												: undefined;
+											const isUserCode = isUserGeneratedReferral(row.type);
+											const isActivating = activatingCode === row.code;
+
+											return (
+												<TableRow key={row.code}>
+													<TableCell>
+														<div className="flex min-w-0 flex-col gap-0.5">
+															<span className="font-mono font-medium">
+																{row.code}
+															</span>
+															{row.description ? (
+																<span className="max-w-56 truncate text-xs text-muted-foreground">
+																	{row.description}
+																</span>
+															) : null}
+														</div>
+													</TableCell>
+													<TableCell className="max-w-48">
+														{ownerBusinessId && isUserCode ? (
+															<Link
+																href={`/admin/business/${ownerBusinessId}`}
+																className="font-medium text-foreground underline-offset-4 hover:underline"
+															>
+																{displayName}
+															</Link>
+														) : (
+															<span
+																className={cn(
+																	"truncate",
+																	isUserCode
+																		? "text-foreground"
+																		: "text-muted-foreground",
+																)}
+																title={row.created_by}
+															>
+																{displayName}
+															</span>
+														)}
+													</TableCell>
+													<TableCell>
+														<Badge
+															variant={isUserCode ? "secondary" : "outline"}
+															className="font-normal"
+														>
+															{referralTypeLabel(row.type)}
+														</Badge>
+													</TableCell>
+													<TableCell>
+														{row.is_active ? (
+															<Badge variant="default">Active</Badge>
+														) : (
+															<Badge variant="secondary">Inactive</Badge>
+														)}
+													</TableCell>
+													<TableCell className="text-right tabular-nums">
+														{row.total_signups.toLocaleString()}
+													</TableCell>
+													<TableCell className="text-right tabular-nums">
+														{row.active_subscriptions.toLocaleString()}
+													</TableCell>
+													<TableCell className="text-right font-mono tabular-nums">
+														{row.total_revenue.toLocaleString(undefined, {
+															maximumFractionDigits: 2,
+														})}
+													</TableCell>
+													<TableCell>
+														{row.is_active ? (
+															<Button
+																type="button"
+																variant="outline"
+																size="sm"
+																disabled={toggleCodeStatusState.isLoading}
+																onClick={() => setDeactivateTarget(row)}
+															>
+																Deactivate
+															</Button>
+														) : (
+															<Button
+																type="button"
+																variant="outline"
+																size="sm"
+																disabled={isActivating}
+																onClick={() => void handleActivate(row.code)}
+															>
+																{isActivating ? (
+																	<Loader2Icon
+																		className="animate-spin"
+																		aria-hidden
+																	/>
+																) : null}
+																Activate
+															</Button>
+														)}
+													</TableCell>
+												</TableRow>
+											);
+										})
+									)}
+								</TableBody>
+							</Table>
+						</div>
 					)}
 				</CardContent>
 			</Card>
+
+			<AlertDialog
+				open={deactivateTarget !== null}
+				onOpenChange={(open) => {
+					if (!open && !toggleCodeStatusState.isLoading) {
+						setDeactivateTarget(null);
+					}
+				}}
+			>
+				<AlertDialogContent>
+					<AlertDialogHeader>
+						<AlertDialogTitle>Deactivate referral code?</AlertDialogTitle>
+						<AlertDialogDescription>
+							{deactivateTarget
+								? `“${deactivateTarget.code}” will stop accepting new signups. Existing referred users are not affected.`
+								: null}
+						</AlertDialogDescription>
+					</AlertDialogHeader>
+					<AlertDialogFooter>
+						<AlertDialogCancel disabled={toggleCodeStatusState.isLoading}>
+							Cancel
+						</AlertDialogCancel>
+						<AlertDialogAction
+							disabled={toggleCodeStatusState.isLoading}
+							onClick={(e) => {
+								e.preventDefault();
+								void handleConfirmDeactivate();
+							}}
+						>
+							{toggleCodeStatusState.isLoading ? (
+								<Loader2Icon className="animate-spin" aria-hidden />
+							) : null}
+							{toggleCodeStatusState.isLoading ? "Deactivating…" : "Deactivate"}
+						</AlertDialogAction>
+					</AlertDialogFooter>
+				</AlertDialogContent>
+			</AlertDialog>
 
 			<Dialog
 				open={addOpen}
@@ -381,7 +704,8 @@ export function ReferralsAdminPanel({ embedded = false }: ReferralsAdminPanelPro
 					<DialogHeader>
 						<DialogTitle>Add referral campaign</DialogTitle>
 						<DialogDescription>
-							Create a new referral code businesses and users can sign up with.
+							Create an admin referral code businesses and users can sign up
+							with.
 						</DialogDescription>
 					</DialogHeader>
 
@@ -445,8 +769,12 @@ export function ReferralsAdminPanel({ embedded = false }: ReferralsAdminPanelPro
 				<Dialog
 					open={commissionEditOpen}
 					onOpenChange={(open) => {
-						setCommissionEditOpen(open);
-						if (!open) setCommissionFormError("");
+						if (open) {
+							openCommissionEdit();
+							return;
+						}
+						setCommissionEditOpen(false);
+						setCommissionFormError("");
 					}}
 				>
 					<DialogContent className="sm:max-w-md">
