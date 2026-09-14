@@ -724,13 +724,30 @@ export type CampaignOutput = {
 	is_active: boolean;
 };
 
-/** OpenAPI `ReferralPerformanceSchema` */
+/** OpenAPI `ReferralListSchema` — `GET /api/v1/admin/referrals/codes` */
+export type ReferralListItem = {
+	code: string;
+	description?: string | null;
+	created_by: string;
+	type: string;
+	is_active: boolean;
+};
+
+/** OpenAPI `ReferralPerformanceSchema` — `GET /api/v1/admin/referrals/codes/{code}/performance` */
 export type ReferralPerformance = {
 	code: string;
-	description: string;
+	description?: string | null;
+	created_by: string;
+	type: string;
 	is_active: boolean;
 	total_signups: number;
 	active_subscriptions: number;
+	total_revenue: number;
+};
+
+/** OpenAPI `ReferralStatusToggleSchema` — `PATCH /api/v1/admin/referrals/codes/{code}/status` */
+export type ReferralStatusToggleRequest = {
+	is_active: boolean;
 };
 
 /** OpenAPI commission rate response — `GET/PUT /api/v1/admin/referrals/commission-rate` */
