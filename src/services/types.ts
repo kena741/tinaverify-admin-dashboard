@@ -419,6 +419,11 @@ export type AdminGrantCreditsRequest = {
 	credits: number;
 	/** Reference receipt / proof image (form field `file`). */
 	file?: File | null;
+	/**
+	 * Query `is_internal` — marks the grant as for internal teams.
+	 * Defaults to `false` when omitted.
+	 */
+	is_internal?: boolean;
 };
 
 /** OpenAPI `AdminBusinessCreateSchema` — `POST /api/v1/admin/businesses` */
@@ -435,6 +440,11 @@ export type AdminManualSubscriptionRequest = {
 	amount?: number | null;
 	/** Reference receipt / proof image (form field `file`). */
 	file?: File | null;
+	/**
+	 * Query `is_internal` — marks the assigned plan as for internal teams.
+	 * Defaults to `false` when omitted.
+	 */
+	is_internal?: boolean;
 };
 
 /** OpenAPI `UpdateSuperuserSchema` — `PATCH /api/v1/admin/users/{user_id}/superuser` */

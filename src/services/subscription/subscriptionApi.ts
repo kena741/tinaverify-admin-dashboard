@@ -177,7 +177,7 @@ export const subscriptionApi = createApi({
 
 		/**
 		 * `POST /api/v1/subscriptions/grant-credits`
-		 * Multipart: `credits`, `file`.
+		 * Query: `business_id`, `is_internal`. Multipart: `credits`, `file`.
 		 */
 		grantSubscriptionCredits: builder.mutation<
 			SubscriptionOutput,
@@ -192,7 +192,10 @@ export const subscriptionApi = createApi({
 				return {
 					url: "/api/v1/subscriptions/grant-credits",
 					method: "POST",
-					params: { business_id: businessId },
+					params: {
+						business_id: businessId,
+						is_internal: body.is_internal === true,
+					},
 					body: formData,
 					headers: bearerHeaders(),
 				};

@@ -300,13 +300,23 @@ export default function SubscriptionPage() {
 		setGrantConfirmOpen(true);
 	};
 
-	const onConfirmGrantCredits = async (referenceImage: File) => {
+	const onConfirmGrantCredits = async ({
+		referenceImage,
+		isInternal,
+	}: {
+		referenceImage: File;
+		isInternal: boolean;
+	}) => {
 		if (!businessId) return;
 		const n = Number.parseInt(grantCreditsInput.trim(), 10);
 		try {
 			const out = await grantSubscriptionCredits({
 				businessId,
-				body: { credits: n, file: referenceImage },
+				body: {
+					credits: n,
+					file: referenceImage,
+					is_internal: isInternal,
+				},
 			}).unwrap();
 			setGrantSuccess(out);
 			setGrantCreditsInput("");
@@ -337,7 +347,13 @@ export default function SubscriptionPage() {
 		setAssignConfirmOpen(true);
 	};
 
-	const onConfirmManualAssign = async (referenceImage: File) => {
+	const onConfirmManualAssign = async ({
+		referenceImage,
+		isInternal,
+	}: {
+		referenceImage: File;
+		isInternal: boolean;
+	}) => {
 		if (!businessId || !manualPlanId) return;
 		try {
 			const out = await assignSubscription({
@@ -346,6 +362,7 @@ export default function SubscriptionPage() {
 					plan_id: manualPlanId,
 					amount: manualAmountParsed,
 					file: referenceImage,
+					is_internal: isInternal,
 				},
 			}).unwrap();
 			setManualSuccess(out);
@@ -869,6 +886,7 @@ export default function SubscriptionPage() {
 				summary={`Are you sure you want to grant ${creditsParsed} credits to ${selectedBusinessName}?`}
 				confirmLabel="Yes, grant credits"
 				isPending={granting}
+				internalLabel="Credits are for internal teams"
 				onConfirm={onConfirmGrantCredits}
 			/>
 
@@ -879,6 +897,7 @@ export default function SubscriptionPage() {
 				summary={`Are you sure you want to assign ${selectedManualPlanName} to ${selectedBusinessName}?`}
 				confirmLabel="Yes, assign plan"
 				isPending={assigning}
+				internalLabel="Plan is for internal teams"
 				onConfirm={onConfirmManualAssign}
 			/>
 		</div>
