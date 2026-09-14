@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Loader2Icon } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
 	Dialog,
 	DialogContent,
@@ -15,6 +16,11 @@ import {
 import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 
+export type ConfirmCreditActionPayload = {
+	referenceImage: File;
+	isInternal: boolean;
+};
+
 type ConfirmCreditActionDialogProps = {
 	open: boolean;
 	onOpenChange: (open: boolean) => void;
@@ -22,7 +28,9 @@ type ConfirmCreditActionDialogProps = {
 	summary: string;
 	confirmLabel: string;
 	isPending?: boolean;
-	onConfirm: (referenceImage: File) => void | Promise<void>;
+	/** Label for the internal-teams checkbox (defaults to grant/assign wording). */
+	internalLabel?: string;
+	onConfirm: (payload: ConfirmCreditActionPayload) => void | Promise<void>;
 };
 
 export function ConfirmCreditActionDialog({
@@ -32,15 +40,18 @@ export function ConfirmCreditActionDialog({
 	summary,
 	confirmLabel,
 	isPending = false,
+	internalLabel = "This is for internal teams",
 	onConfirm,
 }: ConfirmCreditActionDialogProps) {
 	const [file, setFile] = useState<File | null>(null);
 	const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+	const [isInternal, setIsInternal] = useState(false);
 	const [localError, setLocalError] = useState("");
 
 	useEffect(() => {
 		if (open) return;
 		setFile(null);
+		setIsInternal(false);
 		setLocalError("");
 		setPreviewUrl((prev) => {
 			if (prev) URL.revokeObjectURL(prev);
@@ -60,7 +71,7 @@ export function ConfirmCreditActionDialog({
 			return;
 		}
 		setLocalError("");
-		await onConfirm(file);
+		await onConfirm({ referenceImage: file, isInternal });
 	}
 
 	return (
@@ -111,6 +122,31 @@ export function ConfirmCreditActionDialog({
 							className="max-h-40 max-w-full rounded-md border bg-muted object-contain"
 						/>
 					) : null}
+
+					<Field orientation="horizontal" className="items-start">
+						<Checkbox
+							id="credit-action-is-internal"
+							checked={isInternal}
+							disabled={isPending}
+							onCheckedChange={(v) => setIsInternal(v === true)}
+							aria-describedby="credit-action-is-internal-desc"
+						/>
+						<div className="flex flex-col gap-0.5">
+							<FieldLabel
+								htmlFor="credit-action-is-internal"
+								className="cursor-pointer"
+							>
+								{internalLabel}
+							</FieldLabel>
+							<p
+								id="credit-action-is-internal-desc"
+								className="text-xs text-muted-foreground"
+							>
+								Check this when the credits or plan are for internal team use,
+								not a paying customer.
+							</p>
+						</div>
+					</Field>
 
 					{localError ? (
 						<p className="text-sm text-destructive">{localError}</p>
