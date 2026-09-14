@@ -125,7 +125,10 @@ export const adminApi = createApi({
 			},
 		}),
 
-		/** `POST /api/v1/admin/subscriptions` — multipart: `business_id`, `plan_id`, `amount?`, `file` */
+		/**
+		 * `POST /api/v1/admin/subscriptions`
+		 * Query: `is_internal`. Multipart: `business_id`, `plan_id`, `amount?`, `file`.
+		 */
 		adminAssignSubscription: builder.mutation<
 			SubscriptionOutput,
 			{ body: AdminManualSubscriptionRequest }
@@ -143,6 +146,9 @@ export const adminApi = createApi({
 				return {
 					url: "/api/v1/admin/subscriptions",
 					method: "POST",
+					params: {
+						is_internal: body.is_internal === true,
+					},
 					body: formData,
 					headers: bearerHeaders(),
 				};

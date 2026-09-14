@@ -377,18 +377,28 @@ export default function BusinessDetailClient({
 		setGrantConfirmOpen(true);
 	}
 
-	async function onConfirmGrantCredits(referenceImage: File) {
+	async function onConfirmGrantCredits({
+		referenceImage,
+		isInternal,
+	}: {
+		referenceImage: File;
+		isInternal: boolean;
+	}) {
 		try {
 			const out = await grantSubscriptionCredits({
 				businessId,
-				body: { credits: grantCreditsParsed, file: referenceImage },
+				body: {
+					credits: grantCreditsParsed,
+					file: referenceImage,
+					is_internal: isInternal,
+				},
 			}).unwrap();
 			setGrantCreditsInput("");
 			setGrantConfirmOpen(false);
 			setGrantBanner({
 				variant: "default",
 				title: "Credits granted",
-				message: `Granted ${grantCreditsParsed} credits (ref: ${referenceImage.name}). Status is now ${out.status}.`,
+				message: `Granted ${grantCreditsParsed} credits${isInternal ? " (internal)" : ""} (ref: ${referenceImage.name}). Status is now ${out.status}.`,
 			});
 		} catch (err) {
 			setGrantBanner({
@@ -417,7 +427,13 @@ export default function BusinessDetailClient({
 		setAssignConfirmOpen(true);
 	}
 
-	async function onConfirmManualAssign(referenceImage: File) {
+	async function onConfirmManualAssign({
+		referenceImage,
+		isInternal,
+	}: {
+		referenceImage: File;
+		isInternal: boolean;
+	}) {
 		if (!manualPlanId) return;
 		try {
 			const out = await assignSubscription({
@@ -425,13 +441,14 @@ export default function BusinessDetailClient({
 					business_id: businessId,
 					plan_id: manualPlanId,
 					file: referenceImage,
+					is_internal: isInternal,
 				},
 			}).unwrap();
 			setAssignConfirmOpen(false);
 			setManualBanner({
 				variant: "default",
 				title: "Subscription assigned",
-				message: `Assigned ${selectedAssignPlan?.name ?? "plan"} (ref: ${referenceImage.name}). Status is now ${out.status}.`,
+				message: `Assigned ${selectedAssignPlan?.name ?? "plan"}${isInternal ? " (internal)" : ""} (ref: ${referenceImage.name}). Status is now ${out.status}.`,
 			});
 		} catch (err) {
 			setManualBanner({
@@ -1064,6 +1081,7 @@ export default function BusinessDetailClient({
 				summary={`Are you sure you want to grant ${grantCreditsParsed} credits to ${business.name}?`}
 				confirmLabel="Yes, grant credits"
 				isPending={grantingCredits}
+				internalLabel="Credits are for internal teams"
 				onConfirm={onConfirmGrantCredits}
 			/>
 
@@ -1074,6 +1092,7 @@ export default function BusinessDetailClient({
 				summary={`Are you sure you want to assign ${selectedAssignPlan?.name ?? "this plan"} to ${business.name}?`}
 				confirmLabel="Yes, assign plan"
 				isPending={assigningSubscription}
+				internalLabel="Plan is for internal teams"
 				onConfirm={onConfirmManualAssign}
 			/>
 
