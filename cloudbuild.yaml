@@ -16,7 +16,7 @@ images:
 timeout: 1200s
 substitutions:
   _NEXT_PUBLIC_ADMIN_GRANT_CREDITS: "true"
-  _NEXT_PUBLIC_ADMIN_BUSINESS_SMS: "false"
+  _NEXT_PUBLIC_ADMIN_BUSINESS_SMS: "true"
 options:
   logging: CLOUD_LOGGING_ONLY
   machineType: E2_HIGHCPU_8

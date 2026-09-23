@@ -7,7 +7,7 @@ substitutions:
   _REGION: europe-west4
   _NEXT_PUBLIC_BACKEND_BASE_URL: https://zuludine-backend-prod-562272610794.europe-west3.run.app
   _NEXT_PUBLIC_ADMIN_GRANT_CREDITS: "true"
-  _NEXT_PUBLIC_ADMIN_BUSINESS_SMS: "false"
+  _NEXT_PUBLIC_ADMIN_BUSINESS_SMS: "true"
 
 steps:
   - name: gcr.io/cloud-builders/docker
