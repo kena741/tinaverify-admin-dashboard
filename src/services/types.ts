@@ -229,6 +229,30 @@ export type BankAccountResponse = {
 	is_archived: boolean;
 };
 
+/** OpenAPI `SystemBankAccountCreateSchema` */
+export type SystemBankAccountCreateRequest = {
+	bank_name: string;
+	account_number: string;
+	is_active?: boolean;
+};
+
+/** OpenAPI `SystemBankAccountOutputSchema` */
+export type SystemBankAccountOutput = {
+	id: UUID;
+	bank_name: string;
+	account_number: string;
+	is_active: boolean;
+	created_at?: string | null;
+	updated_at?: string | null;
+};
+
+/** OpenAPI `SystemBankAccountUpdateSchema` */
+export type SystemBankAccountUpdateRequest = {
+	bank_name?: string | null;
+	account_number?: string | null;
+	is_active?: boolean | null;
+};
+
 // -----------------------------
 // Employees
 // -----------------------------
@@ -414,6 +438,16 @@ export type SubscriptionCheckoutResponse = {
 	tx_ref: string;
 };
 
+/** OpenAPI multipart body for `POST /api/v1/subscriptions/manual-request` */
+export type ManualSubscriptionRequest = {
+	business_id: UUID;
+	plan_id: UUID;
+	bank_name: string;
+	receiver_account_number: string;
+	file: File;
+	description?: string | null;
+};
+
 /** OpenAPI multipart body for `POST /api/v1/subscriptions/grant-credits` */
 export type AdminGrantCreditsRequest = {
 	credits: number;
@@ -424,6 +458,42 @@ export type AdminGrantCreditsRequest = {
 	 * Defaults to `false` when omitted.
 	 */
 	is_internal?: boolean;
+};
+
+/** OpenAPI `ManualSubscriptionStatus` */
+export type ManualSubscriptionStatus = "pending" | "approved" | "rejected";
+
+/** OpenAPI `ManualSubscriptionResponseSchema` */
+export type ManualSubscriptionResponse = {
+	id: UUID;
+	business_id: UUID;
+	plan_id: UUID;
+	bank_name: string;
+	receiver_account_number: string;
+	file_receipt_url: string;
+	description?: string | null;
+	status: ManualSubscriptionStatus | string;
+	approved_by?: UUID | null;
+	created_at?: string | null;
+	updated_at?: string | null;
+};
+
+/** OpenAPI `PaginatedManualSubscriptionResponse` */
+export type PaginatedManualSubscriptionResponse = {
+	items: ManualSubscriptionResponse[];
+	total_count: number;
+	page_number: number;
+	returned_count: number;
+	offset: number;
+	limit: number;
+};
+
+/** OpenAPI `PaymentBankOutputSchema` for `GET /api/v1/payments/banks` */
+export type ChapaBankOutput = {
+	id: string;
+	name: string;
+	code?: string | null;
+	swift?: string | null;
 };
 
 /** OpenAPI `AdminBusinessCreateSchema` — `POST /api/v1/admin/businesses` */

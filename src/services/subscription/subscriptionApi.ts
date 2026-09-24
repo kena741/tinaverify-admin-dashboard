@@ -8,9 +8,11 @@ import type {
 	CustomCheckoutRequest,
 	ExchangeRateOutput,
 	ExchangeRateUpdateRequest,
+	ManualSubscriptionRequest,
 	SubscriptionCheckoutResponse,
 	SubscriptionOutput,
 	SubscriptionStatus,
+	SystemBankAccountOutput,
 	TransactionLogOutput,
 	TransactionLogStatus,
 	UsageOutput,
@@ -18,9 +20,7 @@ import type {
 
 function bearerHeaders(accessToken?: string | null) {
 	const token =
-		accessToken !== undefined &&
-		accessToken !== null &&
-		accessToken !== ""
+		accessToken !== undefined && accessToken !== null && accessToken !== ""
 			? accessToken
 			: getStoredAccessToken();
 	return token ? { Authorization: `Bearer ${token}` } : {};
@@ -35,6 +35,7 @@ export const subscriptionApi = createApi({
 		"SubscriptionTransactions",
 		"ExchangeRate",
 		"TransactionLogs",
+		"SystemBank",
 	],
 	endpoints: (builder) => ({
 		/** `GET /api/v1/subscriptions/me` */
@@ -62,10 +63,15 @@ export const subscriptionApi = createApi({
 			} | void
 		>({
 			query: (arg) => {
+				const query = (arg ?? {}) as {
+					businessId?: string | null;
+					planId?: string | null;
+					status?: SubscriptionStatus | null;
+				};
 				const params: Record<string, string> = {};
-				if (arg?.businessId) params.business_id = arg.businessId;
-				if (arg?.planId) params.plan_id = arg.planId;
-				if (arg?.status) params.status = arg.status;
+				if (query.businessId) params.business_id = query.businessId;
+				if (query.planId) params.plan_id = query.planId;
+				if (query.status) params.status = query.status;
 				return {
 					url: "/api/v1/subscriptions/transactions",
 					params: Object.keys(params).length > 0 ? params : undefined,
@@ -73,11 +79,14 @@ export const subscriptionApi = createApi({
 				};
 			},
 			serializeQueryArgs: ({ endpointName, queryArgs }) => {
-				const arg = queryArgs ?? {};
-				const businessId =
-					"businessId" in arg ? arg.businessId : undefined;
-				const planId = "planId" in arg ? arg.planId : undefined;
-				const status = "status" in arg ? arg.status : undefined;
+				const arg = (queryArgs ?? {}) as {
+					businessId?: string | null;
+					planId?: string | null;
+					status?: SubscriptionStatus | null;
+				};
+				const businessId = arg.businessId;
+				const planId = arg.planId;
+				const status = arg.status;
 				const hasFilter =
 					Boolean(businessId) || Boolean(planId) || Boolean(status);
 				if (!hasFilter) return `${endpointName}(global)`;
@@ -101,7 +110,10 @@ export const subscriptionApi = createApi({
 		}),
 
 		/** `GET /api/v1/subscriptions/usage` — 404 when no active subscription → null */
-		getSubscriptionUsage: builder.query<UsageOutput | null, { businessId: string }>({
+		getSubscriptionUsage: builder.query<
+			UsageOutput | null,
+			{ businessId: string }
+		>({
 			async queryFn({ businessId }, _api, _extra, baseQuery) {
 				const result = await baseQuery({
 					url: "/api/v1/subscriptions/usage",
@@ -234,6 +246,59 @@ export const subscriptionApi = createApi({
 			invalidatesTags: [{ type: "ExchangeRate" as const, id: "CURRENT" }],
 		}),
 
+		/** `GET /api/v1/subscriptions/system-banks` */
+		listSystemBanks: builder.query<SystemBankAccountOutput[], void>({
+			query: () => ({
+				url: "/api/v1/subscriptions/system-banks",
+				headers: bearerHeaders(),
+			}),
+			transformResponse: (response: unknown) => {
+				if (Array.isArray(response))
+					return response as SystemBankAccountOutput[];
+				if (
+					typeof response === "object" &&
+					response !== null &&
+					"items" in response &&
+					Array.isArray((response as { items: unknown }).items)
+				) {
+					return (response as { items: SystemBankAccountOutput[] }).items;
+				}
+				return [];
+			},
+			providesTags: [{ type: "SystemBank" as const, id: "LIST" }],
+		}),
+
+		/** `POST /api/v1/subscriptions/manual-request` */
+		createManualSubscriptionRequest: builder.mutation<
+			unknown,
+			{ body: ManualSubscriptionRequest }
+		>({
+			query: ({ body }) => {
+				const formData = new FormData();
+				formData.append("business_id", body.business_id);
+				formData.append("plan_id", body.plan_id);
+				formData.append("bank_name", body.bank_name);
+				formData.append(
+					"receiver_account_number",
+					body.receiver_account_number,
+				);
+				formData.append("file", body.file);
+				if (body.description != null) {
+					formData.append("description", body.description);
+				}
+				return {
+					url: "/api/v1/subscriptions/manual-request",
+					method: "POST",
+					body: formData,
+					headers: bearerHeaders(),
+				};
+			},
+			invalidatesTags: [
+				{ type: "TransactionLogs" as const, id: "LIST" },
+				{ type: "SubscriptionTransactions" as const, id: "LIST" },
+			],
+		}),
+
 		/** `GET /api/v1/subscriptions/transaction-logs` — Chapa payment logs (admin) */
 		listSubscriptionTransactionLogs: builder.query<
 			TransactionLogOutput[],
@@ -244,10 +309,15 @@ export const subscriptionApi = createApi({
 			} | void
 		>({
 			query: (arg) => {
+				const query = (arg ?? {}) as {
+					status?: TransactionLogStatus | null;
+					limit?: number;
+					offset?: number;
+				};
 				const params: Record<string, string | number> = {};
-				if (arg?.status) params.status = arg.status;
-				if (arg?.limit != null) params.limit = arg.limit;
-				if (arg?.offset != null) params.offset = arg.offset;
+				if (query.status) params.status = query.status;
+				if (query.limit != null) params.limit = query.limit;
+				if (query.offset != null) params.offset = query.offset;
 				return {
 					url: "/api/v1/subscriptions/transaction-logs",
 					params: Object.keys(params).length > 0 ? params : undefined,
@@ -268,5 +338,7 @@ export const {
 	useGrantSubscriptionCreditsMutation,
 	useGetExchangeRateQuery,
 	useUpdateExchangeRateMutation,
+	useListSystemBanksQuery,
+	useCreateManualSubscriptionRequestMutation,
 	useListSubscriptionTransactionLogsQuery,
 } = subscriptionApi;
