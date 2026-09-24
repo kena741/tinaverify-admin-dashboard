@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Loader2Icon, MessageSquareIcon } from "lucide-react";
 
 import { useSendCustomSmsMutation } from "@/services/sms/smsApi";
@@ -63,13 +63,14 @@ export function SendBusinessSmsDialog({
 	const [formError, setFormError] = useState("");
 	const [successMessage, setSuccessMessage] = useState("");
 
-	useEffect(() => {
-		if (!open) {
+	const handleDialogOpenChange = (nextOpen: boolean) => {
+		if (!nextOpen) {
 			setMessage("");
 			setFormError("");
 			setSuccessMessage("");
 		}
-	}, [open]);
+		onOpenChange(nextOpen);
+	};
 
 	const handleSubmit = async (e: React.FormEvent) => {
 		e.preventDefault();
@@ -104,7 +105,7 @@ export function SendBusinessSmsDialog({
 	};
 
 	return (
-		<Dialog open={open} onOpenChange={onOpenChange}>
+		<Dialog open={open} onOpenChange={handleDialogOpenChange}>
 			<DialogContent className="sm:max-w-md">
 				<DialogHeader>
 					<DialogTitle>Send custom SMS</DialogTitle>
@@ -158,7 +159,7 @@ export function SendBusinessSmsDialog({
 						<Button
 							type="button"
 							variant="outline"
-							onClick={() => onOpenChange(false)}
+							onClick={() => handleDialogOpenChange(false)}
 							disabled={sendSmsState.isLoading}
 						>
 							{successMessage ? "Close" : "Cancel"}
@@ -166,7 +167,9 @@ export function SendBusinessSmsDialog({
 						<Button
 							type="submit"
 							disabled={
-								sendSmsState.isLoading || !phoneNumber?.trim() || !!successMessage
+								sendSmsState.isLoading ||
+								!phoneNumber?.trim() ||
+								!!successMessage
 							}
 						>
 							{sendSmsState.isLoading ? (

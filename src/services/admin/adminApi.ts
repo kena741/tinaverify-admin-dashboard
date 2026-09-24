@@ -11,7 +11,13 @@ import type {
 	AdminUserRegisterRequest,
 	AuditLogOutput,
 	BusinessOutput,
+	ManualSubscriptionResponse,
+	ManualSubscriptionStatus,
+	PaginatedManualSubscriptionResponse,
 	SubscriptionOutput,
+	SystemBankAccountCreateRequest,
+	SystemBankAccountOutput,
+	SystemBankAccountUpdateRequest,
 	UpdateSuperuserRequest,
 	UserOutput,
 } from "../types";
@@ -27,7 +33,7 @@ function bearerHeaders(accessToken?: string | null) {
 export const adminApi = createApi({
 	reducerPath: "adminApi",
 	baseQuery: backendBaseQuery,
-	tagTypes: ["AuditLog"],
+	tagTypes: ["AuditLog", "SystemBank", "ManualSubscription", "Subscription"],
 	endpoints: (builder) => ({
 		/** `GET /api/v1/admin/audit-logs` */
 		listAdminAuditLogs: builder.query<
@@ -42,14 +48,22 @@ export const adminApi = createApi({
 			} | void
 		>({
 			query: (arg) => {
-				const params: Record<string, string | number> = {
-					limit: arg?.limit ?? 50,
-					offset: arg?.offset ?? 0,
+				const query = (arg ?? {}) as {
+					limit?: number;
+					offset?: number;
+					startDate?: string | null;
+					endDate?: string | null;
+					action?: string | null;
+					adminId?: string | null;
 				};
-				if (arg?.startDate) params.start_date = arg.startDate;
-				if (arg?.endDate) params.end_date = arg.endDate;
-				if (arg?.action) params.action = arg.action;
-				if (arg?.adminId) params.admin_id = arg.adminId;
+				const params: Record<string, string | number> = {
+					limit: query.limit ?? 50,
+					offset: query.offset ?? 0,
+				};
+				if (query.startDate) params.start_date = query.startDate;
+				if (query.endDate) params.end_date = query.endDate;
+				if (query.action) params.action = query.action;
+				if (query.adminId) params.admin_id = query.adminId;
 				return {
 					url: "/api/v1/admin/audit-logs",
 					params,
@@ -69,32 +83,33 @@ export const adminApi = createApi({
 		}),
 
 		/** `POST /api/v1/admin/users/register` */
-		adminRegisterUser: builder.mutation<UserOutput, { body: AdminUserRegisterRequest }>(
-			{
-				query: ({ body }) => ({
-					url: "/api/v1/admin/users/register",
-					method: "POST",
-					body,
-					headers: {
-						"Content-Type": "application/json",
-						...bearerHeaders(),
-					},
-				}),
-				invalidatesTags: [{ type: "AuditLog", id: "LIST" }],
-				async onQueryStarted(_arg, { dispatch, queryFulfilled }) {
-					try {
-						const { data: user } = await queryFulfilled;
-						dispatch(
-							authApi.util.updateQueryData("listAllUsers", undefined, (draft) => {
-								if (!draft.some((u) => u.id === user.id)) draft.push(user);
-							}),
-						);
-					} catch {
-						/* keep cache */
-					}
+		adminRegisterUser: builder.mutation<
+			UserOutput,
+			{ body: AdminUserRegisterRequest }
+		>({
+			query: ({ body }) => ({
+				url: "/api/v1/admin/users/register",
+				method: "POST",
+				body,
+				headers: {
+					"Content-Type": "application/json",
+					...bearerHeaders(),
 				},
+			}),
+			invalidatesTags: [{ type: "AuditLog", id: "LIST" }],
+			async onQueryStarted(_arg, { dispatch, queryFulfilled }) {
+				try {
+					const { data: user } = await queryFulfilled;
+					dispatch(
+						authApi.util.updateQueryData("listAllUsers", undefined, (draft) => {
+							if (!draft.some((u) => u.id === user.id)) draft.push(user);
+						}),
+					);
+				} catch {
+					/* keep cache */
+				}
 			},
-		),
+		}),
 
 		/** `POST /api/v1/admin/businesses` */
 		adminCreateBusiness: builder.mutation<
@@ -171,6 +186,129 @@ export const adminApi = createApi({
 			},
 		}),
 
+		/** `POST /api/v1/admin/system-banks` */
+		adminCreateSystemBank: builder.mutation<
+			SystemBankAccountOutput,
+			{ body: SystemBankAccountCreateRequest }
+		>({
+			query: ({ body }) => ({
+				url: "/api/v1/admin/system-banks",
+				method: "POST",
+				body,
+				headers: {
+					"Content-Type": "application/json",
+					...bearerHeaders(),
+				},
+			}),
+			invalidatesTags: [{ type: "SystemBank" as const, id: "LIST" }],
+		}),
+
+		/** `GET /api/v1/admin/system-banks` */
+		adminListSystemBanks: builder.query<
+			SystemBankAccountOutput[],
+			{ isActive?: boolean | null } | void
+		>({
+			query: (arg) => {
+				const query = (arg ?? {}) as { isActive?: boolean | null };
+				return {
+					url: "/api/v1/admin/system-banks",
+					params:
+						query.isActive != null ? { is_active: query.isActive } : undefined,
+					headers: bearerHeaders(),
+				};
+			},
+			transformResponse: (response: unknown) => {
+				if (Array.isArray(response))
+					return response as SystemBankAccountOutput[];
+				return [];
+			},
+			providesTags: [{ type: "SystemBank" as const, id: "LIST" }],
+		}),
+
+		/** `PATCH /api/v1/admin/system-banks/{bank_id}` */
+		adminUpdateSystemBank: builder.mutation<
+			SystemBankAccountOutput,
+			{ bankId: string; body: SystemBankAccountUpdateRequest }
+		>({
+			query: ({ bankId, body }) => ({
+				url: `/api/v1/admin/system-banks/${bankId}`,
+				method: "PATCH",
+				body,
+				headers: {
+					"Content-Type": "application/json",
+					...bearerHeaders(),
+				},
+			}),
+			invalidatesTags: [{ type: "SystemBank" as const, id: "LIST" }],
+		}),
+
+		/** `DELETE /api/v1/admin/system-banks/{bank_id}` */
+		adminDeleteSystemBank: builder.mutation<void, { bankId: string }>({
+			query: ({ bankId }) => ({
+				url: `/api/v1/admin/system-banks/${bankId}`,
+				method: "DELETE",
+				headers: bearerHeaders(),
+			}),
+			invalidatesTags: [{ type: "SystemBank" as const, id: "LIST" }],
+		}),
+
+		/** `GET /api/v1/admin/manual-subscriptions` */
+		listAdminManualSubscriptions: builder.query<
+			PaginatedManualSubscriptionResponse,
+			{
+				reqStatus?: ManualSubscriptionStatus | null;
+				limit?: number;
+				offset?: number;
+			} | void
+		>({
+			query: (arg) => {
+				const query = (arg ?? {}) as {
+					reqStatus?: ManualSubscriptionStatus | null;
+					limit?: number;
+					offset?: number;
+				};
+				const params: Record<string, string | number> = {};
+				if (query.reqStatus) params.req_status = query.reqStatus;
+				if (query.limit != null) params.limit = query.limit;
+				if (query.offset != null) params.offset = query.offset;
+				return {
+					url: "/api/v1/admin/manual-subscriptions",
+					params: Object.keys(params).length > 0 ? params : undefined,
+					headers: bearerHeaders(),
+				};
+			},
+			providesTags: [{ type: "ManualSubscription" as const, id: "LIST" }],
+		}),
+
+		/** `POST /api/v1/admin/manual-subscriptions/{request_id}/approve` */
+		adminApproveManualSubscription: builder.mutation<
+			SubscriptionOutput,
+			{ requestId: string }
+		>({
+			query: ({ requestId }) => ({
+				url: `/api/v1/admin/manual-subscriptions/${requestId}/approve`,
+				method: "POST",
+				headers: bearerHeaders(),
+			}),
+			invalidatesTags: [
+				{ type: "ManualSubscription" as const, id: "LIST" },
+				{ type: "Subscription" as const, id: "LIST" },
+			],
+		}),
+
+		/** `POST /api/v1/admin/manual-subscriptions/{request_id}/reject` */
+		adminRejectManualSubscription: builder.mutation<
+			ManualSubscriptionResponse,
+			{ requestId: string }
+		>({
+			query: ({ requestId }) => ({
+				url: `/api/v1/admin/manual-subscriptions/${requestId}/reject`,
+				method: "POST",
+				headers: bearerHeaders(),
+			}),
+			invalidatesTags: [{ type: "ManualSubscription" as const, id: "LIST" }],
+		}),
+
 		/** `PATCH /api/v1/admin/users/{user_id}/superuser` */
 		adminUpdateSuperuser: builder.mutation<
 			UserOutput,
@@ -208,5 +346,12 @@ export const {
 	useAdminRegisterUserMutation,
 	useAdminCreateBusinessMutation,
 	useAdminAssignSubscriptionMutation,
+	useAdminCreateSystemBankMutation,
+	useAdminListSystemBanksQuery,
+	useAdminUpdateSystemBankMutation,
+	useAdminDeleteSystemBankMutation,
+	useListAdminManualSubscriptionsQuery,
+	useAdminApproveManualSubscriptionMutation,
+	useAdminRejectManualSubscriptionMutation,
 	useAdminUpdateSuperuserMutation,
 } = adminApi;

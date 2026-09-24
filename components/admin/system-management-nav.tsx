@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
 	ChevronRightIcon,
 	CircleDollarSignIcon,
@@ -12,10 +12,7 @@ import {
 } from "lucide-react";
 
 import { usePlatformAccess } from "@/hooks/use-platform-access";
-import {
-	adminPathMatches,
-	normalizeAdminPath,
-} from "@/lib/admin-sidebar-path";
+import { adminPathMatches, normalizeAdminPath } from "@/lib/admin-sidebar-path";
 import {
 	adminNavButtonClass,
 	adminNavGroupLabelClass,
@@ -36,6 +33,11 @@ import { cn } from "@/lib/utils";
 
 const financeLinks = [
 	{ name: "Transactions", href: "/admin/finance/transactions" },
+	{
+		name: "Manual Subscrption Requests",
+		href: "/admin/finance/manual-subscription-requests",
+	},
+	{ name: "Tinaverify bank accounts", href: "/admin/finance/system-banks" },
 	{ name: "Payment settings", href: "/admin/finance/payment-settings" },
 ] as const;
 
@@ -75,11 +77,8 @@ export function SystemManagementNav({ pathname }: { pathname: string }) {
 		showFinance &&
 		(normalizeAdminPath(pathname).startsWith("/admin/finance") ||
 			visibleFinance.some((item) => adminPathMatches(pathname, item.href)));
-	const [financeOpen, setFinanceOpen] = useState(financeActive);
-
-	useEffect(() => {
-		if (financeActive) setFinanceOpen(true);
-	}, [financeActive]);
+	const [financeOpen, setFinanceOpen] = useState(false);
+	const isFinanceOpen = financeActive || financeOpen;
 
 	if (!showFinance && visibleFlat.length === 0) return null;
 
@@ -104,12 +103,12 @@ export function SystemManagementNav({ pathname }: { pathname: string }) {
 								<ChevronRightIcon
 									className={cn(
 										"ml-auto size-4! opacity-50 transition-transform",
-										financeOpen && "rotate-90",
+										isFinanceOpen && "rotate-90",
 									)}
 									aria-hidden
 								/>
 							</SidebarMenuButton>
-							{financeOpen ? (
+							{isFinanceOpen ? (
 								<SidebarMenuSub className="ml-3.5 border-l border-sidebar-border pl-2.5">
 									{visibleFinance.map((item) => {
 										const isActive = adminPathMatches(pathname, item.href);

@@ -72,4 +72,4 @@ jobs:
           gcloud builds submit \
             --project="${GCP_PROJECT_ID}" \
             --config="${CONFIG}" \
-            --substitutions="_IMAGE=${IMAGE},_SERVICE=${SERVICE},_REGION=europe-west4,_NEXT_PUBLIC_BACKEND_BASE_URL=${NEXT_PUBLIC_BACKEND_BASE_URL},_NEXT_PUBLIC_ADMIN_GRANT_CREDITS=true,_NEXT_PUBLIC_ADMIN_BUSINESS_SMS=false"
+            --substitutions="_IMAGE=${IMAGE},_SERVICE=${SERVICE},_REGION=europe-west4,_NEXT_PUBLIC_BACKEND_BASE_URL=${NEXT_PUBLIC_BACKEND_BASE_URL}"
