@@ -166,7 +166,8 @@ export function ResetUserPasswordDialog({
 							<Alert>
 								<AlertTitle>Temporary password created</AlertTitle>
 								<AlertDescription>
-									A new password was generated and the user details were recorded.
+									A new password was generated and the user details were
+									recorded.
 								</AlertDescription>
 							</Alert>
 						)}
@@ -221,7 +222,9 @@ export function ResetUserPasswordDialog({
 							<p className="text-sm text-muted-foreground">{userDetails}</p>
 						</div>
 						<div className="rounded-lg border border-dashed border-border p-3 text-sm text-muted-foreground">
-							A new temporary password will be generated and sent by SMS if a mobile number is on file. The user should change it to something they can remember.
+							A new temporary password will be generated and sent by SMS if a
+							mobile number is on file. The user should change it to something
+							they can remember.
 						</div>
 					</div>
 				)}

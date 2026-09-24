@@ -146,7 +146,9 @@ export const authApi = createApi({
 				method: "GET",
 				headers: bearerHeaders(),
 			}),
-			providesTags: (_r, _e, { userId }) => [{ type: "User" as const, id: userId }],
+			providesTags: (_r, _e, { userId }) => [
+				{ type: "User" as const, id: userId },
+			],
 		}),
 	}),
 });
