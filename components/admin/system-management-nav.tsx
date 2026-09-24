@@ -33,6 +33,10 @@ import { cn } from "@/lib/utils";
 
 const financeLinks = [
 	{ name: "Transactions", href: "/admin/finance/transactions" },
+	{
+		name: "Manual Subscrption Requests",
+		href: "/admin/finance/manual-subscription-requests",
+	},
 	{ name: "Tinaverify bank accounts", href: "/admin/finance/system-banks" },
 	{ name: "Payment settings", href: "/admin/finance/payment-settings" },
 ] as const;
