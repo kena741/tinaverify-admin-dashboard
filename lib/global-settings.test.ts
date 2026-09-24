@@ -7,7 +7,7 @@ import {
 	generalUseToRows,
 	rowsToGeneralUse,
 	type PolicyDocument,
-} from "./global-settings.ts";
+} from "./global-settings";
 
 test("policies round-trip through API object shape", () => {
 	const docs: PolicyDocument[] = [

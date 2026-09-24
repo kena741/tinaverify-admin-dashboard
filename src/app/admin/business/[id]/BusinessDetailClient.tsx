@@ -80,6 +80,7 @@ import { useListRolesQuery } from "../../../../services/role/roleApi";
 import { useGetUserByIdQuery } from "../../../../services/auth/authApi";
 import { BusinessPaymentsTab } from "@/components/admin/business-payments-tab";
 import { ConfirmCreditActionDialog } from "@/components/admin/confirm-credit-action-dialog";
+import { ResetUserPasswordDialog } from "@/components/admin/reset-user-password-dialog";
 import { SendBusinessSmsDialog } from "@/components/admin/send-business-sms-dialog";
 import { usePlatformAccess } from "@/hooks/use-platform-access";
 import { ADMIN_FEATURE } from "@/lib/admin-feature-flags";
@@ -91,7 +92,6 @@ import {
 	subscriptionRowTimestamp,
 } from "@/lib/subscription-filters";
 import { formatPlatformLabel, formatUserDisplayName } from "@/lib/userDisplay";
-
 
 function roleLabel(role?: RoleOutput | null) {
 	return role?.name ?? "—";
@@ -189,6 +189,12 @@ export default function BusinessDetailClient({
 	const businessSmsEnabled = ADMIN_FEATURE.businessSms;
 	const missingBusinessId = !businessId;
 	const [sendSmsOpen, setSendSmsOpen] = useState(false);
+	const [resetPasswordTarget, setResetPasswordTarget] = useState<{
+		userName: string;
+		phoneNumber?: string | null;
+		email?: string | null;
+		contextLabel?: string | null;
+	} | null>(null);
 
 	const tabParam = searchParams.get("tab");
 	const activeTab: DetailTab = resolveDetailTab(tabParam);
@@ -218,7 +224,10 @@ export default function BusinessDetailClient({
 		},
 	);
 
-	const { data: user } = useGetUserByIdQuery({ userId: business?.owner_id ?? "" }, { skip: businessLoading || businessFetching || missingBusinessId });
+	const { data: user } = useGetUserByIdQuery(
+		{ userId: business?.owner_id ?? "" },
+		{ skip: businessLoading || businessFetching || missingBusinessId },
+	);
 
 	const { data: allBusinesses, isLoading: allBusinessesLoading } =
 		useListAllBusinessesQuery(undefined, { skip: missingBusinessId });
@@ -243,15 +252,13 @@ export default function BusinessDetailClient({
 		},
 	);
 
-	const {
-		data: branches,
-		isLoading: branchesLoading,
-	} = useListBusinessBranchesQuery(
-		{ businessId },
-		{
-			skip: missingBusinessId,
-		},
-	);
+	const { data: branches, isLoading: branchesLoading } =
+		useListBusinessBranchesQuery(
+			{ businessId },
+			{
+				skip: missingBusinessId,
+			},
+		);
 
 	const {
 		data: bankAccounts,
@@ -265,16 +272,18 @@ export default function BusinessDetailClient({
 		},
 	);
 
-	const { data: subscriptionPlans } = useListSubscriptionPlansQuery(
-		undefined,
-		{ skip: missingBusinessId },
-	);
+	const { data: subscriptionPlans } = useListSubscriptionPlansQuery(undefined, {
+		skip: missingBusinessId,
+	});
 
 	const {
 		data: activeSubscription,
 		error: activeSubscriptionError,
 		refetch: refetchActiveSubscription,
-	} = useGetActiveSubscriptionQuery({ businessId }, { skip: missingBusinessId });
+	} = useGetActiveSubscriptionQuery(
+		{ businessId },
+		{ skip: missingBusinessId },
+	);
 
 	const {
 		data: subscriptionHistory,
@@ -612,6 +621,23 @@ export default function BusinessDetailClient({
 						</p>
 					</div>
 					<div className="flex shrink-0 flex-wrap items-center gap-2">
+						{user?.id ? (
+							<Button
+								type="button"
+								variant="outline"
+								size="sm"
+								onClick={() =>
+									setResetPasswordTarget({
+										userName: ownerDisplay,
+										phoneNumber: user.phone_number,
+										email: user.email,
+										contextLabel: business.name,
+									})
+								}
+							>
+								Reset password
+							</Button>
+						) : null}
 						{businessSmsEnabled ? (
 							<Button
 								type="button"
@@ -639,7 +665,7 @@ export default function BusinessDetailClient({
 								</Badge>
 							</Button>
 						)}
-						{(canMutateOwners || user?.phone_number) ? (
+						{canMutateOwners || user?.phone_number ? (
 							<DropdownMenu>
 								<DropdownMenuTrigger
 									render={
@@ -659,9 +685,7 @@ export default function BusinessDetailClient({
 											disabled={!user?.phone_number}
 											onClick={() => {
 												if (user?.phone_number) {
-													void navigator.clipboard.writeText(
-														user.phone_number,
-													);
+													void navigator.clipboard.writeText(user.phone_number);
 												}
 											}}
 										>
@@ -692,7 +716,10 @@ export default function BusinessDetailClient({
 					</div>
 				</div>
 
-				<div className="flex flex-wrap items-center gap-2" aria-label="Businesses">
+				<div
+					className="flex flex-wrap items-center gap-2"
+					aria-label="Businesses"
+				>
 					{allBusinessesLoading ? (
 						<Skeleton className="h-8 w-40" />
 					) : ownerBusinesses.length <= 1 ? (
@@ -910,7 +937,10 @@ export default function BusinessDetailClient({
 								<AlertTitle>Subscription</AlertTitle>
 								<AlertDescription className="flex flex-wrap items-center gap-2">
 									<span className="wrap-break-word">
-										{getErrorMessage(activeSubscriptionError, "Request failed.")}
+										{getErrorMessage(
+											activeSubscriptionError,
+											"Request failed.",
+										)}
 									</span>
 									<Button
 										type="button"
@@ -926,7 +956,7 @@ export default function BusinessDetailClient({
 					</div>
 				) : null}
 
-				{(manualBanner || grantBanner) ? (
+				{manualBanner || grantBanner ? (
 					<div className="flex flex-col gap-2">
 						{manualBanner ? (
 							<Alert
@@ -977,7 +1007,10 @@ export default function BusinessDetailClient({
 									setManualBanner(null);
 								}}
 							>
-								<SelectTrigger id="quick-assign-plan" className="h-9 w-full bg-background">
+								<SelectTrigger
+									id="quick-assign-plan"
+									className="h-9 w-full bg-background"
+								>
 									<SelectValue placeholder="Select plan…">
 										{manualPlanId
 											? subscriptionPlanById.get(manualPlanId)?.name
@@ -1059,7 +1092,10 @@ export default function BusinessDetailClient({
 								<p className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
 									Under development
 								</p>
-								<Badge variant="outline" className="font-normal text-muted-foreground">
+								<Badge
+									variant="outline"
+									className="font-normal text-muted-foreground"
+								>
 									Unavailable
 								</Badge>
 							</div>
@@ -1102,6 +1138,18 @@ export default function BusinessDetailClient({
 					onOpenChange={setSendSmsOpen}
 					businessName={business.name}
 					phoneNumber={user?.phone_number}
+				/>
+			) : null}
+			{resetPasswordTarget ? (
+				<ResetUserPasswordDialog
+					open={Boolean(resetPasswordTarget)}
+					onOpenChange={(nextOpen) => {
+						if (!nextOpen) setResetPasswordTarget(null);
+					}}
+					userName={resetPasswordTarget.userName}
+					phoneNumber={resetPasswordTarget.phoneNumber}
+					email={resetPasswordTarget.email}
+					contextLabel={resetPasswordTarget.contextLabel}
 				/>
 			) : null}
 
@@ -1322,30 +1370,55 @@ export default function BusinessDetailClient({
 															</TableCell>
 															{canMutateOwners ? (
 																<TableCell className="text-right">
-																	<button
-																		type="button"
-																		className={cn(
-																			buttonVariants({
-																				variant: "outline",
-																				size: "sm",
-																			}),
-																		)}
-																		disabled={
-																			updateEmployeeRoleState.isLoading ||
-																			!selectedRoleId ||
-																			selectedRoleId === emp.role_id
-																		}
-																		onClick={async () => {
-																			if (!selectedRoleId) return;
-																			await updateEmployeeRole({
-																				businessId,
-																				employeeId: emp.id,
-																				body: { role_id: selectedRoleId },
-																			}).unwrap();
-																		}}
-																	>
-																		Save
-																	</button>
+																	<div className="flex items-center justify-end gap-2">
+																		<button
+																			type="button"
+																			className={cn(
+																				buttonVariants({
+																					variant: "outline",
+																					size: "sm",
+																				}),
+																			)}
+																			disabled={
+																				updateEmployeeRoleState.isLoading ||
+																				!selectedRoleId ||
+																				selectedRoleId === emp.role_id
+																			}
+																			onClick={async () => {
+																				if (!selectedRoleId) return;
+																				await updateEmployeeRole({
+																					businessId,
+																					employeeId: emp.id,
+																					body: { role_id: selectedRoleId },
+																				}).unwrap();
+																			}}
+																		>
+																			Save
+																		</button>
+																		<button
+																			type="button"
+																			className={cn(
+																				buttonVariants({
+																					variant: "ghost",
+																					size: "sm",
+																				}),
+																			)}
+																			onClick={() =>
+																				setResetPasswordTarget({
+																					userName:
+																						emp.user?.username ??
+																						emp.user?.phone_number ??
+																						emp.user_id,
+																					phoneNumber:
+																						emp.user?.phone_number ?? null,
+																					email: emp.user?.email ?? null,
+																					contextLabel: business.name,
+																				})
+																			}
+																		>
+																			Reset password
+																		</button>
+																	</div>
 																</TableCell>
 															) : null}
 														</TableRow>
@@ -1456,9 +1529,7 @@ export default function BusinessDetailClient({
 															</TableCell>
 															<TableCell>
 																<Badge
-																	variant={subscriptionBadgeVariant(
-																		row.status,
-																	)}
+																	variant={subscriptionBadgeVariant(row.status)}
 																	className="font-normal capitalize"
 																>
 																	{getSubscriptionStatusLabel(row.status)}
@@ -1559,28 +1630,32 @@ export default function BusinessDetailClient({
 													</TableCell>
 												</TableRow>
 											) : (
-												(bankAccounts ?? []).map((account: BankAccountResponse) => (
-													<TableRow
-														key={`${account.bank_name}-${account.account_number}-${account.account_name}`}
-													>
-														<TableCell className="font-medium">
-															{account.bank_name}
-														</TableCell>
-														<TableCell>{account.account_name}</TableCell>
-														<TableCell className="font-mono text-sm">
-															{account.account_number}
-														</TableCell>
-														<TableCell>
-															<Badge
-																variant={
-																	account.is_archived ? "secondary" : "default"
-																}
-															>
-																{account.is_archived ? "Archived" : "Active"}
-															</Badge>
-														</TableCell>
-													</TableRow>
-												))
+												(bankAccounts ?? []).map(
+													(account: BankAccountResponse) => (
+														<TableRow
+															key={`${account.bank_name}-${account.account_number}-${account.account_name}`}
+														>
+															<TableCell className="font-medium">
+																{account.bank_name}
+															</TableCell>
+															<TableCell>{account.account_name}</TableCell>
+															<TableCell className="font-mono text-sm">
+																{account.account_number}
+															</TableCell>
+															<TableCell>
+																<Badge
+																	variant={
+																		account.is_archived
+																			? "secondary"
+																			: "default"
+																	}
+																>
+																	{account.is_archived ? "Archived" : "Active"}
+																</Badge>
+															</TableCell>
+														</TableRow>
+													),
+												)
 											)}
 										</TableBody>
 									</Table>
