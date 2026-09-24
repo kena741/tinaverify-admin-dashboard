@@ -259,7 +259,7 @@ export function RolesAdminPanel({ embedded = false }: { embedded?: boolean }) {
 							<TableHeader>
 								<TableRow>
 									<TableHead>Name</TableHead>
-									<TableHead className="w-[4.5rem] text-right">
+									<TableHead className="w-18 text-right">
 										<span className="sr-only">Actions</span>
 									</TableHead>
 								</TableRow>
@@ -370,7 +370,7 @@ export function RolesAdminPanel({ embedded = false }: { embedded?: boolean }) {
 							<TableHeader>
 								<TableRow>
 									<TableHead>Action</TableHead>
-									<TableHead className="w-[4.5rem] text-right">
+									<TableHead className="w-18 text-right">
 										<span className="sr-only">Actions</span>
 									</TableHead>
 								</TableRow>

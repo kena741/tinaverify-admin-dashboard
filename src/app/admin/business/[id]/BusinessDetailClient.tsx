@@ -80,6 +80,7 @@ import { useListRolesQuery } from "../../../../services/role/roleApi";
 import { useGetUserByIdQuery } from "../../../../services/auth/authApi";
 import { BusinessPaymentsTab } from "@/components/admin/business-payments-tab";
 import { ConfirmCreditActionDialog } from "@/components/admin/confirm-credit-action-dialog";
+import { ResetUserPasswordDialog } from "@/components/admin/reset-user-password-dialog";
 import { SendBusinessSmsDialog } from "@/components/admin/send-business-sms-dialog";
 import { usePlatformAccess } from "@/hooks/use-platform-access";
 import { ADMIN_FEATURE } from "@/lib/admin-feature-flags";
@@ -189,6 +190,12 @@ export default function BusinessDetailClient({
 	const businessSmsEnabled = ADMIN_FEATURE.businessSms;
 	const missingBusinessId = !businessId;
 	const [sendSmsOpen, setSendSmsOpen] = useState(false);
+	const [resetPasswordTarget, setResetPasswordTarget] = useState<{
+		userName: string;
+		phoneNumber?: string | null;
+		email?: string | null;
+		contextLabel?: string | null;
+	} | null>(null);
 
 	const tabParam = searchParams.get("tab");
 	const activeTab: DetailTab = resolveDetailTab(tabParam);
@@ -612,6 +619,23 @@ export default function BusinessDetailClient({
 						</p>
 					</div>
 					<div className="flex shrink-0 flex-wrap items-center gap-2">
+						{user?.id ? (
+							<Button
+								type="button"
+								variant="outline"
+								size="sm"
+								onClick={() =>
+									setResetPasswordTarget({
+										userName: ownerDisplay,
+										phoneNumber: user.phone_number,
+										email: user.email,
+										contextLabel: business.name,
+									})
+								}
+							>
+								Reset password
+							</Button>
+						) : null}
 						{businessSmsEnabled ? (
 							<Button
 								type="button"
@@ -1104,6 +1128,18 @@ export default function BusinessDetailClient({
 					phoneNumber={user?.phone_number}
 				/>
 			) : null}
+			{resetPasswordTarget ? (
+				<ResetUserPasswordDialog
+					open={Boolean(resetPasswordTarget)}
+					onOpenChange={(nextOpen) => {
+						if (!nextOpen) setResetPasswordTarget(null);
+					}}
+					userName={resetPasswordTarget.userName}
+					phoneNumber={resetPasswordTarget.phoneNumber}
+					email={resetPasswordTarget.email}
+					contextLabel={resetPasswordTarget.contextLabel}
+				/>
+			) : null}
 
 			<Tabs value={activeTab} onValueChange={onTabChange} className="gap-3">
 				<TabsList className="h-auto w-full flex-wrap justify-start gap-1 rounded-lg border border-border bg-muted/40 p-1">
@@ -1322,30 +1358,54 @@ export default function BusinessDetailClient({
 															</TableCell>
 															{canMutateOwners ? (
 																<TableCell className="text-right">
-																	<button
-																		type="button"
-																		className={cn(
-																			buttonVariants({
-																				variant: "outline",
-																				size: "sm",
-																			}),
-																		)}
-																		disabled={
-																			updateEmployeeRoleState.isLoading ||
-																			!selectedRoleId ||
-																			selectedRoleId === emp.role_id
-																		}
-																		onClick={async () => {
-																			if (!selectedRoleId) return;
-																			await updateEmployeeRole({
-																				businessId,
-																				employeeId: emp.id,
-																				body: { role_id: selectedRoleId },
-																			}).unwrap();
-																		}}
-																	>
-																		Save
-																	</button>
+																	<div className="flex items-center justify-end gap-2">
+																		<button
+																			type="button"
+																			className={cn(
+																				buttonVariants({
+																					variant: "outline",
+																					size: "sm",
+																				}),
+																			)}
+																			disabled={
+																				updateEmployeeRoleState.isLoading ||
+																				!selectedRoleId ||
+																				selectedRoleId === emp.role_id
+																			}
+																			onClick={async () => {
+																				if (!selectedRoleId) return;
+																				await updateEmployeeRole({
+																					businessId,
+																					employeeId: emp.id,
+																					body: { role_id: selectedRoleId },
+																				}).unwrap();
+																			}}
+																		>
+																			Save
+																		</button>
+																		<button
+																			type="button"
+																			className={cn(
+																				buttonVariants({
+																					variant: "ghost",
+																					size: "sm",
+																				}),
+																			)}
+																			onClick={() =>
+																				setResetPasswordTarget({
+																																										userName:
+																						emp.user?.username ??
+																						emp.user?.phone_number ??
+																						emp.user_id,
+																					phoneNumber: emp.user?.phone_number ?? null,
+																					email: emp.user?.email ?? null,
+																					contextLabel: business.name,
+																				})
+																			}
+																		>
+																			Reset password
+																		</button>
+																	</div>
 																</TableCell>
 															) : null}
 														</TableRow>

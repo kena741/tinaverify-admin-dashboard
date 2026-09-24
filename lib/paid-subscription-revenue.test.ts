@@ -4,7 +4,7 @@ import test from "node:test";
 import {
 	paidSubscriptionAmount,
 	sumPaidSubscriptionRevenueInRange,
-} from "./analytics.ts";
+} from "./analytics";
 
 const REF = "TX-12345";
 

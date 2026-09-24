@@ -9,6 +9,7 @@ import {
 import type {
 	BranchOutput,
 	BusinessOutput,
+	ForgotPasswordRequest,
 	LoginRequest,
 	PaginatedUserResponse,
 	UserAuthResponse,
@@ -42,6 +43,18 @@ export const authApi = createApi({
 					},
 				};
 			},
+		}),
+
+		forgotPassword: builder.mutation<unknown, { body: ForgotPasswordRequest }>({
+			query: ({ body }) => ({
+				url: "/api/v1/users/forgot-password",
+				method: "POST",
+				body,
+				headers: {
+					"Content-Type": "application/json",
+					...bearerHeaders(),
+				},
+			}),
 		}),
 
 		readMe: builder.query<UserOutput, void>({
@@ -140,6 +153,7 @@ export const authApi = createApi({
 
 export const {
 	useReadMeQuery,
+	useForgotPasswordMutation,
 	useListMyBusinessesQuery,
 	useGetMyBranchQuery,
 	useListUsersQuery,
