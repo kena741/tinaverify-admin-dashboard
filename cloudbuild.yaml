@@ -1,3 +1,9 @@
+substitutions:
+  _IMAGE: europe-west3-docker.pkg.dev/zulu-dine-492112/zuludine-frontend/zuludine-fe:latest
+  _NEXT_PUBLIC_BACKEND_BASE_URL: https://zuludine-backend-prod-562272610794.europe-west3.run.app
+  _NEXT_PUBLIC_ADMIN_GRANT_CREDITS: "true"
+  _NEXT_PUBLIC_ADMIN_BUSINESS_SMS: "true"
+
 steps:
   - name: gcr.io/cloud-builders/docker
     args:
