@@ -5,7 +5,7 @@ substitutions:
   _IMAGE: europe-west3-docker.pkg.dev/zulu-dine-492112/zuludine-frontend/zuludine-fe:latest
   _SERVICE: tinaverify-admin
   _REGION: europe-west4
-  _NEXT_PUBLIC_BACKEND_BASE_URL: https://zuludine-backend-prod-562272610794.europe-west3.run.app
+  _NEXT_PUBLIC_BACKEND_BASE_URL: https://api.tinaverify.com
   _NEXT_PUBLIC_ADMIN_GRANT_CREDITS: "true"
   _NEXT_PUBLIC_ADMIN_BUSINESS_SMS: "true"
 
