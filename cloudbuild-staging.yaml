@@ -6,6 +6,8 @@ substitutions:
   _SERVICE: tinaverify-admin-staging
   _REGION: europe-west4
   _NEXT_PUBLIC_BACKEND_BASE_URL: https://zuludine-backend-staging-pvx5z7p4ba-ey.a.run.app
+  _NEXT_PUBLIC_ADMIN_GRANT_CREDITS: "true"
+  _NEXT_PUBLIC_ADMIN_BUSINESS_SMS: "true"
 
 steps:
   - name: gcr.io/cloud-builders/docker
