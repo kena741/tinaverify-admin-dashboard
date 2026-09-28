@@ -37,24 +37,24 @@ const financeLinks = [
 		name: "Manual Subscrption Requests",
 		href: "/admin/finance/manual-subscription-requests",
 	},
-	{ name: "Tinaverify bank accounts", href: "/admin/finance/system-banks" },
-	{ name: "Payment settings", href: "/admin/finance/payment-settings" },
+	{ name: "Tinaverify Bank Accounts", href: "/admin/finance/system-banks" },
+	{ name: "Payment Settings", href: "/admin/finance/payment-settings" },
 ] as const;
 
 const systemFlatLinks = [
 	{
-		name: "Staff management",
+		name: "Staff Management",
 		href: "/admin/platform-staff",
 		icon: UserCogIcon,
 	},
 	{
-		name: "Audit logs",
+		name: "Audit Logs",
 		href: "/admin/audit-logs",
 		icon: ScrollTextIcon,
 	},
-	{ name: "Global settings", href: "/admin/settings", icon: SettingsIcon },
+	{ name: "Global Settings", href: "/admin/settings", icon: SettingsIcon },
 	{
-		name: "Contact messages",
+		name: "Contact Messages",
 		href: "/admin/settings/contact-messages",
 		icon: MessageSquareIcon,
 	},

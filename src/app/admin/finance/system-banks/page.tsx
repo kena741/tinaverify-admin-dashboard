@@ -227,7 +227,7 @@ export default function TinaverifySystemBanksPage() {
 			</AlertDialog>
 
 			<PageHeader
-				title="Tinaverify bank accounts"
+				title="Tinaverify Bank Accounts"
 				description="Manage the banks users can transfer money to for subscription requests."
 			/>
 
