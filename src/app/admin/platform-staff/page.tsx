@@ -502,7 +502,7 @@ export default function PlatformStaffPage() {
 					<p className="admin-eyebrow">Platform access</p>
 					<div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
 						<div className="min-w-0">
-							<h1 className="admin-page-title">Staff management</h1>
+							<h1 className="admin-page-title">Staff Management</h1>
 							<p className="mt-1 max-w-xl text-sm leading-relaxed text-muted-foreground">
 								Who can operate Tina Verify — assign people, then shape what
 								their role is allowed to do.

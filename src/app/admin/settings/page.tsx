@@ -366,7 +366,7 @@ export default function GlobalSettingsPage() {
 	return (
 		<div className="flex flex-col gap-6">
 			<PageHeader
-				title="Global settings"
+				title="Global Settings"
 				description="Policies, contact info, subscription plans, and roles & permissions."
 			/>
 

@@ -483,7 +483,7 @@ export default function AuditLogsPage() {
 	return (
 		<div className="flex flex-col gap-6">
 			<PageHeader
-				title="Audit logs"
+				title="Audit Logs"
 				description="Who changed what, and when. Superuser-only trail of admin actions."
 			/>
 
