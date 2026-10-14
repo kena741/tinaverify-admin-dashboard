@@ -78,7 +78,7 @@ export default function PaymentSettingsPage() {
 	return (
 		<div className="flex flex-col gap-6">
 			<PageHeader
-				title="Payment settings"
+				title="Payment Settings"
 				description="ETB → credits exchange rate. Payment providers are coming soon."
 			/>
 
