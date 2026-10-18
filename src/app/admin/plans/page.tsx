@@ -110,6 +110,13 @@ function formatMoney(price: string) {
 	return n.toLocaleString(undefined, { maximumFractionDigits: 2 });
 }
 
+function getPlanCreditsLabel(
+	plan: Pick<SubscriptionPlanOutput, "credits" | "is_unlimited">,
+) {
+	if (plan.is_unlimited) return "Unlimited";
+	return plan.credits?.toLocaleString() ?? "—";
+}
+
 function parsePriceInput(raw: string): number | string {
 	const trimmed = raw.trim();
 	if (trimmed === "") return "";
@@ -158,18 +165,21 @@ export function PlansAdminPanel({ embedded = false }: { embedded?: boolean }) {
 	const [archivePlan, { isLoading: archiving }] = useArchiveSubscriptionPlanMutation();
 
 	const [createName, setCreateName] = useState("");
-	const [createMonthlyLimit, setCreateMonthlyLimit] = useState("");
+	const [createCredits, setCreateCredits] = useState("");
+	const [createIsUnlimited, setCreateIsUnlimited] = useState(false);
 	const [createPrice, setCreatePrice] = useState("");
 	const [createDurationDays, setCreateDurationDays] = useState("30");
 
 	const [editName, setEditName] = useState("");
-	const [editMonthlyLimit, setEditMonthlyLimit] = useState("");
+	const [editCredits, setEditCredits] = useState("");
+	const [editIsUnlimited, setEditIsUnlimited] = useState(false);
 	const [editPrice, setEditPrice] = useState("");
 	const [editDurationDays, setEditDurationDays] = useState("");
 
 	const resetCreateForm = useCallback(() => {
 		setCreateName("");
-		setCreateMonthlyLimit("");
+		setCreateCredits("");
+		setCreateIsUnlimited(false);
 		setCreatePrice("");
 		setCreateDurationDays("30");
 	}, []);
@@ -178,7 +188,8 @@ export function PlansAdminPanel({ embedded = false }: { embedded?: boolean }) {
 		setBanner(null);
 		setEditPlanId(plan.id);
 		setEditName(plan.name);
-		setEditMonthlyLimit(String(plan.monthly_transaction_limit));
+		setEditCredits(plan.credits == null ? "" : String(plan.credits));
+		setEditIsUnlimited(plan.is_unlimited ?? false);
 		setEditPrice(String(plan.price));
 		setEditDurationDays(String(plan.duration_days));
 		setEditOpen(true);
@@ -193,7 +204,7 @@ export function PlansAdminPanel({ embedded = false }: { embedded?: boolean }) {
 		e.preventDefault();
 		setBanner(null);
 		const name = createName.trim();
-		const monthly = Number.parseInt(createMonthlyLimit, 10);
+		const credits = createCredits.trim() === "" ? null : Number(createCredits);
 		const priceVal = parsePriceInput(createPrice);
 		if (!name) {
 			setBanner({
@@ -203,11 +214,15 @@ export function PlansAdminPanel({ embedded = false }: { embedded?: boolean }) {
 			});
 			return;
 		}
-		if (!Number.isFinite(monthly) || monthly < 0) {
+		if (
+			!createIsUnlimited &&
+			credits !== null &&
+			(!Number.isSafeInteger(credits) || credits < 0)
+		) {
 			setBanner({
 				variant: "destructive",
 				title: "Validation",
-				message: "Enter a valid monthly transaction limit (0 or greater).",
+				message: "Enter a whole-number credit limit (0 or greater), or choose unlimited.",
 			});
 			return;
 		}
@@ -233,7 +248,8 @@ export function PlansAdminPanel({ embedded = false }: { embedded?: boolean }) {
 			await createPlan({
 				body: {
 					name,
-					monthly_transaction_limit: monthly,
+					credits: createIsUnlimited ? null : credits,
+					is_unlimited: createIsUnlimited,
 					price: priceVal,
 					...(durationParsed !== undefined ? { duration_days: durationParsed } : {}),
 				},
@@ -258,7 +274,7 @@ export function PlansAdminPanel({ embedded = false }: { embedded?: boolean }) {
 		if (!editPlanId) return;
 		setBanner(null);
 		const name = editName.trim();
-		const monthly = Number.parseInt(editMonthlyLimit, 10);
+		const credits = editCredits.trim() === "" ? null : Number(editCredits);
 		const priceVal = parsePriceInput(editPrice);
 		const durationRaw = editDurationDays.trim();
 		const durationParsed = durationRaw === "" ? null : Number.parseInt(durationRaw, 10);
@@ -271,11 +287,15 @@ export function PlansAdminPanel({ embedded = false }: { embedded?: boolean }) {
 			});
 			return;
 		}
-		if (!Number.isFinite(monthly) || monthly < 0) {
+		if (
+			!editIsUnlimited &&
+			credits !== null &&
+			(!Number.isSafeInteger(credits) || credits < 0)
+		) {
 			setBanner({
 				variant: "destructive",
 				title: "Validation",
-				message: "Enter a valid monthly transaction limit.",
+				message: "Enter a whole-number credit limit (0 or greater), or choose unlimited.",
 			});
 			return;
 		}
@@ -301,7 +321,8 @@ export function PlansAdminPanel({ embedded = false }: { embedded?: boolean }) {
 				subscriptionPlanId: editPlanId,
 				body: {
 					name,
-					monthly_transaction_limit: monthly,
+					credits: editIsUnlimited ? null : credits,
+					is_unlimited: editIsUnlimited,
 					price: priceVal,
 					duration_days:
 						durationParsed === null
@@ -441,9 +462,7 @@ export function PlansAdminPanel({ embedded = false }: { embedded?: boolean }) {
 									<TableRow>
 										<TableHead className="min-w-48">Name</TableHead>
 										<TableHead className="text-right tabular-nums">Price</TableHead>
-										<TableHead className="text-right tabular-nums">
-											Monthly limit
-										</TableHead>
+										<TableHead className="text-right tabular-nums">Credits</TableHead>
 										<TableHead className="text-right tabular-nums">Duration</TableHead>
 										<TableHead>Status</TableHead>
 										<TableHead className="w-12 text-right">
@@ -461,7 +480,7 @@ export function PlansAdminPanel({ embedded = false }: { embedded?: boolean }) {
 												{formatMoney(plan.price)}
 											</TableCell>
 											<TableCell className="text-right tabular-nums">
-												{plan.monthly_transaction_limit.toLocaleString()}
+												{getPlanCreditsLabel(plan)}
 											</TableCell>
 											<TableCell className="text-right tabular-nums text-muted-foreground">
 												{plan.duration_days} days
@@ -576,9 +595,9 @@ export function PlansAdminPanel({ embedded = false }: { embedded?: boolean }) {
 										</dd>
 									</div>
 									<div>
-										<dt className="text-muted-foreground">Monthly limit</dt>
+										<dt className="text-muted-foreground">Credits</dt>
 										<dd className="tabular-nums font-medium">
-											{detailQuery.data.monthly_transaction_limit.toLocaleString()}
+											{getPlanCreditsLabel(detailQuery.data)}
 										</dd>
 									</div>
 									<div>
@@ -634,19 +653,29 @@ export function PlansAdminPanel({ embedded = false }: { embedded?: boolean }) {
 								/>
 							</Field>
 							<Field>
-								<FieldLabel htmlFor="create-monthly">Monthly transaction limit</FieldLabel>
+								<FieldLabel htmlFor="create-credits">Credit limit</FieldLabel>
 								<Input
-									id="create-monthly"
-									name="monthly_transaction_limit"
+									id="create-credits"
+									name="credits"
 									type="text"
 									inputMode="numeric"
 									autoComplete="off"
 									spellCheck={false}
 									placeholder="e.g. 1000"
-									value={createMonthlyLimit}
-									onChange={(e) => setCreateMonthlyLimit(e.target.value)}
+									value={createCredits}
+									onChange={(e) => setCreateCredits(e.target.value)}
+									disabled={createIsUnlimited}
 								/>
-								<FieldDescription>Whole number; 0 means unlimited depending on policy.</FieldDescription>
+								<FieldDescription>Optional; enter a whole number or choose unlimited.</FieldDescription>
+							</Field>
+							<Field orientation="horizontal">
+								<Checkbox
+									id="create-unlimited"
+									name="is_unlimited"
+									checked={createIsUnlimited}
+									onCheckedChange={(checked) => setCreateIsUnlimited(checked === true)}
+								/>
+								<FieldLabel htmlFor="create-unlimited">Unlimited credits</FieldLabel>
 							</Field>
 							<Field>
 								<FieldLabel htmlFor="create-price">Price</FieldLabel>
@@ -737,17 +766,27 @@ export function PlansAdminPanel({ embedded = false }: { embedded?: boolean }) {
 									/>
 								</Field>
 								<Field>
-									<FieldLabel htmlFor="edit-monthly">Monthly transaction limit</FieldLabel>
+									<FieldLabel htmlFor="edit-credits">Credit limit</FieldLabel>
 									<Input
-										id="edit-monthly"
-										name="monthly_transaction_limit"
+										id="edit-credits"
+										name="credits"
 										type="text"
 										inputMode="numeric"
 										autoComplete="off"
 										spellCheck={false}
-										value={editMonthlyLimit}
-										onChange={(e) => setEditMonthlyLimit(e.target.value)}
+										value={editCredits}
+										onChange={(e) => setEditCredits(e.target.value)}
+										disabled={editIsUnlimited}
 									/>
+								</Field>
+								<Field orientation="horizontal">
+									<Checkbox
+										id="edit-unlimited"
+										name="is_unlimited"
+										checked={editIsUnlimited}
+										onCheckedChange={(checked) => setEditIsUnlimited(checked === true)}
+									/>
+									<FieldLabel htmlFor="edit-unlimited">Unlimited credits</FieldLabel>
 								</Field>
 								<Field>
 									<FieldLabel htmlFor="edit-price">Price</FieldLabel>
