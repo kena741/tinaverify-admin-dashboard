@@ -15,7 +15,11 @@ import {
 } from "../../../services/subscription/subscriptionApi";
 import { useAdminAssignSubscriptionMutation } from "../../../services/admin/adminApi";
 import { useListSubscriptionPlansQuery } from "../../../services/subscription-plan/subscriptionPlanApi";
-import type { BusinessOutput, SubscriptionOutput } from "../../../services/types";
+import type {
+	BusinessOutput,
+	SubscriptionOutput,
+	SubscriptionPlanOutput,
+} from "../../../services/types";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -56,6 +60,13 @@ function moneyLabel(price: string) {
 	const n = Number(price);
 	if (!Number.isFinite(n)) return price;
 	return n.toLocaleString(undefined, { maximumFractionDigits: 2 });
+}
+
+function planCreditsLabel(
+	plan: Pick<SubscriptionPlanOutput, "credits" | "is_unlimited">,
+) {
+	if (plan.is_unlimited) return "Unlimited";
+	return plan.credits?.toLocaleString() ?? "—";
 }
 
 /** Safe display for usage counters — API may omit fields or send strings. */
@@ -180,6 +191,7 @@ export default function SubscriptionPage() {
 		for (const p of plans) m.set(p.id, p);
 		return m;
 	}, [plans]);
+	const selectedStandardPlan = plansById.get(standardPlanId);
 
 	const selectedBusinessName =
 		selectedBusiness?.name?.trim() || "this business";
@@ -616,10 +628,7 @@ export default function SubscriptionPage() {
 									</Select>
 									<FieldDescription>
 										{standardPlanId
-											? `You will pay ${moneyLabel(plansById.get(standardPlanId)?.price ?? "0")} at checkout. Monthly transaction limit: ${
-													plansById.get(standardPlanId)
-														?.monthly_transaction_limit ?? "—"
-												}`
+											? `You will pay ${moneyLabel(selectedStandardPlan?.price ?? "0")} at checkout. Credit limit: ${selectedStandardPlan ? planCreditsLabel(selectedStandardPlan) : "—"}`
 											: "Pick the tier to bill at its catalog price."}
 									</FieldDescription>
 								</Field>
@@ -826,6 +835,7 @@ export default function SubscriptionPage() {
 													.map((p) => (
 														<SelectItem key={p.id} value={p.id}>
 															{p.name} • {moneyLabel(p.price)} •{" "}
+															{planCreditsLabel(p)} credits •{" "}
 															{p.duration_days} days
 														</SelectItem>
 													))}

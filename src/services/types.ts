@@ -399,7 +399,8 @@ export type PlatformStaffOutput = {
 export type SubscriptionPlanOutput = {
 	id: UUID;
 	name: string;
-	monthly_transaction_limit: number;
+	credits?: number | null;
+	is_unlimited?: boolean;
 	price: string;
 	duration_days: number;
 	is_archived: boolean;
@@ -408,7 +409,8 @@ export type SubscriptionPlanOutput = {
 /** OpenAPI `SubscriptionPlanCreateSchema` — body for `POST /api/v1/subscription-plan` */
 export type SubscriptionPlanCreate = {
 	name: string;
-	monthly_transaction_limit: number;
+	credits?: number | null;
+	is_unlimited?: boolean;
 	price: number | string;
 	duration_days?: number;
 };
@@ -416,7 +418,8 @@ export type SubscriptionPlanCreate = {
 /** OpenAPI `SubscriptionPlanUpdateSchema` — body for `PATCH /api/v1/subscription-plan/{subscription_plan_id}` */
 export type SubscriptionPlanUpdate = {
 	name?: string | null;
-	monthly_transaction_limit?: number | null;
+	credits?: number | null;
+	is_unlimited?: boolean | null;
 	price?: number | string | null;
 	duration_days?: number | null;
 };
@@ -572,10 +575,12 @@ export type SubscriptionPlanAuditDetails = {
 	new_name?: string | null;
 	old_price?: number | null;
 	new_price?: number | null;
-	old_monthly_transaction_limit?: number | null;
-	new_monthly_transaction_limit?: number | null;
+	old_credits?: number | null;
+	new_credits?: number | null;
 	old_duration_days?: number | null;
 	new_duration_days?: number | null;
+	old_is_unlimited?: boolean | null;
+	new_is_unlimited?: boolean | null;
 };
 
 export type UpdateSuperuserAuditDetails = {

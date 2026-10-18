@@ -12367,7 +12367,7 @@
 						],
 						"title": "New Price"
 					},
-					"old_monthly_transaction_limit": {
+					"old_credits": {
 						"anyOf": [
 							{
 								"type": "integer"
@@ -12376,9 +12376,9 @@
 								"type": "null"
 							}
 						],
-						"title": "Old Monthly Transaction Limit"
+						"title": "Old Credits"
 					},
-					"new_monthly_transaction_limit": {
+					"new_credits": {
 						"anyOf": [
 							{
 								"type": "integer"
@@ -12387,7 +12387,7 @@
 								"type": "null"
 							}
 						],
-						"title": "New Monthly Transaction Limit"
+						"title": "New Credits"
 					},
 					"old_duration_days": {
 						"anyOf": [
@@ -12410,6 +12410,28 @@
 							}
 						],
 						"title": "New Duration Days"
+					},
+					"old_is_unlimited": {
+						"anyOf": [
+							{
+								"type": "boolean"
+							},
+							{
+								"type": "null"
+							}
+						],
+						"title": "Old Is Unlimited"
+					},
+					"new_is_unlimited": {
+						"anyOf": [
+							{
+								"type": "boolean"
+							},
+							{
+								"type": "null"
+							}
+						],
+						"title": "New Is Unlimited"
 					}
 				},
 				"type": "object",
@@ -12421,9 +12443,21 @@
 						"type": "string",
 						"title": "Name"
 					},
-					"monthly_transaction_limit": {
-						"type": "integer",
-						"title": "Monthly Transaction Limit"
+					"credits": {
+						"anyOf": [
+							{
+								"type": "integer"
+							},
+							{
+								"type": "null"
+							}
+						],
+						"title": "Credits"
+					},
+					"is_unlimited": {
+						"type": "boolean",
+						"title": "Is Unlimited",
+						"default": false
 					},
 					"price": {
 						"anyOf": [
@@ -12444,7 +12478,7 @@
 					}
 				},
 				"type": "object",
-				"required": ["name", "monthly_transaction_limit", "price"],
+				"required": ["name", "price"],
 				"title": "SubscriptionPlanCreateSchema"
 			},
 			"SubscriptionPlanOutputSchema": {
@@ -12458,9 +12492,21 @@
 						"type": "string",
 						"title": "Name"
 					},
-					"monthly_transaction_limit": {
-						"type": "integer",
-						"title": "Monthly Transaction Limit"
+					"credits": {
+						"anyOf": [
+							{
+								"type": "integer"
+							},
+							{
+								"type": "null"
+							}
+						],
+						"title": "Credits"
+					},
+					"is_unlimited": {
+						"type": "boolean",
+						"title": "Is Unlimited",
+						"default": false
 					},
 					"price": {
 						"type": "string",
@@ -12480,7 +12526,6 @@
 				"required": [
 					"id",
 					"name",
-					"monthly_transaction_limit",
 					"price",
 					"duration_days",
 					"is_archived"
@@ -12500,7 +12545,7 @@
 						],
 						"title": "Name"
 					},
-					"monthly_transaction_limit": {
+					"credits": {
 						"anyOf": [
 							{
 								"type": "integer"
@@ -12509,7 +12554,18 @@
 								"type": "null"
 							}
 						],
-						"title": "Monthly Transaction Limit"
+						"title": "Credits"
+					},
+					"is_unlimited": {
+						"anyOf": [
+							{
+								"type": "boolean"
+							},
+							{
+								"type": "null"
+							}
+						],
+						"title": "Is Unlimited"
 					},
 					"price": {
 						"anyOf": [
