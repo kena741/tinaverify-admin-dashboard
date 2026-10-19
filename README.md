@@ -43,7 +43,19 @@ By default, Supabase requires email confirmation for new user signups. To disabl
 4. Or keep it enabled and users will receive confirmation emails
 
 If email confirmation is enabled:
+
 - Users must click the confirmation link in their email before they can log in
 - The confirmation email is sent automatically after signup
 - Users will see a helpful error message if they try to login before confirming
+
 # tinaverify-admin
+
+## Cloud Run Build Configuration
+
+The deploy workflow reads build-time values from GCP Secret Manager. Sync the local, git-ignored env files before deploying:
+
+```bash
+GCP_PROJECT_ID=zulu-dine-492112 bash scripts/sync-env-to-secret-manager.sh
+```
+
+The script maps `.env.development` to the `development` Secret Manager values (used by staging deployments) and `.env.production` to `production`. GitHub Actions uses the latest versions of `NEXT_PUBLIC_BACKEND_BASE_URL_<environment>`, `NEXT_PUBLIC_ADMIN_GRANT_CREDITS_<environment>`, and `NEXT_PUBLIC_ADMIN_BUSINESS_SMS_<environment>`. Grant the GitHub Actions service account `roles/secretmanager.secretAccessor`; the account running the sync script needs permission to create secrets and add versions.
