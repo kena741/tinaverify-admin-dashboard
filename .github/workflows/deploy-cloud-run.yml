@@ -29,8 +29,8 @@ jobs:
     environment: ${{ github.event_name == 'workflow_dispatch' && inputs.target || github.ref_name }}
     env:
       TARGET: ${{ github.event_name == 'workflow_dispatch' && inputs.target || github.ref_name }}
-      SECRET_ENVIRONMENT: ${{ (github.event_name == 'workflow_dispatch' && inputs.target || github.ref_name) == 'production' && 'production' || 'development' }}
       GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID || 'zulu-dine-492112' }}
+      NEXT_PUBLIC_BACKEND_BASE_URL: ${{ secrets.NEXT_PUBLIC_BACKEND_BASE_URL }}
     steps:
       - name: Validate configuration
         env:
@@ -38,6 +38,10 @@ jobs:
         run: |
           if [ -z "$GCP_SA_KEY" ]; then
             echo "Missing secret GCP_SA_KEY (JSON key for github-actions-tinaverify@zulu-dine-492112.iam.gserviceaccount.com)"
+            exit 1
+          fi
+          if [ -z "$NEXT_PUBLIC_BACKEND_BASE_URL" ]; then
+            echo "Missing environment secret NEXT_PUBLIC_BACKEND_BASE_URL for ${TARGET}"
             exit 1
           fi
 
@@ -50,38 +54,6 @@ jobs:
           project_id: ${{ env.GCP_PROJECT_ID }}
 
       - uses: google-github-actions/setup-gcloud@v2
-
-      - name: Load build values from Secret Manager
-        run: |
-          set -euo pipefail
-
-          read_secret() {
-            local secret_name="$1"
-            if ! gcloud secrets describe "$secret_name" --project="${GCP_PROJECT_ID}" >/dev/null 2>&1; then
-              echo "Missing Secret Manager secret ${secret_name} in project ${GCP_PROJECT_ID}"
-              exit 1
-            fi
-            gcloud secrets versions access latest \
-              --project="${GCP_PROJECT_ID}" \
-              --secret="${secret_name}"
-          }
-
-          NEXT_PUBLIC_BACKEND_BASE_URL="$(read_secret "NEXT_PUBLIC_BACKEND_BASE_URL_${SECRET_ENVIRONMENT}")"
-          NEXT_PUBLIC_ADMIN_GRANT_CREDITS="$(read_secret "NEXT_PUBLIC_ADMIN_GRANT_CREDITS_${SECRET_ENVIRONMENT}")"
-          NEXT_PUBLIC_ADMIN_BUSINESS_SMS="$(read_secret "NEXT_PUBLIC_ADMIN_BUSINESS_SMS_${SECRET_ENVIRONMENT}")"
-
-          if [ -z "$NEXT_PUBLIC_BACKEND_BASE_URL" ] || \
-             [ -z "$NEXT_PUBLIC_ADMIN_GRANT_CREDITS" ] || \
-             [ -z "$NEXT_PUBLIC_ADMIN_BUSINESS_SMS" ]; then
-            echo "One or more build values are empty in Secret Manager for ${TARGET}"
-            exit 1
-          fi
-
-          {
-            printf 'NEXT_PUBLIC_BACKEND_BASE_URL=%s\n' "$NEXT_PUBLIC_BACKEND_BASE_URL"
-            printf 'NEXT_PUBLIC_ADMIN_GRANT_CREDITS=%s\n' "$NEXT_PUBLIC_ADMIN_GRANT_CREDITS"
-            printf 'NEXT_PUBLIC_ADMIN_BUSINESS_SMS=%s\n' "$NEXT_PUBLIC_ADMIN_BUSINESS_SMS"
-          } >> "$GITHUB_ENV"
 
       - name: Build and deploy via Cloud Build
         run: |
@@ -100,4 +72,4 @@ jobs:
           gcloud builds submit \
             --project="${GCP_PROJECT_ID}" \
             --config="${CONFIG}" \
-            --substitutions="_IMAGE=${IMAGE},_SERVICE=${SERVICE},_REGION=europe-west4,_NEXT_PUBLIC_BACKEND_BASE_URL=${NEXT_PUBLIC_BACKEND_BASE_URL},_NEXT_PUBLIC_ADMIN_GRANT_CREDITS=${NEXT_PUBLIC_ADMIN_GRANT_CREDITS},_NEXT_PUBLIC_ADMIN_BUSINESS_SMS=${NEXT_PUBLIC_ADMIN_BUSINESS_SMS}"
+            --substitutions="_IMAGE=${IMAGE},_SERVICE=${SERVICE},_REGION=europe-west4,_NEXT_PUBLIC_BACKEND_BASE_URL=${NEXT_PUBLIC_BACKEND_BASE_URL}"
