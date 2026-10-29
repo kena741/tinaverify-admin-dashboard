@@ -9,7 +9,7 @@ Use this skill when the backend API changes or when initializing new API feature
 
 ### 1. Fetching the Specification
 Whenever I ask to "sync the API" or "update types," perform the following:
-* **Action:** Run the `fetch-openai-json.sh` script.
+* **Action:** Run `npm run fetch-openapi` to fetch staging by default, or `npm run fetch-openapi -- production` to fetch the production specification.
 * **Output:** The script will update the `@/src/services/openapi.json` file.
 
 ### 2. Type Generation
