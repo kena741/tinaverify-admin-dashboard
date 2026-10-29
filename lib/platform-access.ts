@@ -27,6 +27,10 @@ const ROUTE_RULES: { prefix: string; anyOf: string[] }[] = [
 		prefix: "/admin/services/coupons",
 		anyOf: ["platform:notifications:view", "platform:referral:view"],
 	},
+	{
+		prefix: "/admin/coupons",
+		anyOf: ["platform:notifications:view", "platform:referral:view"],
+	},
 	{ prefix: "/admin/referrals", anyOf: ["platform:referral:view"] },
 	{
 		prefix: "/admin/owners",
