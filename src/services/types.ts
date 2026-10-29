@@ -836,6 +836,71 @@ export type CommissionRateUpdateRequest = {
 };
 
 // -----------------------------
+// Coupons
+// -----------------------------
+
+export type CouponDiscountType = "percentage" | "fixed";
+
+/** OpenAPI `CouponCreateSchema` — body for `POST /api/v1/admin/coupons` */
+export type CouponCreateRequest = {
+	code: string;
+	description?: string | null;
+	discount_type: CouponDiscountType;
+	discount_value: number | string;
+	max_discount_amount?: number | string | null;
+	min_purchase_amount?: number | string;
+	applicable_plan_ids?: UUID[] | null;
+	max_uses?: number | null;
+	max_uses_per_business?: number;
+	valid_from?: string | null;
+	valid_until?: string | null;
+	is_active?: boolean;
+};
+
+/** OpenAPI `CouponUpdateSchema` — body for `PATCH /api/v1/admin/coupons/{coupon_id}` */
+export type CouponUpdateRequest = {
+	description?: string | null;
+	discount_type?: CouponDiscountType | null;
+	discount_value?: number | string | null;
+	max_discount_amount?: number | string | null;
+	min_purchase_amount?: number | string | null;
+	applicable_plan_ids?: UUID[] | null;
+	max_uses?: number | null;
+	max_uses_per_business?: number | null;
+	valid_from?: string | null;
+	valid_until?: string | null;
+	is_active?: boolean | null;
+};
+
+/** OpenAPI `CouponOutputSchema` */
+export type CouponOutput = {
+	id: UUID;
+	code: string;
+	description?: string | null;
+	discount_type: CouponDiscountType;
+	discount_value: string;
+	max_discount_amount?: string | null;
+	min_purchase_amount: string;
+	applicable_plan_ids?: UUID[] | null;
+	max_uses?: number | null;
+	used_count: number;
+	max_uses_per_business: number;
+	valid_from?: string | null;
+	valid_until?: string | null;
+	is_active: boolean;
+	created_at: string;
+	updated_at: string;
+};
+
+/** OpenAPI `PaginatedCouponResponse` — `GET /api/v1/admin/coupons` */
+export type PaginatedCouponResponse = {
+	items: CouponOutput[];
+	total_count: number;
+	page_number: number;
+	limit: number;
+};
+
+// -----------------------------
 // SMS
 // -----------------------------
 

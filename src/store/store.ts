@@ -16,6 +16,7 @@ import { globalSettingsApi } from "../services/global-settings/globalSettingsApi
 import { contactMessagesApi } from "../services/contact-messages/contactMessagesApi";
 import { platformApi } from "../services/platform/platformApi";
 import { adminApi } from "../services/admin/adminApi";
+import { couponsApi } from "../services/coupons/couponsApi";
 
 // Combine all reducers
 const appReducer = combineReducers({
@@ -26,6 +27,7 @@ const appReducer = combineReducers({
 	[roleApi.reducerPath]: roleApi.reducer,
 	[platformApi.reducerPath]: platformApi.reducer,
 	[adminApi.reducerPath]: adminApi.reducer,
+	[couponsApi.reducerPath]: couponsApi.reducer,
 	[subscriptionApi.reducerPath]: subscriptionApi.reducer,
 	[subscriptionPlanApi.reducerPath]: subscriptionPlanApi.reducer,
 	[referralsApi.reducerPath]: referralsApi.reducer,
@@ -64,6 +66,7 @@ export const store = configureStore({
 			roleApi.middleware,
 			platformApi.middleware,
 			adminApi.middleware,
+			couponsApi.middleware,
 			subscriptionApi.middleware,
 			subscriptionPlanApi.middleware,
 			referralsApi.middleware,
