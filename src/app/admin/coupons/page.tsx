@@ -100,8 +100,6 @@ type CouponFormState = {
 	description: string;
 	discountType: CouponDiscountType;
 	discountValue: string;
-	maxDiscountAmount: string;
-	minPurchaseAmount: string;
 	applicablePlanIds: string[] | null;
 	maxUses: string;
 	maxUsesPerBusiness: string;
@@ -115,9 +113,7 @@ const emptyForm = (): CouponFormState => ({
 	description: "",
 	discountType: "percentage",
 	discountValue: "",
-	maxDiscountAmount: "",
-	minPurchaseAmount: "0",
-	applicablePlanIds: null,
+	applicablePlanIds: [],
 	maxUses: "",
 	maxUsesPerBusiness: "1",
 	validFrom: "",
@@ -219,8 +215,6 @@ function formFromCoupon(coupon: CouponOutput): CouponFormState {
 		description: coupon.description ?? "",
 		discountType: coupon.discount_type,
 		discountValue: coupon.discount_value,
-		maxDiscountAmount: coupon.max_discount_amount ?? "",
-		minPurchaseAmount: coupon.min_purchase_amount,
 		applicablePlanIds: coupon.applicable_plan_ids ?? null,
 		maxUses: coupon.max_uses?.toString() ?? "",
 		maxUsesPerBusiness: coupon.max_uses_per_business.toString(),
@@ -236,9 +230,7 @@ function buildCreateBody(form: CouponFormState): CouponCreateRequest {
 		description: form.description.trim() || null,
 		discount_type: form.discountType,
 		discount_value: form.discountValue,
-		max_discount_amount: form.maxDiscountAmount || null,
-		min_purchase_amount: form.minPurchaseAmount || "0",
-		applicable_plan_ids: form.applicablePlanIds,
+		applicable_plan_ids: form.applicablePlanIds ?? [],
 		max_uses: form.maxUses ? Number(form.maxUses) : null,
 		max_uses_per_business: Number(form.maxUsesPerBusiness),
 		valid_from: toIsoDateTime(form.validFrom),
@@ -252,8 +244,6 @@ function buildUpdateBody(form: CouponFormState): CouponUpdateRequest {
 		description: form.description.trim() || null,
 		discount_type: form.discountType,
 		discount_value: form.discountValue,
-		max_discount_amount: form.maxDiscountAmount || null,
-		min_purchase_amount: form.minPurchaseAmount || "0",
 		applicable_plan_ids: form.applicablePlanIds,
 		max_uses: form.maxUses ? Number(form.maxUses) : null,
 		max_uses_per_business: Number(form.maxUsesPerBusiness),
@@ -338,6 +328,14 @@ export default function CouponsPage() {
 	async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
 		event.preventDefault();
 		setFormError("");
+		if (
+			(formMode === "create" &&
+				(!form.applicablePlanIds || form.applicablePlanIds.length === 0)) ||
+			(formMode === "edit" && form.applicablePlanIds?.length === 0)
+		) {
+			setFormError("Select at least one subscription plan.");
+			return;
+		}
 		try {
 			if (formMode === "create") {
 				await createCoupon(buildCreateBody(form)).unwrap();
@@ -516,9 +514,6 @@ export default function CouponsPage() {
 															{coupon.discount_type === "percentage"
 																? `${coupon.discount_value}%`
 																: `${coupon.discount_value} ETB`}
-														</span>
-														<span className="text-xs text-muted-foreground">
-															Min. {coupon.min_purchase_amount} ETB
 														</span>
 													</div>
 												</TableCell>
@@ -892,38 +887,6 @@ function CouponFormFields({
 				/>
 			</Field>
 			<Field>
-				<FieldLabel htmlFor={`${prefix}-max-discount`}>
-					Maximum discount (ETB)
-				</FieldLabel>
-				<Input
-					id={`${prefix}-max-discount`}
-					type="number"
-					min="0.01"
-					step="any"
-					value={form.maxDiscountAmount}
-					onChange={(event) =>
-						update("maxDiscountAmount", event.target.value)
-					}
-					placeholder="No cap"
-				/>
-				<FieldDescription>
-					For percentage discounts, leave blank for no cap.
-				</FieldDescription>
-			</Field>
-			<Field>
-				<FieldLabel htmlFor={`${prefix}-minimum`}>
-					Minimum purchase (ETB)
-				</FieldLabel>
-				<Input
-					id={`${prefix}-minimum`}
-					type="number"
-					min="0"
-					step="any"
-					value={form.minPurchaseAmount}
-					onChange={(event) => update("minPurchaseAmount", event.target.value)}
-				/>
-			</Field>
-			<Field>
 				<FieldLabel htmlFor={`${prefix}-max-uses`}>Total usage limit</FieldLabel>
 				<Input
 					id={`${prefix}-max-uses`}
@@ -954,15 +917,24 @@ function CouponFormFields({
 			<FieldSet className="sm:col-span-2">
 				<FieldLegend variant="label">Applicable subscription plans</FieldLegend>
 				<FieldDescription>
-					Choose which plans can use this coupon.
+					{mode === "create"
+						? "Select at least one plan. All plans selects every available plan."
+						: "Choose the plans that can use this coupon, or select All plans."}
 				</FieldDescription>
 				<Field orientation="horizontal">
 					<Checkbox
 						id={`${prefix}-all-plans`}
 						checked={allPlansSelected}
-						onCheckedChange={(checked) =>
-							update("applicablePlanIds", checked === true ? null : [])
-						}
+						onCheckedChange={(checked) => {
+							if (checked !== true) {
+								update("applicablePlanIds", []);
+							} else {
+								update(
+									"applicablePlanIds",
+									mode === "edit" ? null : plans.map((plan) => plan.id),
+								);
+							}
+						}}
 						disabled={
 							plansLoading || Boolean(plansError) || plans.length === 0
 						}
@@ -995,7 +967,7 @@ function CouponFormFields({
 					<p className="text-sm text-muted-foreground">
 						No subscription plans are available.
 					</p>
-				) : form.applicablePlanIds !== null ? (
+				) : (
 					<FieldGroup className="max-h-48 overflow-y-auto rounded-md border p-3">
 						{plans.map((plan) => {
 							const checked =
@@ -1031,9 +1003,8 @@ function CouponFormFields({
 							);
 						})}
 					</FieldGroup>
-				) : null}
-				{form.applicablePlanIds !== null &&
-				form.applicablePlanIds.some(
+				)}
+				{form.applicablePlanIds?.some(
 					(id) => !plans.some((plan) => plan.id === id),
 				) ? (
 					<FieldDescription>
@@ -1090,10 +1061,8 @@ function CouponDetails({ coupon }: { coupon: CouponOutput }) {
 				? `${coupon.discount_value}%`
 				: `${coupon.discount_value} ETB`,
 		],
-		["Maximum discount", coupon.max_discount_amount ?? "No cap"],
-		["Minimum purchase", `${coupon.min_purchase_amount} ETB`],
 		[
-			"Applicable plans",
+				"Applicable plans",
 			coupon.applicable_plan_ids?.join(", ") || "All plans",
 		],
 		["Usage", `${coupon.used_count} / ${coupon.max_uses ?? "Unlimited"}`],
