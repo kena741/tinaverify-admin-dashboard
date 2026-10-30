@@ -8654,39 +8654,12 @@
 						"title": "Discount Value",
 						"description": "Percentage or fixed amount in ETB"
 					},
-					"max_discount_amount": {
-						"anyOf": [
-							{ "type": "number", "exclusiveMinimum": 0.0 },
-							{
-								"type": "string",
-								"pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
-							},
-							{ "type": "null" }
-						],
-						"title": "Max Discount Amount",
-						"description": "Cap for percentage discounts"
-					},
-					"min_purchase_amount": {
-						"anyOf": [
-							{ "type": "number", "minimum": 0.0 },
-							{
-								"type": "string",
-								"pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
-							}
-						],
-						"title": "Min Purchase Amount",
-						"description": "Minimum order/plan amount",
-						"default": "0.00"
-					},
 					"applicable_plan_ids": {
-						"anyOf": [
-							{
-								"items": { "type": "string", "format": "uuid" },
-								"type": "array"
-							},
-							{ "type": "null" }
-						],
-						"title": "Applicable Plan Ids"
+						"items": { "type": "string", "format": "uuid" },
+						"type": "array",
+						"minItems": 1,
+						"title": "Applicable Plan Ids",
+						"description": "List of plan IDs this coupon applies to"
 					},
 					"max_uses": {
 						"anyOf": [
@@ -8724,7 +8697,12 @@
 					}
 				},
 				"type": "object",
-				"required": ["code", "discount_type", "discount_value"],
+				"required": [
+					"code",
+					"discount_type",
+					"discount_value",
+					"applicable_plan_ids"
+				],
 				"title": "CouponCreateSchema"
 			},
 			"CouponDiscountType": {
@@ -8748,29 +8726,9 @@
 						"pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
 						"title": "Discount Value"
 					},
-					"max_discount_amount": {
-						"anyOf": [
-							{
-								"type": "string",
-								"pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
-							},
-							{ "type": "null" }
-						],
-						"title": "Max Discount Amount"
-					},
-					"min_purchase_amount": {
-						"type": "string",
-						"pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
-						"title": "Min Purchase Amount"
-					},
 					"applicable_plan_ids": {
-						"anyOf": [
-							{
-								"items": { "type": "string", "format": "uuid" },
-								"type": "array"
-							},
-							{ "type": "null" }
-						],
+						"items": { "type": "string", "format": "uuid" },
+						"type": "array",
 						"title": "Applicable Plan Ids"
 					},
 					"max_uses": {
@@ -8814,7 +8772,6 @@
 					"code",
 					"discount_type",
 					"discount_value",
-					"min_purchase_amount",
 					"used_count",
 					"max_uses_per_business",
 					"is_active",
@@ -8846,37 +8803,17 @@
 						],
 						"title": "Discount Value"
 					},
-					"max_discount_amount": {
-						"anyOf": [
-							{ "type": "number", "exclusiveMinimum": 0.0 },
-							{
-								"type": "string",
-								"pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
-							},
-							{ "type": "null" }
-						],
-						"title": "Max Discount Amount"
-					},
-					"min_purchase_amount": {
-						"anyOf": [
-							{ "type": "number", "minimum": 0.0 },
-							{
-								"type": "string",
-								"pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
-							},
-							{ "type": "null" }
-						],
-						"title": "Min Purchase Amount"
-					},
 					"applicable_plan_ids": {
 						"anyOf": [
 							{
 								"items": { "type": "string", "format": "uuid" },
-								"type": "array"
+								"type": "array",
+								"minItems": 1
 							},
 							{ "type": "null" }
 						],
-						"title": "Applicable Plan Ids"
+						"title": "Applicable Plan Ids",
+						"description": "List of plan IDs this coupon applies to"
 					},
 					"max_uses": {
 						"anyOf": [
