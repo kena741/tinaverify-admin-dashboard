@@ -10,19 +10,15 @@ import {
 	ChevronRightIcon,
 } from "lucide-react";
 
-import { useListUsersQuery } from "@/services/auth/authApi";
+import { useGetUserByIdQuery } from "@/services/auth/authApi";
 import { AdminCreateBusinessDialog } from "@/components/admin/admin-create-business-dialog";
 import { AdminCreateUserDialog } from "@/components/admin/admin-create-user-dialog";
 import { useListBusinessesQuery } from "@/services/branch-management/branchManagementApi";
-import { useAccumulatedPaginatedQuery } from "@/hooks/use-accumulated-paginated-query";
-import { ADMIN_LIST_MAX_PAGE_SIZE } from "@/services/paginatedFetch";
 import { useListAdminSubscriptionTransactionsQuery } from "@/services/subscription/subscriptionApi";
 import { useListSubscriptionPlansQuery } from "@/services/subscription-plan/subscriptionPlanApi";
 import type {
 	AdminSubscriptionOutput,
 	BusinessOutput,
-	PaginatedBusinessResponse,
-	PaginatedUserResponse,
 	UserOutput,
 } from "@/services/types";
 import {
@@ -33,7 +29,7 @@ import {
 	getSubscriptionStatusFilterLabel,
 	getSubscriptionStatusLabel,
 	PLAN_FILTER_ALL,
-	summarizePlatformSubscription,
+	summarizeBusinessSubscriptionStats,
 	subscriptionRowTimestamp,
 	type PlatformSubscriptionSummary,
 	type SubscriptionStatusFilter,
@@ -272,7 +268,7 @@ export default function TransactionsPage() {
 	const [minAmount, setMinAmount] = useState("");
 	const [sortKey, setSortKey] = useState<SortKey>("date");
 	const [sortDir, setSortDir] = useState<SortDir>("desc");
-	// ponytail: client slice; API has no owners search endpoint
+	// ponytail: server page of businesses; Next/Prev only — no auto-walk
 	const [page, setPage] = useState(1);
 	const [pageSize, setPageSize] = useState<PageSize>(20);
 	const [createUserOpen, setCreateUserOpen] = useState(false);
@@ -307,39 +303,42 @@ export default function TransactionsPage() {
 		setPage(1);
 	}
 
+	const businessOffset = (page - 1) * pageSize;
 	const {
-		data: businesses,
+		data: businessPage,
 		isLoading: businessesLoading,
-		isFetchingMore: businessesFetchingMore,
-	} = useAccumulatedPaginatedQuery<BusinessOutput, PaginatedBusinessResponse>(
-		useListBusinessesQuery,
-		"owners-businesses",
-		ADMIN_LIST_MAX_PAGE_SIZE,
+		isFetching: businessesFetching,
+		error: businessesError,
+		refetch: refetchBusinesses,
+	} = useListBusinessesQuery({
+		offset: businessOffset,
+		limit: pageSize,
+	});
+	const businesses = businessPage?.items;
+	const businessTotal = businessPage?.total_count ?? 0;
+	const pageBusinessIds = useMemo(
+		() => (businesses ?? []).map((b) => b.id),
+		[businesses],
 	);
+
 	const { data: plans } = useListSubscriptionPlansQuery();
 
 	const {
 		data: statsTransactions,
 		isLoading: statsLoading,
 		isFetching: statsFetching,
-		error,
-		refetch,
-	} = useListAdminSubscriptionTransactionsQuery();
-	const {
-		data: users,
-		isFetchingMore: usersFetchingMore,
-		isComplete: usersComplete,
-	} = useAccumulatedPaginatedQuery<UserOutput, PaginatedUserResponse>(
-		useListUsersQuery,
-		"owners-users",
-		ADMIN_LIST_MAX_PAGE_SIZE,
+		error: transactionsError,
+		refetch: refetchTransactions,
+	} = useListAdminSubscriptionTransactionsQuery(
+		{ businessIds: pageBusinessIds },
+		{ skip: pageBusinessIds.length === 0 },
 	);
 
-	const usersById = useMemo(() => {
-		const map = new Map<string, UserOutput>();
-		for (const user of users ?? []) map.set(user.id, user);
-		return map;
-	}, [users]);
+	const error = businessesError ?? transactionsError;
+	function refetch() {
+		void refetchBusinesses();
+		if (pageBusinessIds.length > 0) void refetchTransactions();
+	}
 
 	const ownerIdByBusinessId = useMemo(() => {
 		const map = new Map<string, string>();
@@ -363,13 +362,13 @@ export default function TransactionsPage() {
 		return map;
 	}, [businesses]);
 
-	const filteredRows = useMemo(() => {
-		const allBusinesses = businesses ?? [];
+	const pageRows = useMemo(() => {
+		const pageBusinesses = businesses ?? [];
 		const transactions = statsTransactions ?? [];
 		const withSubscription =
 			buildLatestBusinessSubscriptionRows(transactions);
 		const unsubscribed = buildUnsubscribedBusinessRows(
-			allBusinesses,
+			pageBusinesses,
 			transactions,
 		);
 
@@ -395,8 +394,12 @@ export default function TransactionsPage() {
 			}
 		}
 
-		businessRows = businessRows.filter((r) =>
-			ownerIdByBusinessId.has(r.business_id),
+		// Only rows for businesses on this server page.
+		const pageBizIds = new Set(pageBusinesses.map((b) => b.id));
+		businessRows = businessRows.filter(
+			(r) =>
+				pageBizIds.has(r.business_id) &&
+				ownerIdByBusinessId.has(r.business_id),
 		);
 
 		let rows = collapseSubscriptionRowsByOwner(
@@ -408,14 +411,14 @@ export default function TransactionsPage() {
 		if (q) {
 			rows = rows.filter((row) => {
 				const ownerId = ownerIdByBusinessId.get(row.business_id);
-				const owner = ownerId ? usersById.get(ownerId) : undefined;
 				const ownerBusinesses = ownerId
 					? (businessesByOwnerId.get(ownerId) ?? [])
 					: [];
+				// ponytail: owner name/phone search after row mounts getUserById
 				return ownerRowSearchHay(
 					row,
 					ownerId,
-					owner,
+					undefined,
 					ownerBusinesses,
 				).includes(q);
 			});
@@ -476,7 +479,6 @@ export default function TransactionsPage() {
 		deferredSearch,
 		ownerIdByBusinessId,
 		businessesByOwnerId,
-		usersById,
 		bizCountFilter,
 		minAmount,
 		dateFrom,
@@ -485,11 +487,13 @@ export default function TransactionsPage() {
 		sortDir,
 	]);
 
-	const totalItems = filteredRows.length;
-	const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+	const totalPages = Math.max(1, Math.ceil(businessTotal / pageSize) || 1);
 	const currentPage = Math.min(page, totalPages);
-	const pageStart = (currentPage - 1) * pageSize;
-	const pageRows = filteredRows.slice(pageStart, pageStart + pageSize);
+	if (page !== currentPage) {
+		setPage(currentPage);
+	}
+	const rangeStart = businessTotal === 0 ? 0 : businessOffset + 1;
+	const rangeEnd = Math.min(businessOffset + pageSize, businessTotal);
 
 	const searchPending =
 		searchTerm.trim() !== deferredSearch.trim();
@@ -528,17 +532,28 @@ export default function TransactionsPage() {
 	}
 
 	const summarySnapshot = useMemo((): PlatformSubscriptionSummary | null => {
-		if (businessesLoading || statsLoading) return null;
-		if (!businesses) return null;
-		return summarizePlatformSubscription(
-			businesses,
+		if (businessPage == null) return null;
+		const pageBizCount = businesses?.length ?? 0;
+		// ponytail: page-only — never infer platform-wide status from a slice
+		const stats = summarizeBusinessSubscriptionStats(
 			statsTransactions ?? [],
+			pageBizCount,
 		);
-	}, [businessesLoading, statsLoading, businesses, statsTransactions]);
+		return {
+			...stats,
+			totalBusinesses: businessTotal,
+			totalOwners: pageRows.length,
+		};
+	}, [
+		businessPage,
+		businesses,
+		statsTransactions,
+		businessTotal,
+		pageRows.length,
+	]);
 
-	const businessesBusy = businessesLoading && summarySnapshot === null;
-	const statsBusy = statsLoading && summarySnapshot === null;
-	const summaryBusy = businessesBusy || statsBusy;
+	const businessesBusy = businessesLoading && !businessPage;
+	const summaryBusy = businessesBusy;
 
 	const planLabel =
 		planId === PLAN_FILTER_ALL
@@ -554,7 +569,7 @@ export default function TransactionsPage() {
 					? "1 business"
 					: "2 businesses";
 
-	const listBusy = businessesLoading || statsLoading;
+	const listBusy = businessesLoading && !businessPage;
 
 	return (
 		<div className="mx-auto flex w-full max-w-6xl flex-col gap-6 pb-8">
@@ -587,10 +602,10 @@ export default function TransactionsPage() {
 							>
 								Create business
 							</Button>
-							{summarySnapshot && !summaryBusy ? (
+							{businessPage && !businessesBusy ? (
 								<p className="font-mono text-xs tabular-nums text-muted-foreground">
-									{filteredRows.length.toLocaleString()} shown ·{" "}
-									{summarySnapshot.totalOwners.toLocaleString()} total
+									{pageRows.length.toLocaleString()} on page ·{" "}
+									{businessTotal.toLocaleString()} businesses
 								</p>
 							) : null}
 						</div>
@@ -650,14 +665,12 @@ export default function TransactionsPage() {
 						) : (
 							<div className="flex flex-col gap-1">
 								<p className="font-mono text-[clamp(2rem,5vw,2.75rem)] leading-none font-semibold tracking-tight tabular-nums">
-									{summarySnapshot?.totalOwners != null
-										? summarySnapshot.totalOwners.toLocaleString()
+									{summarySnapshot?.totalBusinesses != null
+										? summarySnapshot.totalBusinesses.toLocaleString()
 										: "—"}
 								</p>
 								<p className="admin-brand-band-muted">
-									{summarySnapshot?.totalBusinesses != null
-										? `${summarySnapshot.totalBusinesses.toLocaleString()} businesses across the roster`
-										: "Business counts load with the roster"}
+									Businesses on the platform · list loads {pageSize} per page
 								</p>
 							</div>
 						)}
@@ -667,37 +680,37 @@ export default function TransactionsPage() {
 
 					<div className="grid flex-1 grid-cols-2 gap-x-6 gap-y-5 sm:grid-cols-2">
 						<OwnersLedgerStat
-							label="Active sub"
-							loading={summaryBusy}
+							label="Active (page)"
+							loading={summaryBusy || statsLoading}
 							value={
-								summarySnapshot?.active != null
+								summarySnapshot && !statsLoading
 									? summarySnapshot.active.toLocaleString()
 									: null
 							}
 						/>
 						<OwnersLedgerStat
-							label="Pending"
-							loading={summaryBusy}
+							label="Pending (page)"
+							loading={summaryBusy || statsLoading}
 							value={
-								summarySnapshot?.pending != null
+								summarySnapshot && !statsLoading
 									? summarySnapshot.pending.toLocaleString()
 									: null
 							}
 						/>
 						<OwnersLedgerStat
-							label="Expired"
-							loading={summaryBusy}
+							label="Expired (page)"
+							loading={summaryBusy || statsLoading}
 							value={
-								summarySnapshot?.expired != null
+								summarySnapshot && !statsLoading
 									? summarySnapshot.expired.toLocaleString()
 									: null
 							}
 						/>
 						<OwnersLedgerStat
-							label="Unsubscribed"
-							loading={summaryBusy}
+							label="Unsubscribed (page)"
+							loading={summaryBusy || statsLoading}
 							value={
-								summarySnapshot?.noSubscription != null
+								summarySnapshot && !statsLoading
 									? summarySnapshot.noSubscription.toLocaleString()
 									: null
 							}
@@ -708,11 +721,12 @@ export default function TransactionsPage() {
 
 			{summarySnapshot ? (
 				<p className="text-xs leading-relaxed text-muted-foreground">
-					Status counts are businesses by latest subscription, not owners.
+					Status counts are for businesses on this page only. Subscriptions and
+					owner profiles load with the current page — nothing is prefetched off
+					this screen.
 					{summarySnapshot.other > 0
 						? ` Includes ${summarySnapshot.other.toLocaleString()} other status.`
-						: ""}{" "}
-					The table lists one owner per row.
+						: ""}
 				</p>
 			) : null}
 
@@ -922,7 +936,7 @@ export default function TransactionsPage() {
 								<Skeleton key={i} className="h-12 w-full" />
 							))}
 						</div>
-					) : filteredRows.length === 0 ? (
+					) : pageRows.length === 0 ? (
 						<div className="flex flex-col items-start gap-1 py-10">
 							<p className="text-sm font-medium text-foreground">
 								No owners match
@@ -1009,16 +1023,6 @@ export default function TransactionsPage() {
 												key={ownerId ?? row.id}
 												row={row}
 												ownerId={ownerId}
-												owner={
-													ownerId ? usersById.get(ownerId) : undefined
-												}
-												usersPending={
-													Boolean(
-														ownerId &&
-															!usersById.get(ownerId) &&
-															!usersComplete,
-													)
-												}
 												ownerBusinesses={ownerBusinesses}
 												onSelect={() =>
 													router.push(`/admin/business/${row.business_id}`)
@@ -1031,22 +1035,22 @@ export default function TransactionsPage() {
 						</div>
 					)}
 
-					{!listBusy && totalItems > 0 ? (
+					{!listBusy && businessTotal > 0 ? (
 						<div className="flex flex-col gap-3 border-t border-border pt-4 sm:flex-row sm:items-center sm:justify-between">
 							<div className="flex flex-col gap-1">
 								<p className="font-mono text-xs tabular-nums text-muted-foreground">
-									{pageStart + 1}–
-									{Math.min(pageStart + pageSize, totalItems)} of {totalItems}{" "}
-									owner{totalItems === 1 ? "" : "s"}
+									Businesses {rangeStart}–{rangeEnd} of{" "}
+									{businessTotal.toLocaleString()}
 									{statusFilter !== "all"
 										? ` · ${getSubscriptionStatusFilterLabel(statusFilter)}`
 										: ""}
+									{pageRows.length > 0
+										? ` · ${pageRows.length} owner${pageRows.length === 1 ? "" : "s"} on page`
+										: ""}
 								</p>
-								{businessesFetchingMore ||
-								usersFetchingMore ||
-								statsFetching ? (
+								{businessesFetching || statsFetching ? (
 									<p className="text-[11px] text-muted-foreground">
-										Loading more roster data…
+										Loading page…
 									</p>
 								) : null}
 							</div>
@@ -1058,7 +1062,10 @@ export default function TransactionsPage() {
 									value={String(pageSize)}
 									onValueChange={(v) => {
 										const next = Number(v) as PageSize;
-										if (PAGE_SIZE_OPTIONS.includes(next)) setPageSize(next);
+										if (PAGE_SIZE_OPTIONS.includes(next)) {
+											setPageSize(next);
+											setPage(1);
+										}
 									}}
 								>
 									<SelectTrigger className="h-8 w-18" size="sm">
@@ -1076,7 +1083,7 @@ export default function TransactionsPage() {
 									type="button"
 									variant="outline"
 									size="sm"
-									disabled={currentPage <= 1}
+									disabled={currentPage <= 1 || businessesFetching}
 									onClick={() => setPage(Math.max(1, currentPage - 1))}
 								>
 									Previous
@@ -1088,7 +1095,9 @@ export default function TransactionsPage() {
 									type="button"
 									variant="outline"
 									size="sm"
-									disabled={currentPage >= totalPages}
+									disabled={
+										currentPage >= totalPages || businessesFetching
+									}
 									onClick={() =>
 										setPage(Math.min(totalPages, currentPage + 1))
 									}
@@ -1108,18 +1117,18 @@ export default function TransactionsPage() {
 function OwnerRow({
 	row,
 	ownerId,
-	owner,
-	usersPending,
 	ownerBusinesses,
 	onSelect,
 }: {
 	row: AdminSubscriptionOutput;
 	ownerId: string | undefined;
-	owner: UserOutput | undefined;
-	usersPending: boolean;
 	ownerBusinesses: BusinessOutput[];
 	onSelect: () => void;
 }) {
+	const { data: owner, isLoading: ownerLoading } = useGetUserByIdQuery(
+		{ userId: ownerId ?? "" },
+		{ skip: !ownerId },
+	);
 	const count = ownerBusinesses.length;
 	const namesSummary = formatBusinessNames(ownerBusinesses);
 	const displayName = owner ? formatUserDisplayName(owner) : null;
@@ -1131,7 +1140,7 @@ function OwnerRow({
 			? namesSummary
 			: "owner";
 	const dateLabel = formatSubscriptionDate(row.started_at ?? row.created_at);
-	const ownerPending = Boolean(ownerId && usersPending && !owner);
+	const ownerPending = Boolean(ownerId && ownerLoading && !owner);
 
 	return (
 		<TableRow

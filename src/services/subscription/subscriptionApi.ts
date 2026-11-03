@@ -59,12 +59,15 @@ export const subscriptionApi = createApi({
 
 		/**
 		 * `GET /api/v1/subscriptions/transactions` — admin subscription history.
-		 * Walks every page (API default limit is 100; max 1000).
+		 * Prefer `businessId` / `businessIds` so callers don't pull the global ledger.
+		 * Unscoped calls still walk pages (API default limit 100; max 1000).
 		 */
 		listAdminSubscriptionTransactions: builder.query<
 			AdminSubscriptionOutput[],
 			{
 				businessId?: string | null;
+				/** Parallel per-business fetches — use for a single UI page of businesses. */
+				businessIds?: string[] | null;
 				planId?: string | null;
 				status?: SubscriptionStatus | null;
 			} | void
@@ -72,23 +75,62 @@ export const subscriptionApi = createApi({
 			async queryFn(arg, _api, _extra, baseQuery) {
 				const query = (arg ?? {}) as {
 					businessId?: string | null;
+					businessIds?: string[] | null;
 					planId?: string | null;
 					status?: SubscriptionStatus | null;
 				};
+				const bq = baseQuery as (arg: {
+					url: string;
+					method?: string;
+					params?: Record<string, string | number>;
+					headers?: Record<string, string>;
+				}) => Promise<{ data?: unknown; error?: unknown }>;
+				const headers = bearerHeaders() as Record<string, string>;
+
+				const ids = [
+					...new Set(
+						(query.businessIds ?? [])
+							.filter(Boolean)
+							.concat(query.businessId ? [query.businessId] : []),
+					),
+				];
+
+				// ponytail: page-scoped — one request per business, no global walk
+				if (ids.length > 0) {
+					const settled = await Promise.all(
+						ids.map((businessId) => {
+							const extraParams: Record<string, string | number> = {
+								business_id: businessId,
+							};
+							if (query.planId) extraParams.plan_id = query.planId;
+							if (query.status) extraParams.status = query.status;
+							return fetchAllPaginatedItems<AdminSubscriptionOutput>(
+								bq,
+								"/api/v1/subscriptions/transactions",
+								headers,
+								ADMIN_LIST_MAX_PAGE_SIZE,
+								extraParams,
+							);
+						}),
+					);
+					const merged: AdminSubscriptionOutput[] = [];
+					for (const res of settled) {
+						if ("error" in res && res.error) {
+							return { error: res.error };
+						}
+						if ("data" in res && res.data) merged.push(...res.data);
+					}
+					return { data: merged };
+				}
+
 				const extraParams: Record<string, string | number> = {};
-				if (query.businessId) extraParams.business_id = query.businessId;
 				if (query.planId) extraParams.plan_id = query.planId;
 				if (query.status) extraParams.status = query.status;
 
 				return fetchAllPaginatedItems<AdminSubscriptionOutput>(
-					baseQuery as (arg: {
-						url: string;
-						method?: string;
-						params?: Record<string, string | number>;
-						headers?: Record<string, string>;
-					}) => Promise<{ data?: unknown; error?: unknown }>,
+					bq,
 					"/api/v1/subscriptions/transactions",
-					bearerHeaders() as Record<string, string>,
+					headers,
 					ADMIN_LIST_MAX_PAGE_SIZE,
 					extraParams,
 				);
@@ -96,18 +138,25 @@ export const subscriptionApi = createApi({
 			serializeQueryArgs: ({ endpointName, queryArgs }) => {
 				const arg = (queryArgs ?? {}) as {
 					businessId?: string | null;
+					businessIds?: string[] | null;
 					planId?: string | null;
 					status?: SubscriptionStatus | null;
 				};
-				const businessId = arg.businessId;
+				const ids = [
+					...new Set(
+						(arg.businessIds ?? [])
+							.filter(Boolean)
+							.concat(arg.businessId ? [arg.businessId] : []),
+					),
+				].sort();
 				const planId = arg.planId;
 				const status = arg.status;
-				const hasFilter =
-					Boolean(businessId) || Boolean(planId) || Boolean(status);
-				if (!hasFilter) return `${endpointName}(global)`;
-				return `${endpointName}(${businessId ?? ""}|${planId ?? ""}|${status ?? ""})`;
+				if (ids.length === 0 && !planId && !status) {
+					return `${endpointName}(global)`;
+				}
+				return `${endpointName}(${ids.join(",")}|${planId ?? ""}|${status ?? ""})`;
 			},
-			keepUnusedDataFor: 120,
+			keepUnusedDataFor: 60,
 			providesTags: [{ type: "SubscriptionTransactions" as const, id: "LIST" }],
 		}),
 
