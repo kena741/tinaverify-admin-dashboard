@@ -719,7 +719,12 @@ export default function CouponsPage() {
 							</AlertDescription>
 						</Alert>
 					) : detailCoupon ? (
-						<CouponDetails coupon={detailCoupon} />
+						<CouponDetails
+							coupon={detailCoupon}
+							plans={subscriptionPlans ?? []}
+							plansLoading={plansLoading}
+							plansError={plansError}
+						/>
 					) : null}
 					<DialogFooter>
 						<Button
@@ -1041,7 +1046,17 @@ function CouponFormFields({
 	);
 }
 
-function CouponDetails({ coupon }: { coupon: CouponOutput }) {
+function CouponDetails({
+	coupon,
+	plans,
+	plansLoading,
+	plansError,
+}: {
+	coupon: CouponOutput;
+	plans: SubscriptionPlanOutput[];
+	plansLoading: boolean;
+	plansError: unknown;
+}) {
 	const details = [
 		["Description", coupon.description || "—"],
 		[
@@ -1049,10 +1064,6 @@ function CouponDetails({ coupon }: { coupon: CouponOutput }) {
 			coupon.discount_type === "percentage"
 				? `${coupon.discount_value}%`
 				: `${coupon.discount_value} ETB`,
-		],
-		[
-				"Applicable plans",
-			coupon.applicable_plan_ids?.join(", ") || "All plans",
 		],
 		["Usage", `${coupon.used_count} / ${coupon.max_uses ?? "Unlimited"}`],
 		["Uses per business", coupon.max_uses_per_business],
@@ -1068,10 +1079,56 @@ function CouponDetails({ coupon }: { coupon: CouponOutput }) {
 			{details.map(([label, value]) => (
 				<div key={label} className="flex flex-col gap-1 rounded-lg border p-3">
 					<dt className="text-xs text-muted-foreground">{label}</dt>
-					<dd className="break-words text-sm font-medium">{value}</dd>
+					<dd className="wrap-break-word text-sm font-medium">{value}</dd>
 				</div>
 			))}
+			<div className="flex flex-col gap-1 rounded-lg border p-3">
+				<dt className="text-xs text-muted-foreground">Applicable plans</dt>
+				<dd className="wrap-break-word text-sm font-medium">
+					<CouponApplicablePlans
+						planIds={coupon.applicable_plan_ids ?? []}
+						plans={plans}
+						plansLoading={plansLoading}
+						plansError={plansError}
+					/>
+				</dd>
+			</div>
 		</dl>
+	);
+}
+
+function CouponApplicablePlans({
+	planIds,
+	plans,
+	plansLoading,
+	plansError,
+}: {
+	planIds: string[];
+	plans: SubscriptionPlanOutput[];
+	plansLoading: boolean;
+	plansError: unknown;
+}) {
+	if (planIds.length === 0) return "All plans";
+	if (plansLoading) return "Loading plans...";
+	if (plansError) return "Unable to load plans";
+
+	const applicablePlanIds = new Set(planIds);
+	const applicablePlans = plans.filter((plan) =>
+		applicablePlanIds.has(plan.id),
+	);
+
+	return applicablePlans.length > 0 ? (
+		<>
+			{applicablePlans.map((plan, index) => (
+				<span key={plan.id}>
+					{index > 0 ? ", " : null}
+					{plan.name}
+				</span>
+			))}
+			{applicablePlans.length < planIds.length ? ", Unavailable plan" : null}
+		</>
+	) : (
+		"Unavailable plans"
 	);
 }
 
