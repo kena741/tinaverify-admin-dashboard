@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { format } from "date-fns";
-import { useMemo, useState } from "react";
+import { useDeferredValue, useMemo, useState } from "react";
 import {
 	ArrowDownIcon,
 	ArrowUpIcon,
@@ -15,6 +15,7 @@ import { AdminCreateBusinessDialog } from "@/components/admin/admin-create-busin
 import { AdminCreateUserDialog } from "@/components/admin/admin-create-user-dialog";
 import { useListBusinessesQuery } from "@/services/branch-management/branchManagementApi";
 import { useAccumulatedPaginatedQuery } from "@/hooks/use-accumulated-paginated-query";
+import { ADMIN_LIST_MAX_PAGE_SIZE } from "@/services/paginatedFetch";
 import { useListAdminSubscriptionTransactionsQuery } from "@/services/subscription/subscriptionApi";
 import { useListSubscriptionPlansQuery } from "@/services/subscription-plan/subscriptionPlanApi";
 import type {
@@ -222,6 +223,38 @@ function formatBusinessNames(list: BusinessOutput[], max = 2): string {
 	return `${names.slice(0, max).join(", ")} +${names.length - max} more`;
 }
 
+/** Search blob for one owner row — covers owner + every business + subscription. */
+function ownerRowSearchHay(
+	row: AdminSubscriptionOutput,
+	ownerId: string | undefined,
+	owner: UserOutput | undefined,
+	ownerBusinesses: BusinessOutput[],
+): string {
+	const parts: string[] = [
+		row.business?.name ?? "",
+		row.business?.tin_number ?? "",
+		row.plan?.name ?? "",
+		row.plan_id ?? "",
+		row.status,
+		row.chapa_transaction_reference ?? "",
+		row.business_id,
+		row.id,
+		ownerId ?? "",
+		owner ? formatUserDisplayName(owner) : "",
+		owner?.email ?? "",
+		owner?.phone_number ?? "",
+		owner?.username ?? "",
+		owner?.user_information?.first_name ?? "",
+		owner?.user_information?.last_name ?? "",
+		row.amount != null ? String(row.amount) : "",
+		String(row.credits_limit),
+	];
+	for (const b of ownerBusinesses) {
+		parts.push(b.name ?? "", b.tin_number ?? "", b.id, b.owner_id ?? "");
+	}
+	return parts.filter(Boolean).join(" ").toLowerCase();
+}
+
 const PAGE_SIZE_OPTIONS = [10, 20, 50] as const;
 type PageSize = (typeof PAGE_SIZE_OPTIONS)[number];
 
@@ -231,6 +264,7 @@ export default function TransactionsPage() {
 	const [statusFilter, setStatusFilter] =
 		useState<SubscriptionStatusFilter>("all");
 	const [searchTerm, setSearchTerm] = useState("");
+	const deferredSearch = useDeferredValue(searchTerm);
 	const [dateFrom, setDateFrom] = useState("");
 	const [dateTo, setDateTo] = useState("");
 	const [bizCountFilter, setBizCountFilter] =
@@ -238,7 +272,7 @@ export default function TransactionsPage() {
 	const [minAmount, setMinAmount] = useState("");
 	const [sortKey, setSortKey] = useState<SortKey>("date");
 	const [sortDir, setSortDir] = useState<SortDir>("desc");
-	// ponytail: client slice only; server page params when list endpoint grows large
+	// ponytail: client slice; API has no owners search endpoint
 	const [page, setPage] = useState(1);
 	const [pageSize, setPageSize] = useState<PageSize>(20);
 	const [createUserOpen, setCreateUserOpen] = useState(false);
@@ -249,7 +283,7 @@ export default function TransactionsPage() {
 			[
 				planId,
 				statusFilter,
-				searchTerm,
+				deferredSearch,
 				pageSize,
 				dateFrom,
 				dateTo,
@@ -259,7 +293,7 @@ export default function TransactionsPage() {
 		[
 			planId,
 			statusFilter,
-			searchTerm,
+			deferredSearch,
 			pageSize,
 			dateFrom,
 			dateTo,
@@ -280,12 +314,14 @@ export default function TransactionsPage() {
 	} = useAccumulatedPaginatedQuery<BusinessOutput, PaginatedBusinessResponse>(
 		useListBusinessesQuery,
 		"owners-businesses",
+		ADMIN_LIST_MAX_PAGE_SIZE,
 	);
 	const { data: plans } = useListSubscriptionPlansQuery();
 
 	const {
 		data: statsTransactions,
 		isLoading: statsLoading,
+		isFetching: statsFetching,
 		error,
 		refetch,
 	} = useListAdminSubscriptionTransactionsQuery();
@@ -296,6 +332,7 @@ export default function TransactionsPage() {
 	} = useAccumulatedPaginatedQuery<UserOutput, PaginatedUserResponse>(
 		useListUsersQuery,
 		"owners-users",
+		ADMIN_LIST_MAX_PAGE_SIZE,
 	);
 
 	const usersById = useMemo(() => {
@@ -362,41 +399,27 @@ export default function TransactionsPage() {
 			ownerIdByBusinessId.has(r.business_id),
 		);
 
-		const q = searchTerm.trim().toLowerCase();
-		if (q) {
-			businessRows = businessRows.filter((row) => {
-				const ownerId = ownerIdByBusinessId.get(row.business_id);
-				const owner = ownerId ? usersById.get(ownerId) : undefined;
-				const ownerBizNames = ownerId
-					? (businessesByOwnerId.get(ownerId) ?? [])
-							.map((b) => b.name)
-							.join(" ")
-					: "";
-				const hay = [
-					row.business?.name,
-					row.business?.tin_number,
-					row.plan?.name,
-					row.status,
-					row.chapa_transaction_reference,
-					row.business_id,
-					ownerBizNames,
-					ownerId,
-					owner ? formatUserDisplayName(owner) : "",
-					owner?.email,
-					owner?.phone_number,
-					owner?.username,
-				]
-					.filter(Boolean)
-					.join(" ")
-					.toLowerCase();
-				return hay.includes(q);
-			});
-		}
-
 		let rows = collapseSubscriptionRowsByOwner(
 			businessRows,
 			ownerIdByBusinessId,
 		);
+
+		const q = deferredSearch.trim().toLowerCase();
+		if (q) {
+			rows = rows.filter((row) => {
+				const ownerId = ownerIdByBusinessId.get(row.business_id);
+				const owner = ownerId ? usersById.get(ownerId) : undefined;
+				const ownerBusinesses = ownerId
+					? (businessesByOwnerId.get(ownerId) ?? [])
+					: [];
+				return ownerRowSearchHay(
+					row,
+					ownerId,
+					owner,
+					ownerBusinesses,
+				).includes(q);
+			});
+		}
 
 		if (bizCountFilter !== BIZ_COUNT_FILTER_ALL) {
 			rows = rows.filter((row) => {
@@ -450,7 +473,7 @@ export default function TransactionsPage() {
 		businesses,
 		statsTransactions,
 		planId,
-		searchTerm,
+		deferredSearch,
 		ownerIdByBusinessId,
 		businessesByOwnerId,
 		usersById,
@@ -468,6 +491,8 @@ export default function TransactionsPage() {
 	const pageStart = (currentPage - 1) * pageSize;
 	const pageRows = filteredRows.slice(pageStart, pageStart + pageSize);
 
+	const searchPending =
+		searchTerm.trim() !== deferredSearch.trim();
 	const filtersActive =
 		planId !== PLAN_FILTER_ALL ||
 		statusFilter !== "all" ||
@@ -710,7 +735,8 @@ export default function TransactionsPage() {
 							<div>
 								<CardTitle>Find owners</CardTitle>
 								<CardDescription>
-									Search, subscription status, plan, and date filters.
+									Search owner name, phone, email, business, TIN, plan, status,
+									or amount — plus status, plan, business count, and dates.
 								</CardDescription>
 							</div>
 							{filtersActive ? (
@@ -734,12 +760,16 @@ export default function TransactionsPage() {
 									</FieldLabel>
 									<Input
 										type="search"
-										placeholder="Owner, business, TIN, or plan…"
+										placeholder="Owner, phone, email, business, TIN, plan…"
 										value={searchTerm}
 										onChange={(e) => {
 											setSearchTerm(e.target.value);
 										}}
-										className="h-9 bg-background"
+										className={cn(
+											"h-9 bg-background",
+											searchPending && "opacity-80",
+										)}
+										aria-busy={searchPending}
 									/>
 								</Field>
 
@@ -1012,7 +1042,9 @@ export default function TransactionsPage() {
 										? ` · ${getSubscriptionStatusFilterLabel(statusFilter)}`
 										: ""}
 								</p>
-								{businessesFetchingMore || usersFetchingMore ? (
+								{businessesFetchingMore ||
+								usersFetchingMore ||
+								statsFetching ? (
 									<p className="text-[11px] text-muted-foreground">
 										Loading more roster data…
 									</p>

@@ -3,6 +3,7 @@ import type { FetchBaseQueryError } from "@reduxjs/toolkit/query";
 import { getStoredAccessToken } from "../authTokens";
 import { backendBaseQuery } from "../baseQuery";
 import {
+	ADMIN_LIST_MAX_PAGE_SIZE,
 	ADMIN_LIST_PAGE_SIZE,
 	fetchAllPaginatedItems,
 } from "../paginatedFetch";
@@ -75,6 +76,7 @@ export const branchManagementApi = createApi({
 					}) => Promise<{ data?: unknown; error?: unknown }>,
 					"/api/v1/business",
 					bearerHeaders() as Record<string, string>,
+					ADMIN_LIST_MAX_PAGE_SIZE,
 				);
 			},
 			providesTags: (result) =>

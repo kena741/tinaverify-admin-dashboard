@@ -1,10 +1,5 @@
-import { ServicePlaceholderPage } from "@/components/admin/service-placeholder-page";
+import { redirect } from "next/navigation";
 
-export default function ServiceCouponsPage() {
-	return (
-		<ServicePlaceholderPage
-			title="Coupon"
-			description="Create and manage discount coupons."
-		/>
-	);
+export default function AdminIndexPage() {
+	redirect("/admin/dashboard");
 }

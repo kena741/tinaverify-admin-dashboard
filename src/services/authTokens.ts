@@ -43,6 +43,27 @@ export function isAccessTokenExpiredOrMissing(skewMs = 60_000): boolean {
 
 let refreshInFlight: Promise<boolean> | null = null;
 
+type SessionClearedListener = () => void;
+const sessionClearedListeners = new Set<SessionClearedListener>();
+
+/** Notify UI when tokens are dropped so Redux can match localStorage. */
+export function onSessionCleared(listener: SessionClearedListener): () => void {
+	sessionClearedListeners.add(listener);
+	return () => {
+		sessionClearedListeners.delete(listener);
+	};
+}
+
+function notifySessionCleared(): void {
+	for (const listener of sessionClearedListeners) {
+		try {
+			listener();
+		} catch {
+			/* ignore listener errors */
+		}
+	}
+}
+
 /**
  * Calls `POST /api/v1/users/refresh-token?refresh_token=...` and stores new tokens.
  * Concurrent callers share one refresh. Returns false if refresh fails.
@@ -55,6 +76,7 @@ export async function refreshAccessToken(): Promise<boolean> {
 		const refresh = getStoredRefreshToken();
 		if (!refresh) {
 			clearStoredTokens();
+			notifySessionCleared();
 			return false;
 		}
 		try {
@@ -66,8 +88,13 @@ export async function refreshAccessToken(): Promise<boolean> {
 			if (!res.ok) {
 				// Auth rejection / expired refresh — drop session.
 				// Leave tokens on 5xx so a brief outage doesn't force re-login.
+				// Only clear if this refresh token is still current (another tab may
+				// have rotated it successfully meanwhile).
 				if (res.status >= 400 && res.status < 500) {
-					clearStoredTokens();
+					if (getStoredRefreshToken() === refresh) {
+						clearStoredTokens();
+						notifySessionCleared();
+					}
 				}
 				return false;
 			}
@@ -76,7 +103,10 @@ export async function refreshAccessToken(): Promise<boolean> {
 				refresh_token?: string;
 			};
 			if (!data.access_token || !data.refresh_token) {
-				clearStoredTokens();
+				if (getStoredRefreshToken() === refresh) {
+					clearStoredTokens();
+					notifySessionCleared();
+				}
 				return false;
 			}
 			setStoredTokens(data.access_token, data.refresh_token);

@@ -3,6 +3,9 @@ import type { FetchBaseQueryError } from "@reduxjs/toolkit/query";
 /** Default page size for admin list endpoints (`/api/v1/business`, `/api/v1/users/all`). */
 export const ADMIN_LIST_PAGE_SIZE = 50;
 
+/** OpenAPI max for `/api/v1/business` + `/api/v1/subscriptions/transactions`. */
+export const ADMIN_LIST_MAX_PAGE_SIZE = 1000;
+
 type PaginatedSlice<TItem> = {
 	items: TItem[];
 	total_count: number;
@@ -28,11 +31,18 @@ export async function fetchAllPaginatedItems<TItem>(
 	url: string,
 	headers: Record<string, string>,
 	pageSize: number = ADMIN_LIST_PAGE_SIZE,
+	extraParams?: Record<string, string | number>,
 ): Promise<{ data: TItem[] } | { error: FetchBaseQueryError }> {
+	const pageParams = (offset: number, limit: number) => ({
+		...(extraParams ?? {}),
+		offset,
+		limit,
+	});
+
 	const first = await baseQuery({
 		url,
 		method: "GET",
-		params: { offset: 0, limit: pageSize },
+		params: pageParams(0, pageSize),
 		headers,
 	});
 	if (first.error) {
@@ -59,7 +69,7 @@ export async function fetchAllPaginatedItems<TItem>(
 			const res = await baseQuery({
 				url,
 				method: "GET",
-				params: { offset, limit: resolvedPageSize },
+				params: pageParams(offset, resolvedPageSize),
 				headers,
 			});
 			if (res.error) {
@@ -75,7 +85,7 @@ export async function fetchAllPaginatedItems<TItem>(
 			const res = await baseQuery({
 				url,
 				method: "GET",
-				params: { offset, limit: resolvedPageSize },
+				params: pageParams(offset, resolvedPageSize),
 				headers,
 			});
 			if (res.error) {

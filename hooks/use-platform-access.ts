@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
+import type { FetchBaseQueryError } from "@reduxjs/toolkit/query";
 
 import {
 	canAccessSystemAdminPath,
@@ -17,6 +18,13 @@ import {
 } from "@/services/platform/platformApi";
 import { useAuth } from "@/store/useAuth";
 
+function isUnauthorizedError(error: unknown): boolean {
+	if (typeof error !== "object" || error === null || !("status" in error)) {
+		return false;
+	}
+	return (error as FetchBaseQueryError).status === 401;
+}
+
 /**
  * Resolves the signed-in user's platform role permissions for system-admin UI.
  * - Branch users (`!isSuperuser`): `permissions = null` (branch nav, not this map).
@@ -24,14 +32,24 @@ import { useAuth } from "@/store/useAuth";
  * - Superuser on an active staff row: permission actions from their platform role.
  */
 export function usePlatformAccess() {
-	const { user, isSystemAdmin } = useAuth();
+	const { user, isSystemAdmin, logout } = useAuth();
 	const systemAdmin = isSystemAdmin();
+	const loggedOutForAuthRef = useRef(false);
 
 	const {
 		data: staffList,
 		isLoading: staffLoading,
 		isError: staffError,
+		error: staffQueryError,
 	} = useListPlatformStaffQuery(undefined, { skip: !systemAdmin });
+
+	const staffUnauthorized = isUnauthorizedError(staffQueryError);
+
+	useEffect(() => {
+		if (!staffUnauthorized || loggedOutForAuthRef.current) return;
+		loggedOutForAuthRef.current = true;
+		logout();
+	}, [staffUnauthorized, logout]);
 
 	const myStaff = useMemo(() => {
 		if (!user?.id || !staffList) return null;
@@ -42,7 +60,7 @@ export function usePlatformAccess() {
 
 	const { data: roles } = useListPlatformRolesQuery(
 		{ includeInactive: true },
-		{ skip: !systemAdmin },
+		{ skip: !systemAdmin || staffUnauthorized },
 	);
 
 	const roleName = useMemo(() => {
@@ -53,12 +71,15 @@ export function usePlatformAccess() {
 	const { data: rolePermissions, isLoading: permsLoading } =
 		useListPlatformRolePermissionsQuery(
 			{ roleId: myStaff?.platform_role_id ?? "" },
-			{ skip: !myStaff?.platform_role_id },
+			{ skip: !myStaff?.platform_role_id || staffUnauthorized },
 		);
 
 	const permissions: PlatformPermissionSet | null | undefined = useMemo(() => {
 		if (!systemAdmin) return null;
 		if (staffLoading) return undefined;
+		// 401: session is dead — do not pretend bootstrap-admin "all" access.
+		if (staffUnauthorized) return undefined;
+		// Non-auth staff list failure: keep superusers unblocked.
 		if (staffError) return "all";
 		if (!myStaff) return "all";
 		if (permsLoading) return undefined;
@@ -66,6 +87,7 @@ export function usePlatformAccess() {
 	}, [
 		systemAdmin,
 		staffLoading,
+		staffUnauthorized,
 		staffError,
 		myStaff,
 		permsLoading,

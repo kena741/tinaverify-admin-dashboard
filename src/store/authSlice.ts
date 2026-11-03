@@ -169,6 +169,13 @@ const authSlice = createSlice({
 		clearAuthError(state) {
 			state.error = null;
 		},
+		/** Tokens already cleared in localStorage — sync Redux without looping logout. */
+		sessionExpired(state) {
+			state.user = null;
+			state.sessionPending = false;
+			state.loginPending = false;
+			state.error = null;
+		},
 	},
 	extraReducers: (builder) => {
 		builder
@@ -209,7 +216,7 @@ const authSlice = createSlice({
 	},
 });
 
-export const { clearAuthError } = authSlice.actions;
+export const { clearAuthError, sessionExpired } = authSlice.actions;
 export default authSlice.reducer;
 
 export const selectAuthUser = (state: { auth: AuthState }) => state.auth.user;

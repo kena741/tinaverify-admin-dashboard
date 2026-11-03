@@ -30,7 +30,7 @@ export default function LoginPage() {
 	const uiError = error || authError || "";
 
 	useEffect(() => {
-		if (user) router.replace("/admin");
+		if (user) router.replace("/admin/dashboard");
 	}, [user, router]);
 
 	async function handleLogin(e: React.FormEvent) {
@@ -40,7 +40,7 @@ export default function LoginPage() {
 		const success = await login(emailOrPhone, password);
 
 		if (success) {
-			router.push("/admin");
+			router.push("/admin/dashboard");
 			return;
 		}
 

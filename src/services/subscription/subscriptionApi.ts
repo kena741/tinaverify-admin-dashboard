@@ -2,6 +2,10 @@ import { createApi } from "@reduxjs/toolkit/query/react";
 
 import { getStoredAccessToken } from "../authTokens";
 import { backendBaseQuery } from "../baseQuery";
+import {
+	ADMIN_LIST_MAX_PAGE_SIZE,
+	fetchAllPaginatedItems,
+} from "../paginatedFetch";
 import type {
 	AdminGrantCreditsRequest,
 	AdminSubscriptionOutput,
@@ -53,7 +57,10 @@ export const subscriptionApi = createApi({
 			],
 		}),
 
-		/** `GET /api/v1/subscriptions/transactions` — admin subscription history */
+		/**
+		 * `GET /api/v1/subscriptions/transactions` — admin subscription history.
+		 * Walks every page (API default limit is 100; max 1000).
+		 */
 		listAdminSubscriptionTransactions: builder.query<
 			AdminSubscriptionOutput[],
 			{
@@ -62,21 +69,29 @@ export const subscriptionApi = createApi({
 				status?: SubscriptionStatus | null;
 			} | void
 		>({
-			query: (arg) => {
+			async queryFn(arg, _api, _extra, baseQuery) {
 				const query = (arg ?? {}) as {
 					businessId?: string | null;
 					planId?: string | null;
 					status?: SubscriptionStatus | null;
 				};
-				const params: Record<string, string> = {};
-				if (query.businessId) params.business_id = query.businessId;
-				if (query.planId) params.plan_id = query.planId;
-				if (query.status) params.status = query.status;
-				return {
-					url: "/api/v1/subscriptions/transactions",
-					params: Object.keys(params).length > 0 ? params : undefined,
-					headers: bearerHeaders(),
-				};
+				const extraParams: Record<string, string | number> = {};
+				if (query.businessId) extraParams.business_id = query.businessId;
+				if (query.planId) extraParams.plan_id = query.planId;
+				if (query.status) extraParams.status = query.status;
+
+				return fetchAllPaginatedItems<AdminSubscriptionOutput>(
+					baseQuery as (arg: {
+						url: string;
+						method?: string;
+						params?: Record<string, string | number>;
+						headers?: Record<string, string>;
+					}) => Promise<{ data?: unknown; error?: unknown }>,
+					"/api/v1/subscriptions/transactions",
+					bearerHeaders() as Record<string, string>,
+					ADMIN_LIST_MAX_PAGE_SIZE,
+					extraParams,
+				);
 			},
 			serializeQueryArgs: ({ endpointName, queryArgs }) => {
 				const arg = (queryArgs ?? {}) as {
@@ -92,20 +107,7 @@ export const subscriptionApi = createApi({
 				if (!hasFilter) return `${endpointName}(global)`;
 				return `${endpointName}(${businessId ?? ""}|${planId ?? ""}|${status ?? ""})`;
 			},
-			transformResponse: (response: unknown) => {
-				if (Array.isArray(response)) {
-					return response as AdminSubscriptionOutput[];
-				}
-				if (
-					typeof response === "object" &&
-					response !== null &&
-					"items" in response &&
-					Array.isArray((response as { items: unknown }).items)
-				) {
-					return (response as { items: AdminSubscriptionOutput[] }).items;
-				}
-				return [];
-			},
+			keepUnusedDataFor: 120,
 			providesTags: [{ type: "SubscriptionTransactions" as const, id: "LIST" }],
 		}),
 
