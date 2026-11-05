@@ -120,6 +120,24 @@ export type BusinessOutput = {
 	owner_id: UUID;
 	is_active: boolean;
 	is_archived: boolean;
+	owner_name?: string | null;
+	owner_phone?: string | null;
+	plan_name?: string | null;
+	subscription_status?: string | null;
+	created_at?: string | null;
+};
+
+export type BusinessListFilters = {
+	owner_name?: string | null;
+	business_name?: string | null;
+	phone?: string | null;
+	plan?: string | null;
+	status?: string | null;
+};
+
+export type BusinessListQuery = BusinessListFilters & {
+	offset?: number;
+	limit?: number;
 };
 
 /** OpenAPI `PaginatedBusinessResponse` — `GET /api/v1/business` */

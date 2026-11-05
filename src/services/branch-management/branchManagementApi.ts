@@ -11,12 +11,34 @@ import type {
 	BranchCreateRequest,
 	BranchOutput,
 	BranchUpdateRequest,
+	BusinessListFilters,
+	BusinessListQuery,
 	BusinessOutput,
 	DeactivateBusinessRequest,
 	EmployeeOutput,
 	PaginatedBusinessResponse,
 	UpdateEmployeeRequest,
 } from "../types";
+
+function businessFilterParams(
+	filters: BusinessListFilters | void,
+): Record<string, string> {
+	const params: Record<string, string> = {};
+	if (!filters) return params;
+
+	for (const key of [
+		"owner_name",
+		"business_name",
+		"phone",
+		"plan",
+		"status",
+	] as const) {
+		const value = filters[key];
+		if (typeof value === "string") params[key] = value;
+	}
+
+	return params;
+}
 
 function bearerHeaders(accessToken?: string | null) {
 	const token =
@@ -41,12 +63,12 @@ export const branchManagementApi = createApi({
 		/** `GET /api/v1/business` — one paginated slice. */
 		listBusinesses: builder.query<
 			PaginatedBusinessResponse,
-			{ offset?: number; limit?: number }
+			BusinessListQuery
 		>({
-			query: ({ offset = 0, limit = ADMIN_LIST_PAGE_SIZE }) => ({
+			query: ({ offset = 0, limit = ADMIN_LIST_PAGE_SIZE, ...filters }) => ({
 				url: "/api/v1/business",
 				method: "GET",
-				params: { offset, limit },
+				params: { offset, limit, ...businessFilterParams(filters) },
 				headers: bearerHeaders(),
 			}),
 			providesTags: (result) =>
@@ -65,8 +87,11 @@ export const branchManagementApi = createApi({
 		 * `GET /api/v1/business` — loads every page sequentially in small batches.
 		 * Prefer `listBusinesses` + `useAccumulatedPaginatedQuery` for progressive UI.
 		 */
-		listAllBusinesses: builder.query<BusinessOutput[], void>({
-			async queryFn(_arg, _api, _extraOptions, baseQuery) {
+		listAllBusinesses: builder.query<
+			BusinessOutput[],
+			BusinessListFilters | void
+		>({
+			async queryFn(arg, _api, _extraOptions, baseQuery) {
 				return fetchAllPaginatedItems<BusinessOutput>(
 					baseQuery as (arg: {
 						url: string;
@@ -77,6 +102,7 @@ export const branchManagementApi = createApi({
 					"/api/v1/business",
 					bearerHeaders() as Record<string, string>,
 					ADMIN_LIST_MAX_PAGE_SIZE,
+					businessFilterParams(arg),
 				);
 			},
 			providesTags: (result) =>

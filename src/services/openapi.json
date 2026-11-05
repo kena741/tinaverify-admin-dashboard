@@ -1,6 +1,6 @@
 {
 	"openapi": "3.1.0",
-	"info": { "title": "TinaVerify - STAGING", "version": "0.1.0" },
+	"info": { "title": "TinaVerify - PRODUCTION", "version": "0.1.0" },
 	"paths": {
 		"/api/v1/users": {
 			"post": {
@@ -513,6 +513,61 @@
 				"operationId": "list_all_businesses_api_v1_business_get",
 				"security": [{ "OAuth2PasswordBearer": [] }],
 				"parameters": [
+					{
+						"name": "owner_name",
+						"in": "query",
+						"required": false,
+						"schema": {
+							"anyOf": [{ "type": "string" }, { "type": "null" }],
+							"description": "Filter by owner first name, last name, or username",
+							"title": "Owner Name"
+						},
+						"description": "Filter by owner first name, last name, or username"
+					},
+					{
+						"name": "business_name",
+						"in": "query",
+						"required": false,
+						"schema": {
+							"anyOf": [{ "type": "string" }, { "type": "null" }],
+							"description": "Filter by business name",
+							"title": "Business Name"
+						},
+						"description": "Filter by business name"
+					},
+					{
+						"name": "phone",
+						"in": "query",
+						"required": false,
+						"schema": {
+							"anyOf": [{ "type": "string" }, { "type": "null" }],
+							"description": "Filter by owner phone number",
+							"title": "Phone"
+						},
+						"description": "Filter by owner phone number"
+					},
+					{
+						"name": "plan",
+						"in": "query",
+						"required": false,
+						"schema": {
+							"anyOf": [{ "type": "string" }, { "type": "null" }],
+							"description": "Filter by subscription plan name or plan ID",
+							"title": "Plan"
+						},
+						"description": "Filter by subscription plan name or plan ID"
+					},
+					{
+						"name": "status",
+						"in": "query",
+						"required": false,
+						"schema": {
+							"anyOf": [{ "type": "string" }, { "type": "null" }],
+							"description": "Filter by business status or subscription status",
+							"title": "Status"
+						},
+						"description": "Filter by business status or subscription status"
+					},
 					{
 						"name": "limit",
 						"in": "query",
@@ -7172,7 +7227,7 @@
 			"post": {
 				"tags": ["Developer Verifications"],
 				"summary": "Create Verification",
-				"description": "Verify a payment (sandbox = fixtures; live = banks). Persists for GET + soft dedupe.",
+				"description": "Verify a payment via reference_number or receipt image (sandbox = fixtures; live = banks). Persists for GET + soft dedupe.",
 				"operationId": "create_verification_developer_api_v1_verifications__provider__post",
 				"security": [{ "DeveloperAPIKey": [] }],
 				"parameters": [
@@ -8474,7 +8529,30 @@
 						"title": "Owner Id"
 					},
 					"is_active": { "type": "boolean", "title": "Is Active" },
-					"is_archived": { "type": "boolean", "title": "Is Archived" }
+					"is_archived": { "type": "boolean", "title": "Is Archived" },
+					"owner_name": {
+						"anyOf": [{ "type": "string" }, { "type": "null" }],
+						"title": "Owner Name"
+					},
+					"owner_phone": {
+						"anyOf": [{ "type": "string" }, { "type": "null" }],
+						"title": "Owner Phone"
+					},
+					"plan_name": {
+						"anyOf": [{ "type": "string" }, { "type": "null" }],
+						"title": "Plan Name"
+					},
+					"subscription_status": {
+						"anyOf": [{ "type": "string" }, { "type": "null" }],
+						"title": "Subscription Status"
+					},
+					"created_at": {
+						"anyOf": [
+							{ "type": "string", "format": "date-time" },
+							{ "type": "null" }
+						],
+						"title": "Created At"
+					}
 				},
 				"type": "object",
 				"required": ["id", "name", "owner_id", "is_active", "is_archived"],
