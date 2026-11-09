@@ -10,31 +10,20 @@ import {
 	ChevronRightIcon,
 } from "lucide-react";
 
-import { useGetUserByIdQuery } from "@/services/auth/authApi";
 import { AdminCreateBusinessDialog } from "@/components/admin/admin-create-business-dialog";
 import { AdminCreateUserDialog } from "@/components/admin/admin-create-user-dialog";
 import { useListBusinessesQuery } from "@/services/branch-management/branchManagementApi";
-import { useListAdminSubscriptionTransactionsQuery } from "@/services/subscription/subscriptionApi";
 import { useListSubscriptionPlansQuery } from "@/services/subscription-plan/subscriptionPlanApi";
-import type {
-	AdminSubscriptionOutput,
-	BusinessOutput,
-	UserOutput,
-} from "@/services/types";
+import type { BusinessOutput } from "@/services/types";
 import {
-	buildLatestBusinessSubscriptionRows,
-	buildUnsubscribedBusinessRows,
-	collapseSubscriptionRowsByOwner,
+	countUniqueOwners,
 	getSubscriptionPlanLabel,
 	getSubscriptionStatusFilterLabel,
 	getSubscriptionStatusLabel,
 	PLAN_FILTER_ALL,
-	summarizeBusinessSubscriptionStats,
-	subscriptionRowTimestamp,
 	type PlatformSubscriptionSummary,
 	type SubscriptionStatusFilter,
 } from "@/lib/subscription-filters";
-import { formatUserDisplayName } from "@/lib/userDisplay";
 import { cn } from "@/lib/utils";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -65,16 +54,7 @@ import {
 	TableRow,
 } from "@/components/ui/table";
 
-const BIZ_COUNT_FILTER_ALL = "all";
-type BizCountFilter = typeof BIZ_COUNT_FILTER_ALL | "1" | "2" | "3+";
-
-type SortKey =
-	| "businesses"
-	| "plan"
-	| "status"
-	| "amount"
-	| "credits"
-	| "date";
+type SortKey = "business" | "plan" | "status" | "date";
 type SortDir = "asc" | "desc";
 
 const STATUS_SORT_RANK: Record<string, number> = {
@@ -100,7 +80,7 @@ function isStatusFilter(v: string): v is SubscriptionStatusFilter {
 	);
 }
 
-function formatSubscriptionDate(iso: string | null | undefined): string {
+function formatBusinessDate(iso: string | null | undefined): string {
 	if (!iso) return "—";
 	try {
 		return format(new Date(iso), "MMM d, yyyy");
@@ -119,58 +99,43 @@ function dayEndMs(yyyyMmDd: string): number {
 	return Number.isNaN(t) ? Number.POSITIVE_INFINITY : t;
 }
 
-function ownerBusinessCount(
-	row: AdminSubscriptionOutput,
-	ownerIdByBusinessId: Map<string, string>,
-	businessesByOwnerId: Map<string, BusinessOutput[]>,
-): number {
-	const ownerId = ownerIdByBusinessId.get(row.business_id);
-	if (!ownerId) return 0;
-	return businessesByOwnerId.get(ownerId)?.length ?? 0;
+function businessStatus(business: BusinessOutput): string {
+	return business.subscription_status?.trim().toLowerCase() || "unsubscribed";
 }
 
-function compareOwnerRows(
-	a: AdminSubscriptionOutput,
-	b: AdminSubscriptionOutput,
+function businessTimestamp(business: BusinessOutput): number {
+	const timestamp = new Date(business.created_at ?? "").getTime();
+	return Number.isFinite(timestamp) ? timestamp : 0;
+}
+
+function compareBusinesses(
+	a: BusinessOutput,
+	b: BusinessOutput,
 	sortKey: SortKey,
 	sortDir: SortDir,
-	ownerIdByBusinessId: Map<string, string>,
-	businessesByOwnerId: Map<string, BusinessOutput[]>,
 ): number {
 	const dir = sortDir === "asc" ? 1 : -1;
 	let cmp = 0;
 	switch (sortKey) {
-		case "businesses":
-			cmp =
-				ownerBusinessCount(a, ownerIdByBusinessId, businessesByOwnerId) -
-				ownerBusinessCount(b, ownerIdByBusinessId, businessesByOwnerId);
+		case "business":
+			cmp = a.name.localeCompare(b.name);
 			break;
 		case "plan":
-			cmp = getSubscriptionPlanLabel(a.plan).localeCompare(
-				getSubscriptionPlanLabel(b.plan),
-			);
+			cmp = (a.plan_name ?? "").localeCompare(b.plan_name ?? "");
 			break;
 		case "status":
 			cmp =
-				(STATUS_SORT_RANK[a.status.toLowerCase()] ?? -1) -
-				(STATUS_SORT_RANK[b.status.toLowerCase()] ?? -1);
-			break;
-		case "amount":
-			cmp = (a.amount ?? -1) - (b.amount ?? -1);
-			break;
-		case "credits":
-			cmp = a.credits_limit - b.credits_limit;
+				(STATUS_SORT_RANK[businessStatus(a)] ?? -1) -
+				(STATUS_SORT_RANK[businessStatus(b)] ?? -1);
 			break;
 		case "date":
-			cmp = subscriptionRowTimestamp(a) - subscriptionRowTimestamp(b);
+			cmp = businessTimestamp(a) - businessTimestamp(b);
 			break;
 		default:
 			cmp = 0;
 	}
 	if (cmp !== 0) return cmp * dir;
-	return (a.business?.name ?? a.business_id).localeCompare(
-		b.business?.name ?? b.business_id,
-	);
+	return a.name.localeCompare(b.name);
 }
 
 function getErrorMessage(error: unknown, fallback: string): string {
@@ -212,49 +177,25 @@ function statusBadgeVariant(
 	return "outline";
 }
 
-function formatBusinessNames(list: BusinessOutput[], max = 2): string {
-	if (list.length === 0) return "—";
-	const names = list.map((b) => b.name || "Untitled").filter(Boolean);
-	if (names.length <= max) return names.join(", ");
-	return `${names.slice(0, max).join(", ")} +${names.length - max} more`;
-}
-
-/** Search blob for one owner row — covers owner + every business + subscription. */
-function ownerRowSearchHay(
-	row: AdminSubscriptionOutput,
-	ownerId: string | undefined,
-	owner: UserOutput | undefined,
-	ownerBusinesses: BusinessOutput[],
-): string {
-	const parts: string[] = [
-		row.business?.name ?? "",
-		row.business?.tin_number ?? "",
-		row.plan?.name ?? "",
-		row.plan_id ?? "",
-		row.status,
-		row.chapa_transaction_reference ?? "",
-		row.business_id,
-		row.id,
-		ownerId ?? "",
-		owner ? formatUserDisplayName(owner) : "",
-		owner?.email ?? "",
-		owner?.phone_number ?? "",
-		owner?.username ?? "",
-		owner?.user_information?.first_name ?? "",
-		owner?.user_information?.last_name ?? "",
-		row.amount != null ? String(row.amount) : "",
-		String(row.credits_limit),
-	];
-	for (const b of ownerBusinesses) {
-		parts.push(b.name ?? "", b.tin_number ?? "", b.id, b.owner_id ?? "");
-	}
-	return parts.filter(Boolean).join(" ").toLowerCase();
+function businessSearchHay(business: BusinessOutput): string {
+	return [
+		business.name,
+		business.tin_number,
+		business.id,
+		business.owner_name,
+		business.owner_phone,
+		business.plan_name,
+		business.subscription_status,
+	]
+		.filter(Boolean)
+		.join(" ")
+		.toLowerCase();
 }
 
 const PAGE_SIZE_OPTIONS = [10, 20, 50] as const;
 type PageSize = (typeof PAGE_SIZE_OPTIONS)[number];
 
-export default function TransactionsPage() {
+export default function OwnersPage() {
 	const router = useRouter();
 	const [planId, setPlanId] = useState(PLAN_FILTER_ALL);
 	const [statusFilter, setStatusFilter] =
@@ -263,9 +204,6 @@ export default function TransactionsPage() {
 	const deferredSearch = useDeferredValue(searchTerm);
 	const [dateFrom, setDateFrom] = useState("");
 	const [dateTo, setDateTo] = useState("");
-	const [bizCountFilter, setBizCountFilter] =
-		useState<BizCountFilter>(BIZ_COUNT_FILTER_ALL);
-	const [minAmount, setMinAmount] = useState("");
 	const [sortKey, setSortKey] = useState<SortKey>("date");
 	const [sortDir, setSortDir] = useState<SortDir>("desc");
 	// ponytail: server page of businesses; Next/Prev only — no auto-walk
@@ -283,19 +221,8 @@ export default function TransactionsPage() {
 				pageSize,
 				dateFrom,
 				dateTo,
-				bizCountFilter,
-				minAmount,
 			].join("\0"),
-		[
-			planId,
-			statusFilter,
-			deferredSearch,
-			pageSize,
-			dateFrom,
-			dateTo,
-			bizCountFilter,
-			minAmount,
-		],
+		[planId, statusFilter, deferredSearch, pageSize, dateFrom, dateTo],
 	);
 	const [prevFilterResetKey, setPrevFilterResetKey] = useState(filterResetKey);
 	if (prevFilterResetKey !== filterResetKey) {
@@ -316,171 +243,57 @@ export default function TransactionsPage() {
 	});
 	const businesses = businessPage?.items;
 	const businessTotal = businessPage?.total_count ?? 0;
-	const pageBusinessIds = useMemo(
-		() => (businesses ?? []).map((b) => b.id),
-		[businesses],
-	);
 
 	const { data: plans } = useListSubscriptionPlansQuery();
 
-	const {
-		data: statsTransactions,
-		isLoading: statsLoading,
-		isFetching: statsFetching,
-		error: transactionsError,
-		refetch: refetchTransactions,
-	} = useListAdminSubscriptionTransactionsQuery(
-		{ businessIds: pageBusinessIds },
-		{ skip: pageBusinessIds.length === 0 },
-	);
-
-	const error = businessesError ?? transactionsError;
+	const error = businessesError;
 	function refetch() {
 		void refetchBusinesses();
-		if (pageBusinessIds.length > 0) void refetchTransactions();
 	}
 
-	const ownerIdByBusinessId = useMemo(() => {
-		const map = new Map<string, string>();
-		for (const b of businesses ?? []) {
-			if (b.owner_id) map.set(b.id, b.owner_id);
-		}
-		return map;
-	}, [businesses]);
-
-	const businessesByOwnerId = useMemo(() => {
-		const map = new Map<string, BusinessOutput[]>();
-		for (const b of businesses ?? []) {
-			if (!b.owner_id) continue;
-			const list = map.get(b.owner_id) ?? [];
-			list.push(b);
-			map.set(b.owner_id, list);
-		}
-		for (const list of map.values()) {
-			list.sort((a, b) => (a.name || "").localeCompare(b.name || ""));
-		}
-		return map;
-	}, [businesses]);
-
 	const pageRows = useMemo(() => {
-		const pageBusinesses = businesses ?? [];
-		const transactions = statsTransactions ?? [];
-		const withSubscription =
-			buildLatestBusinessSubscriptionRows(transactions);
-		const unsubscribed = buildUnsubscribedBusinessRows(
-			pageBusinesses,
-			transactions,
-		);
-
-		let businessRows: AdminSubscriptionOutput[];
-
-		if (statusFilter === "unsubscribed") {
-			businessRows = planId === PLAN_FILTER_ALL ? unsubscribed : [];
-		} else if (statusFilter === "all") {
-			businessRows = [...withSubscription, ...unsubscribed];
-			if (planId !== PLAN_FILTER_ALL) {
-				businessRows = withSubscription.filter(
-					(r) => r.plan_id === planId || r.plan?.id === planId,
-				);
-			}
-		} else {
-			businessRows = withSubscription.filter(
-				(r) => r.status.toLowerCase() === statusFilter,
-			);
-			if (planId !== PLAN_FILTER_ALL) {
-				businessRows = businessRows.filter(
-					(r) => r.plan_id === planId || r.plan?.id === planId,
-				);
-			}
+		let rows = businesses ?? [];
+		const selectedPlanName =
+			plans?.find((plan) => plan.id === planId)?.name.toLowerCase();
+		if (statusFilter !== "all") {
+			rows = rows.filter((business) => businessStatus(business) === statusFilter);
 		}
-
-		// Only rows for businesses on this server page.
-		const pageBizIds = new Set(pageBusinesses.map((b) => b.id));
-		businessRows = businessRows.filter(
-			(r) =>
-				pageBizIds.has(r.business_id) &&
-				ownerIdByBusinessId.has(r.business_id),
-		);
-
-		let rows = collapseSubscriptionRowsByOwner(
-			businessRows,
-			ownerIdByBusinessId,
-		);
+		if (selectedPlanName) {
+			rows = rows.filter(
+				(business) =>
+					business.plan_name?.trim().toLowerCase() === selectedPlanName,
+			);
+		}
 
 		const q = deferredSearch.trim().toLowerCase();
 		if (q) {
-			rows = rows.filter((row) => {
-				const ownerId = ownerIdByBusinessId.get(row.business_id);
-				const ownerBusinesses = ownerId
-					? (businessesByOwnerId.get(ownerId) ?? [])
-					: [];
-				// ponytail: owner name/phone search after row mounts getUserById
-				return ownerRowSearchHay(
-					row,
-					ownerId,
-					undefined,
-					ownerBusinesses,
-				).includes(q);
-			});
-		}
-
-		if (bizCountFilter !== BIZ_COUNT_FILTER_ALL) {
-			rows = rows.filter((row) => {
-				const n = ownerBusinessCount(
-					row,
-					ownerIdByBusinessId,
-					businessesByOwnerId,
-				);
-				if (bizCountFilter === "1") return n === 1;
-				if (bizCountFilter === "2") return n === 2;
-				return n >= 3;
-			});
-		}
-
-		const minAmt = minAmount.trim() === "" ? null : Number(minAmount);
-		if (minAmt != null && Number.isFinite(minAmt)) {
-			rows = rows.filter(
-				(row) =>
-					row.amount != null &&
-					Number.isFinite(row.amount) &&
-					row.amount >= minAmt,
-			);
+			rows = rows.filter((business) => businessSearchHay(business).includes(q));
 		}
 
 		if (dateFrom) {
 			const start = dayStartMs(dateFrom);
-			rows = rows.filter(
-				(row) => subscriptionRowTimestamp(row) >= start,
-			);
+			rows = rows.filter((business) => {
+				const timestamp = businessTimestamp(business);
+				return Number.isFinite(timestamp) && timestamp >= start;
+			});
 		}
 		if (dateTo) {
 			const end = dayEndMs(dateTo);
-			rows = rows.filter((row) => {
-				const t = subscriptionRowTimestamp(row);
-				return t > 0 && t <= end;
+			rows = rows.filter((business) => {
+				const timestamp = businessTimestamp(business);
+				return Number.isFinite(timestamp) && timestamp <= end;
 			});
 		}
 
 		return rows.toSorted((a, b) =>
-			compareOwnerRows(
-				a,
-				b,
-				sortKey,
-				sortDir,
-				ownerIdByBusinessId,
-				businessesByOwnerId,
-			),
+			compareBusinesses(a, b, sortKey, sortDir),
 		);
 	}, [
 		statusFilter,
 		businesses,
-		statsTransactions,
 		planId,
+		plans,
 		deferredSearch,
-		ownerIdByBusinessId,
-		businessesByOwnerId,
-		bizCountFilter,
-		minAmount,
 		dateFrom,
 		dateTo,
 		sortKey,
@@ -502,9 +315,7 @@ export default function TransactionsPage() {
 		statusFilter !== "all" ||
 		searchTerm.trim() !== "" ||
 		dateFrom !== "" ||
-		dateTo !== "" ||
-		bizCountFilter !== BIZ_COUNT_FILTER_ALL ||
-		minAmount.trim() !== "";
+		dateTo !== "";
 
 	function clearFilters() {
 		setPlanId(PLAN_FILTER_ALL);
@@ -512,8 +323,6 @@ export default function TransactionsPage() {
 		setSearchTerm("");
 		setDateFrom("");
 		setDateTo("");
-		setBizCountFilter(BIZ_COUNT_FILTER_ALL);
-		setMinAmount("");
 		setPage(1);
 	}
 
@@ -523,7 +332,7 @@ export default function TransactionsPage() {
 		} else {
 			setSortKey(key);
 			setSortDir(
-				key === "plan" || key === "status" || key === "businesses"
+				key === "business" || key === "plan" || key === "status"
 					? "asc"
 					: "desc",
 			);
@@ -533,24 +342,28 @@ export default function TransactionsPage() {
 
 	const summarySnapshot = useMemo((): PlatformSubscriptionSummary | null => {
 		if (businessPage == null) return null;
-		const pageBizCount = businesses?.length ?? 0;
-		// ponytail: page-only — never infer platform-wide status from a slice
-		const stats = summarizeBusinessSubscriptionStats(
-			statsTransactions ?? [],
-			pageBizCount,
-		);
+		const pageBusinesses = businesses ?? [];
+		const stats = {
+			active: 0,
+			pending: 0,
+			expired: 0,
+			other: 0,
+			noSubscription: 0,
+		};
+		for (const business of pageBusinesses) {
+			const status = businessStatus(business);
+			if (status === "active") stats.active++;
+			else if (status === "pending") stats.pending++;
+			else if (status === "expired") stats.expired++;
+			else if (status === "unsubscribed") stats.noSubscription++;
+			else stats.other++;
+		}
 		return {
 			...stats,
 			totalBusinesses: businessTotal,
-			totalOwners: pageRows.length,
+			totalOwners: countUniqueOwners(pageBusinesses),
 		};
-	}, [
-		businessPage,
-		businesses,
-		statsTransactions,
-		businessTotal,
-		pageRows.length,
-	]);
+	}, [businessPage, businesses, businessTotal]);
 
 	const businessesBusy = businessesLoading && !businessPage;
 	const summaryBusy = businessesBusy;
@@ -558,17 +371,7 @@ export default function TransactionsPage() {
 	const planLabel =
 		planId === PLAN_FILTER_ALL
 			? "All plans"
-			: (plans?.find((p) => p.id === planId)?.name ?? "All plans");
-
-	const bizCountLabel =
-		bizCountFilter === BIZ_COUNT_FILTER_ALL
-			? "Any count"
-			: bizCountFilter === "3+"
-				? "3 or more"
-				: bizCountFilter === "1"
-					? "1 business"
-					: "2 businesses";
-
+			: (plans?.find((plan) => plan.id === planId)?.name ?? "All plans");
 	const listBusy = businessesLoading && !businessPage;
 
 	return (
@@ -582,8 +385,8 @@ export default function TransactionsPage() {
 								Owners
 							</h1>
 							<p className="mt-1 max-w-xl text-sm leading-relaxed text-muted-foreground">
-								One row per owner. Open a row to manage their businesses,
-								staff, and subscription.
+								Browse businesses and open a row to manage its owner, staff, and
+								subscription.
 							</p>
 						</div>
 						<div className="flex flex-wrap items-center gap-2">
@@ -623,7 +426,7 @@ export default function TransactionsPage() {
 
 				{error ? (
 					<Alert variant="destructive">
-						<AlertTitle>Can’t load owners</AlertTitle>
+						<AlertTitle>Can’t load businesses</AlertTitle>
 						<AlertDescription className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
 							<span>{getErrorMessage(error, "Request failed.")}</span>
 							<Button
@@ -639,7 +442,7 @@ export default function TransactionsPage() {
 				) : null}
 			</header>
 
-			{/* Signature strip: owners thesis + business status mix */}
+			{/* Business totals and status mix for the current page. */}
 			<section
 				aria-labelledby="owners-closeout-heading"
 				className="admin-brand-band"
@@ -651,10 +454,10 @@ export default function TransactionsPage() {
 								id="owners-closeout-heading"
 								className="admin-brand-band-label"
 							>
-								Platform owners
+								Platform businesses
 							</p>
 							<p className="admin-brand-band-muted">
-								People who operate businesses on Tina Verify
+								Businesses operating on Tina Verify
 							</p>
 						</div>
 						{summaryBusy ? (
@@ -669,9 +472,6 @@ export default function TransactionsPage() {
 										? summarySnapshot.totalBusinesses.toLocaleString()
 										: "—"}
 								</p>
-								<p className="admin-brand-band-muted">
-									Businesses on the platform · list loads {pageSize} per page
-								</p>
 							</div>
 						)}
 					</div>
@@ -680,37 +480,37 @@ export default function TransactionsPage() {
 
 					<div className="grid flex-1 grid-cols-2 gap-x-6 gap-y-5 sm:grid-cols-2">
 						<OwnersLedgerStat
-							label="Active (page)"
-							loading={summaryBusy || statsLoading}
+							label="Active"
+							loading={summaryBusy}
 							value={
-								summarySnapshot && !statsLoading
+								summarySnapshot
 									? summarySnapshot.active.toLocaleString()
 									: null
 							}
 						/>
 						<OwnersLedgerStat
-							label="Pending (page)"
-							loading={summaryBusy || statsLoading}
+							label="Pending"
+							loading={summaryBusy}
 							value={
-								summarySnapshot && !statsLoading
+								summarySnapshot
 									? summarySnapshot.pending.toLocaleString()
 									: null
 							}
 						/>
 						<OwnersLedgerStat
-							label="Expired (page)"
-							loading={summaryBusy || statsLoading}
+							label="Expired"
+							loading={summaryBusy}
 							value={
-								summarySnapshot && !statsLoading
+								summarySnapshot
 									? summarySnapshot.expired.toLocaleString()
 									: null
 							}
 						/>
 						<OwnersLedgerStat
-							label="Unsubscribed (page)"
-							loading={summaryBusy || statsLoading}
+							label="Unsubscribed"
+							loading={summaryBusy}
 							value={
-								summarySnapshot && !statsLoading
+								summarySnapshot
 									? summarySnapshot.noSubscription.toLocaleString()
 									: null
 							}
@@ -721,9 +521,8 @@ export default function TransactionsPage() {
 
 			{summarySnapshot ? (
 				<p className="text-xs leading-relaxed text-muted-foreground">
-					Status counts are for businesses on this page only. Subscriptions and
-					owner profiles load with the current page — nothing is prefetched off
-					this screen.
+					Status counts are for businesses on this page only, based on the
+					business list response.
 					{summarySnapshot.other > 0
 						? ` Includes ${summarySnapshot.other.toLocaleString()} other status.`
 						: ""}
@@ -736,10 +535,10 @@ export default function TransactionsPage() {
 						id="owners-list-heading"
 						className="text-sm font-semibold tracking-tight text-foreground"
 					>
-						Owner list
+						Business list
 					</h2>
 					<p className="text-sm text-muted-foreground">
-						Filter and sort, then open a row to manage that owner’s businesses.
+						Filter and sort businesses, then open a row to manage it.
 					</p>
 				</div>
 
@@ -747,10 +546,10 @@ export default function TransactionsPage() {
 					<CardHeader className="border-b">
 						<div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
 							<div>
-								<CardTitle>Find owners</CardTitle>
+								<CardTitle>Find businesses</CardTitle>
 								<CardDescription>
-									Search owner name, phone, email, business, TIN, plan, status,
-									or amount — plus status, plan, business count, and dates.
+									Search business name, TIN, owner name or phone, plan, and
+									status. Filter by subscription status, plan, or creation date.
 								</CardDescription>
 							</div>
 							{filtersActive ? (
@@ -774,7 +573,7 @@ export default function TransactionsPage() {
 									</FieldLabel>
 									<Input
 										type="search"
-										placeholder="Owner, phone, email, business, TIN, plan…"
+										placeholder="Business, TIN, owner name or phone…"
 										value={searchTerm}
 										onChange={(e) => {
 											setSearchTerm(e.target.value);
@@ -850,58 +649,7 @@ export default function TransactionsPage() {
 								</Field>
 							</div>
 
-							<div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
-								<Field className="gap-1">
-									<FieldLabel className="text-[11px] text-muted-foreground">
-										Businesses
-									</FieldLabel>
-									<Select
-										value={bizCountFilter}
-										onValueChange={(v) => {
-											if (
-												v === BIZ_COUNT_FILTER_ALL ||
-												v === "1" ||
-												v === "2" ||
-												v === "3+"
-											) {
-												setBizCountFilter(v);
-											}
-										}}
-									>
-										<SelectTrigger className="h-9 w-full bg-background">
-											<span className="flex flex-1 truncate text-left text-sm">
-												{bizCountLabel}
-											</span>
-										</SelectTrigger>
-										<SelectContent>
-											<SelectGroup>
-												<SelectItem value={BIZ_COUNT_FILTER_ALL}>
-													Any count
-												</SelectItem>
-												<SelectItem value="1">1 business</SelectItem>
-												<SelectItem value="2">2 businesses</SelectItem>
-												<SelectItem value="3+">3 or more</SelectItem>
-											</SelectGroup>
-										</SelectContent>
-									</Select>
-								</Field>
-
-								<Field className="gap-1">
-									<FieldLabel className="text-[11px] text-muted-foreground">
-										Min amount
-									</FieldLabel>
-									<Input
-										type="number"
-										inputMode="decimal"
-										min={0}
-										step="any"
-										placeholder="Any"
-										value={minAmount}
-										onChange={(e) => setMinAmount(e.target.value)}
-										className="h-9 bg-background"
-									/>
-								</Field>
-
+							<div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
 								<Field className="gap-1">
 									<FieldLabel className="text-[11px] text-muted-foreground">
 										From
@@ -939,11 +687,10 @@ export default function TransactionsPage() {
 					) : pageRows.length === 0 ? (
 						<div className="flex flex-col items-start gap-1 py-10">
 							<p className="text-sm font-medium text-foreground">
-								No owners match
+								No businesses match
 							</p>
 							<p className="max-w-md text-sm text-muted-foreground">
-								Widen the status or plan filter, or clear filters to see the full
-								roster.
+								Adjust the filters or clear them to see more businesses.
 							</p>
 							{filtersActive ? (
 								<Button
@@ -964,14 +711,14 @@ export default function TransactionsPage() {
 									<TableRow className="hover:bg-transparent">
 										<TableHead>Owner</TableHead>
 										<SortableHead
-											label="Businesses"
-											column="businesses"
+											label="Business"
+											column="business"
 											sortKey={sortKey}
 											sortDir={sortDir}
 											onSort={toggleSort}
 										/>
 										<SortableHead
-											label="Primary plan"
+											label="Plan"
 											column="plan"
 											sortKey={sortKey}
 											sortDir={sortDir}
@@ -983,22 +730,6 @@ export default function TransactionsPage() {
 											sortKey={sortKey}
 											sortDir={sortDir}
 											onSort={toggleSort}
-										/>
-										<SortableHead
-											label="Amount"
-											column="amount"
-											sortKey={sortKey}
-											sortDir={sortDir}
-											onSort={toggleSort}
-											align="right"
-										/>
-										<SortableHead
-											label="Credits"
-											column="credits"
-											sortKey={sortKey}
-											sortDir={sortDir}
-											onSort={toggleSort}
-											align="right"
 										/>
 										<SortableHead
 											label="Date"
@@ -1013,23 +744,15 @@ export default function TransactionsPage() {
 									</TableRow>
 								</TableHeader>
 								<TableBody>
-									{pageRows.map((row) => {
-										const ownerId = ownerIdByBusinessId.get(row.business_id);
-										const ownerBusinesses = ownerId
-											? (businessesByOwnerId.get(ownerId) ?? [])
-											: [];
-										return (
-											<OwnerRow
-												key={ownerId ?? row.id}
-												row={row}
-												ownerId={ownerId}
-												ownerBusinesses={ownerBusinesses}
-												onSelect={() =>
-													router.push(`/admin/business/${row.business_id}`)
-												}
-											/>
-										);
-									})}
+									{pageRows.map((business) => (
+										<BusinessRow
+											key={business.id}
+											business={business}
+											onSelect={() =>
+												router.push(`/admin/business/${business.id}`)
+											}
+										/>
+									))}
 								</TableBody>
 							</Table>
 						</div>
@@ -1045,10 +768,10 @@ export default function TransactionsPage() {
 										? ` · ${getSubscriptionStatusFilterLabel(statusFilter)}`
 										: ""}
 									{pageRows.length > 0
-										? ` · ${pageRows.length} owner${pageRows.length === 1 ? "" : "s"} on page`
+										? ` · ${pageRows.length} business${pageRows.length === 1 ? "" : "es"} shown`
 										: ""}
 								</p>
-								{businessesFetching || statsFetching ? (
+								{businessesFetching ? (
 									<p className="text-[11px] text-muted-foreground">
 										Loading page…
 									</p>
@@ -1114,35 +837,17 @@ export default function TransactionsPage() {
 	);
 }
 
-function OwnerRow({
-	row,
-	ownerId,
-	ownerBusinesses,
+function BusinessRow({
+	business,
 	onSelect,
 }: {
-	row: AdminSubscriptionOutput;
-	ownerId: string | undefined;
-	ownerBusinesses: BusinessOutput[];
+	business: BusinessOutput;
 	onSelect: () => void;
 }) {
-	const { data: owner, isLoading: ownerLoading } = useGetUserByIdQuery(
-		{ userId: ownerId ?? "" },
-		{ skip: !ownerId },
-	);
-	const count = ownerBusinesses.length;
-	const namesSummary = formatBusinessNames(ownerBusinesses);
-	const displayName = owner ? formatUserDisplayName(owner) : null;
-	const phone = owner?.phone_number?.trim() ?? "";
-	const showPhone = Boolean(displayName && phone && phone !== displayName);
-	const ownerLabel = displayName
-		? displayName
-		: namesSummary !== "—"
-			? namesSummary
-			: "owner";
-	const dateLabel = formatSubscriptionDate(row.started_at ?? row.created_at);
-	const ownerPending = Boolean(ownerId && ownerLoading && !owner);
-
-	return (
+	const status = businessStatus(business);
+const ownerName = business.owner_name?.trim();
+const ownerPhone = business.owner_phone?.trim();
+return (
 		<TableRow
 			className="cursor-pointer motion-safe:transition-colors hover:bg-muted/40 focus-visible:bg-muted/50 focus-visible:outline-none"
 			onClick={onSelect}
@@ -1154,90 +859,46 @@ function OwnerRow({
 			}}
 			tabIndex={0}
 			role="button"
-			aria-label={`Open ${ownerLabel}, ${count} business${count === 1 ? "" : "es"}`}
+			aria-label={`Open ${business.name}`}
 		>
 			<TableCell>
-				{!ownerId ? (
-					<span className="text-muted-foreground">No owner linked</span>
-				) : ownerPending ? (
-					<div className="flex flex-col gap-1">
-						<Skeleton className="h-4 w-28" />
-						<Skeleton className="h-3 w-24" />
-					</div>
-				) : owner && displayName ? (
-					<div className="flex flex-col gap-0.5">
-						<div className="flex flex-wrap items-center gap-2">
-							<span className="font-medium text-foreground">{displayName}</span>
-							{owner.is_superuser ? (
-								<Badge variant="secondary">Staff</Badge>
-							) : null}
-						</div>
-						{showPhone ? (
-							<span className="font-mono text-xs tabular-nums text-muted-foreground">
-								{phone}
-							</span>
-						) : null}
-					</div>
-				) : (
-					<div className="flex flex-col gap-0.5">
-						<span className="text-muted-foreground">Unknown owner</span>
-						<span
-							className="font-mono text-xs text-muted-foreground"
-							title={ownerId}
-						>
-							{ownerId.slice(0, 8)}…
+				<div className="flex flex-col gap-0.5">
+					<span className="text-sm font-medium text-foreground">
+						{ownerName || "Unknown owner"}
+					</span>
+					{ownerPhone ? (
+						<span className="font-mono text-xs tabular-nums text-muted-foreground">
+							{ownerPhone}
 						</span>
-					</div>
-				)}
+					) : null}
+				</div>
 			</TableCell>
 			<TableCell>
-				<div className="flex max-w-64 items-center gap-2">
-					<span
-						className="min-w-0 truncate text-sm font-medium text-foreground"
-						title={namesSummary}
-					>
-						{namesSummary}
+				<div className="flex max-w-72 flex-col gap-0.5">
+					<span className="truncate text-sm font-medium text-foreground">
+						{business.name || "Untitled"}
 					</span>
-					{count > 0 ? (
-						<span className="shrink-0 rounded-md bg-muted px-1.5 py-0.5 font-mono text-[11px] tabular-nums text-muted-foreground">
-							{count}
+					{business.tin_number ? (
+						<span className="font-mono text-xs tabular-nums text-muted-foreground">
+							TIN {business.tin_number}
 						</span>
 					) : null}
 				</div>
 			</TableCell>
 			<TableCell className="text-sm text-muted-foreground">
-				{getSubscriptionPlanLabel(row.plan)}
+				{getSubscriptionPlanLabel(null, business.plan_name)}
 			</TableCell>
 			<TableCell>
-				<Badge variant={statusBadgeVariant(row.status)}>
-					{getSubscriptionStatusLabel(row.status)}
+				<Badge variant={statusBadgeVariant(status)}>
+					{getSubscriptionStatusLabel(status)}
 				</Badge>
 			</TableCell>
-			<TableCell className="text-right font-mono text-sm tabular-nums text-muted-foreground">
-				{row.amount === null || row.amount === undefined
-					? "—"
-					: Number.isFinite(row.amount)
-						? row.amount.toLocaleString(undefined, {
-								maximumFractionDigits: 2,
-							})
-						: "—"}
-			</TableCell>
-			<TableCell className="text-right font-mono text-sm tabular-nums text-muted-foreground">
-				{row.credits_limit.toLocaleString()}
-			</TableCell>
 			<TableCell className="whitespace-nowrap font-mono text-sm tabular-nums text-muted-foreground">
-				{dateLabel}
-			</TableCell>
-			<TableCell className="w-8 pr-3">
-				<ChevronRightIcon
-					className="size-4 text-muted-foreground/70"
-					aria-hidden
-				/>
+				{formatBusinessDate(business.created_at)}
 			</TableCell>
 		</TableRow>
 	);
 }
-
 
 function OwnersLedgerStat({
 	label,
