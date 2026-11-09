@@ -147,7 +147,7 @@ export default function SubscriptionPage() {
 		isLoading: businessesLoading,
 		error: businessesError,
 		refetch: refetchBusinesses,
-	} = useListAllBusinessesQuery();
+	} = useListAllBusinessesQuery({});
 
 	const {
 		data: plans = [],
@@ -182,7 +182,18 @@ export default function SubscriptionPage() {
 		return rows.filter((b) => {
 			const name = (b.name ?? "").toLowerCase();
 			const tin = (b.tin_number ?? "").toLowerCase();
-			return name.includes(q) || tin.includes(q) || b.id.toLowerCase().includes(q);
+			const searchableFields = [
+				name,
+				tin,
+				b.id,
+				b.owner_name ?? "",
+				b.owner_phone ?? "",
+				b.plan_name ?? "",
+				b.subscription_status ?? "",
+			];
+			return searchableFields.some((field) =>
+				field.toLowerCase().includes(q),
+			);
 		});
 	}, [businessSearch, businesses]);
 

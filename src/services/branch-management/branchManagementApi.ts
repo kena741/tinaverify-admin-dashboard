@@ -32,6 +32,8 @@ function businessFilterParams(
 		"phone",
 		"plan",
 		"status",
+		"from_date",
+		"to_date",
 	] as const) {
 		const value = filters[key];
 		if (typeof value === "string") params[key] = value;

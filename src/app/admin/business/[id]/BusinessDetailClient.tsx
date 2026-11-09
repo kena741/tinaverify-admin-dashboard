@@ -229,13 +229,15 @@ export default function BusinessDetailClient({
 		{ skip: businessLoading || businessFetching || missingBusinessId },
 	);
 
-	const { data: allBusinesses, isLoading: allBusinessesLoading } =
-		useListAllBusinessesQuery(undefined, { skip: missingBusinessId });
+	const {
+		data: allBusinesses = [],
+		isLoading: allBusinessesLoading,
+	} = useListAllBusinessesQuery({}, { skip: missingBusinessId });
 
 	const ownerBusinesses = useMemo(() => {
 		const ownerId = business?.owner_id;
 		if (!ownerId) return [] as BusinessOutput[];
-		return (allBusinesses ?? [])
+		return allBusinesses
 			.filter((b) => b.owner_id === ownerId)
 			.toSorted((a, b) => a.name.localeCompare(b.name));
 	}, [allBusinesses, business?.owner_id]);

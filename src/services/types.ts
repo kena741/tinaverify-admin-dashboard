@@ -116,7 +116,7 @@ export type BusinessCreateRequest = {
 export type BusinessOutput = {
 	id: UUID;
 	name: string;
-	tin_number: string;
+	tin_number?: string | null;
 	owner_id: UUID;
 	is_active: boolean;
 	is_archived: boolean;
@@ -133,6 +133,8 @@ export type BusinessListFilters = {
 	phone?: string | null;
 	plan?: string | null;
 	status?: string | null;
+	from_date?: string | null;
+	to_date?: string | null;
 };
 
 export type BusinessListQuery = BusinessListFilters & {
@@ -662,7 +664,7 @@ export type SubscriptionStatus =
 export type SubscriptionBusinessOutput = {
 	id: UUID;
 	name: string;
-	tin_number: string | null;
+	tin_number?: string | null;
 };
 
 /** Paginated wrapper some deployments return for `GET /api/v1/subscriptions/transactions`. */

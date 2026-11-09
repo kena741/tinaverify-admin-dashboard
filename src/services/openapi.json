@@ -569,6 +569,28 @@
 						"description": "Filter by business status or subscription status"
 					},
 					{
+						"name": "from_date",
+						"in": "query",
+						"required": false,
+						"schema": {
+							"anyOf": [{ "type": "string" }, { "type": "null" }],
+							"description": "Filter businesses created on or after this date (inclusive, e.g. YYYY-MM-DD or MM/DD/YYYY)",
+							"title": "From Date"
+						},
+						"description": "Filter businesses created on or after this date (inclusive, e.g. YYYY-MM-DD or MM/DD/YYYY)"
+					},
+					{
+						"name": "to_date",
+						"in": "query",
+						"required": false,
+						"schema": {
+							"anyOf": [{ "type": "string" }, { "type": "null" }],
+							"description": "Filter businesses created on or before this date (inclusive, e.g. YYYY-MM-DD or MM/DD/YYYY)",
+							"title": "To Date"
+						},
+						"description": "Filter businesses created on or before this date (inclusive, e.g. YYYY-MM-DD or MM/DD/YYYY)"
+					},
+					{
 						"name": "limit",
 						"in": "query",
 						"required": false,
