@@ -4,9 +4,11 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useMemo, useState } from "react";
 import {
 	ArrowLeft,
+	Building2,
 	Loader2Icon,
 	MessageSquare,
 	MoreHorizontal,
+	Phone,
 } from "lucide-react";
 import { format } from "date-fns";
 
@@ -585,40 +587,35 @@ export default function BusinessDetailClient({
 			) : null}
 
 			<header className="flex flex-col gap-4">
-				<div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-					<div className="min-w-0 flex flex-col gap-1">
-						<div className="flex flex-wrap items-center gap-2">
-							<h1
-								id="owner-heading"
-								className="truncate text-[1.625rem] font-semibold tracking-tight text-foreground"
-							>
-								{ownerDisplay}
-							</h1>
-							{business.is_active ? (
-								<Badge variant="secondary" className="font-normal">
-									Business active
-								</Badge>
-							) : (
-								<Badge variant="outline" className="font-normal">
-									Business inactive
-								</Badge>
-							)}
+				<div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+					<div className="flex min-w-0 flex-col gap-2">
+						<h1
+							id="owner-heading"
+							className="text-pretty text-2xl font-semibold tracking-tight text-foreground"
+						>
+							{ownerDisplay}
+						</h1>
+						<div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+							<Building2
+								className="size-4 shrink-0 text-muted-foreground"
+								aria-hidden="true"
+							/>
+							<p className="min-w-0 wrap-break-word text-base font-medium text-foreground">
+								{business.name || "Untitled business"}
+							</p>
 						</div>
-						<p className="text-sm text-muted-foreground">
-							{user?.phone_number ? (
-								<span className="font-mono tabular-nums text-foreground/80">
-									{user.phone_number}
-								</span>
-							) : (
-								<span>No phone on file</span>
-							)}
-							<span className="text-muted-foreground/80">
-								{" · "}
-								{ownerBusinesses.length === 1
-									? "1 business"
-									: `${ownerBusinesses.length || 0} businesses`}
+						<div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
+							<span className="inline-flex items-center gap-1.5">
+								<Phone className="size-3.5 shrink-0" aria-hidden="true" />
+								{user?.phone_number ? (
+									<span className="font-mono tabular-nums text-foreground/80">
+										{user.phone_number}
+									</span>
+								) : (
+									<span>No phone on file</span>
+								)}
 							</span>
-						</p>
+						</div>
 					</div>
 					<div className="flex shrink-0 flex-wrap items-center gap-2">
 						{user?.id ? (
@@ -722,14 +719,7 @@ export default function BusinessDetailClient({
 				>
 					{allBusinessesLoading ? (
 						<Skeleton className="h-8 w-40" />
-					) : ownerBusinesses.length <= 1 ? (
-						<span className="inline-flex h-8 items-center gap-2 rounded-md border border-border bg-card px-2.5 text-sm">
-							<span className="font-medium">{business.name || "Untitled"}</span>
-							<span className="font-mono text-xs text-muted-foreground">
-								{business.tin_number}
-							</span>
-						</span>
-					) : ownerBusinesses.length <= 6 ? (
+					) : ownerBusinesses.length <= 1 ? null : ownerBusinesses.length <= 6 ? (
 						<div
 							role="tablist"
 							aria-label="Select business"
