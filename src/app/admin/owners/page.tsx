@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { format } from "date-fns";
-import { useDeferredValue, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
 	ArrowDownIcon,
 	ArrowUpIcon,
@@ -89,16 +89,6 @@ function formatBusinessDate(iso: string | null | undefined): string {
 	}
 }
 
-function dayStartMs(yyyyMmDd: string): number {
-	const t = new Date(`${yyyyMmDd}T00:00:00`).getTime();
-	return Number.isNaN(t) ? 0 : t;
-}
-
-function dayEndMs(yyyyMmDd: string): number {
-	const t = new Date(`${yyyyMmDd}T23:59:59.999`).getTime();
-	return Number.isNaN(t) ? Number.POSITIVE_INFINITY : t;
-}
-
 function businessStatus(business: BusinessOutput): string {
 	return business.subscription_status?.trim().toLowerCase() || "unsubscribed";
 }
@@ -177,31 +167,23 @@ function statusBadgeVariant(
 	return "outline";
 }
 
-function businessSearchHay(business: BusinessOutput): string {
-	return [
-		business.name,
-		business.tin_number,
-		business.id,
-		business.owner_name,
-		business.owner_phone,
-		business.plan_name,
-		business.subscription_status,
-	]
-		.filter(Boolean)
-		.join(" ")
-		.toLowerCase();
-}
-
 const PAGE_SIZE_OPTIONS = [10, 20, 50] as const;
 type PageSize = (typeof PAGE_SIZE_OPTIONS)[number];
+const SEARCH_DEBOUNCE_MS = 350;
 
 export default function OwnersPage() {
 	const router = useRouter();
 	const [planId, setPlanId] = useState(PLAN_FILTER_ALL);
 	const [statusFilter, setStatusFilter] =
 		useState<SubscriptionStatusFilter>("all");
-	const [searchTerm, setSearchTerm] = useState("");
-	const deferredSearch = useDeferredValue(searchTerm);
+	const [businessName, setBusinessName] = useState("");
+	const [ownerName, setOwnerName] = useState("");
+	const [ownerPhone, setOwnerPhone] = useState("");
+	const [debouncedSearch, setDebouncedSearch] = useState({
+		businessName: "",
+		ownerName: "",
+		ownerPhone: "",
+	});
 	const [dateFrom, setDateFrom] = useState("");
 	const [dateTo, setDateTo] = useState("");
 	const [sortKey, setSortKey] = useState<SortKey>("date");
@@ -212,17 +194,36 @@ export default function OwnersPage() {
 	const [createUserOpen, setCreateUserOpen] = useState(false);
 	const [createBusinessOpen, setCreateBusinessOpen] = useState(false);
 
+	useEffect(() => {
+		const timeoutId = window.setTimeout(() => {
+			setDebouncedSearch({ businessName, ownerName, ownerPhone });
+		}, SEARCH_DEBOUNCE_MS);
+
+		return () => window.clearTimeout(timeoutId);
+	}, [businessName, ownerName, ownerPhone]);
+
 	const filterResetKey = useMemo(
 		() =>
 			[
 				planId,
 				statusFilter,
-				deferredSearch,
+				debouncedSearch.businessName,
+				debouncedSearch.ownerName,
+				debouncedSearch.ownerPhone,
 				pageSize,
 				dateFrom,
 				dateTo,
 			].join("\0"),
-		[planId, statusFilter, deferredSearch, pageSize, dateFrom, dateTo],
+		[
+			planId,
+			statusFilter,
+			debouncedSearch.businessName,
+			debouncedSearch.ownerName,
+			debouncedSearch.ownerPhone,
+			pageSize,
+			dateFrom,
+			dateTo,
+		],
 	);
 	const [prevFilterResetKey, setPrevFilterResetKey] = useState(filterResetKey);
 	if (prevFilterResetKey !== filterResetKey) {
@@ -232,7 +233,7 @@ export default function OwnersPage() {
 
 	const businessOffset = (page - 1) * pageSize;
 	const {
-		data: businessPage,
+		currentData: businessPage,
 		isLoading: businessesLoading,
 		isFetching: businessesFetching,
 		error: businessesError,
@@ -240,6 +241,13 @@ export default function OwnersPage() {
 	} = useListBusinessesQuery({
 		offset: businessOffset,
 		limit: pageSize,
+		business_name: debouncedSearch.businessName.trim() || undefined,
+		owner_name: debouncedSearch.ownerName.trim() || undefined,
+		phone: debouncedSearch.ownerPhone.trim() || undefined,
+		plan: planId === PLAN_FILTER_ALL ? undefined : planId,
+		status: statusFilter === "all" ? undefined : statusFilter,
+		from_date: dateFrom || undefined,
+		to_date: dateTo || undefined,
 	});
 	const businesses = businessPage?.items;
 	const businessTotal = businessPage?.total_count ?? 0;
@@ -251,76 +259,41 @@ export default function OwnersPage() {
 		void refetchBusinesses();
 	}
 
-	const pageRows = useMemo(() => {
-		let rows = businesses ?? [];
-		const selectedPlanName =
-			plans?.find((plan) => plan.id === planId)?.name.toLowerCase();
-		if (statusFilter !== "all") {
-			rows = rows.filter((business) => businessStatus(business) === statusFilter);
-		}
-		if (selectedPlanName) {
-			rows = rows.filter(
-				(business) =>
-					business.plan_name?.trim().toLowerCase() === selectedPlanName,
-			);
-		}
-
-		const q = deferredSearch.trim().toLowerCase();
-		if (q) {
-			rows = rows.filter((business) => businessSearchHay(business).includes(q));
-		}
-
-		if (dateFrom) {
-			const start = dayStartMs(dateFrom);
-			rows = rows.filter((business) => {
-				const timestamp = businessTimestamp(business);
-				return Number.isFinite(timestamp) && timestamp >= start;
-			});
-		}
-		if (dateTo) {
-			const end = dayEndMs(dateTo);
-			rows = rows.filter((business) => {
-				const timestamp = businessTimestamp(business);
-				return Number.isFinite(timestamp) && timestamp <= end;
-			});
-		}
-
-		return rows.toSorted((a, b) =>
-			compareBusinesses(a, b, sortKey, sortDir),
-		);
-	}, [
-		statusFilter,
-		businesses,
-		planId,
-		plans,
-		deferredSearch,
-		dateFrom,
-		dateTo,
-		sortKey,
-		sortDir,
-	]);
+	const pageRows = useMemo(
+		() =>
+			(businesses ?? []).toSorted((a, b) =>
+				compareBusinesses(a, b, sortKey, sortDir),
+			),
+		[businesses, sortKey, sortDir],
+	);
 
 	const totalPages = Math.max(1, Math.ceil(businessTotal / pageSize) || 1);
-	const currentPage = Math.min(page, totalPages);
-	if (page !== currentPage) {
+	const currentPage = businessPage ? Math.min(page, totalPages) : page;
+	if (businessPage && page !== currentPage) {
 		setPage(currentPage);
 	}
 	const rangeStart = businessTotal === 0 ? 0 : businessOffset + 1;
 	const rangeEnd = Math.min(businessOffset + pageSize, businessTotal);
 
 	const searchPending =
-		searchTerm.trim() !== deferredSearch.trim();
+		businessName !== debouncedSearch.businessName ||
+		ownerName !== debouncedSearch.ownerName ||
+		ownerPhone !== debouncedSearch.ownerPhone;
 	const filtersActive =
 		planId !== PLAN_FILTER_ALL ||
 		statusFilter !== "all" ||
-		searchTerm.trim() !== "" ||
+		businessName.trim() !== "" ||
+		ownerName.trim() !== "" ||
+		ownerPhone.trim() !== "" ||
 		dateFrom !== "" ||
 		dateTo !== "";
 
 	function clearFilters() {
 		setPlanId(PLAN_FILTER_ALL);
 		setStatusFilter("all");
-		setSearchTerm("");
+		setBusinessName("");
+		setOwnerName("");
+		setOwnerPhone("");
 		setDateFrom("");
 		setDateTo("");
 		setPage(1);
@@ -372,13 +345,13 @@ export default function OwnersPage() {
 		planId === PLAN_FILTER_ALL
 			? "All plans"
 			: (plans?.find((plan) => plan.id === planId)?.name ?? "All plans");
-	const listBusy = businessesLoading && !businessPage;
+	const listBusy =
+		!businessPage && (businessesLoading || businessesFetching);
 
 	return (
 		<div className="mx-auto flex w-full max-w-6xl flex-col gap-6 pb-8">
 			<header className="flex flex-col gap-4">
 				<div className="flex flex-col gap-1">
-					<p className="admin-eyebrow">Operator roster</p>
 					<div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
 						<div className="min-w-0">
 							<h1 className="text-2xl font-semibold tracking-tight text-foreground sm:text-[1.75rem]">
@@ -405,12 +378,6 @@ export default function OwnersPage() {
 							>
 								Create business
 							</Button>
-							{businessPage && !businessesBusy ? (
-								<p className="font-mono text-xs tabular-nums text-muted-foreground">
-									{pageRows.length.toLocaleString()} on page ·{" "}
-									{businessTotal.toLocaleString()} businesses
-								</p>
-							) : null}
 						</div>
 					</div>
 				</div>
@@ -454,10 +421,7 @@ export default function OwnersPage() {
 								id="owners-closeout-heading"
 								className="admin-brand-band-label"
 							>
-								Platform businesses
-							</p>
-							<p className="admin-brand-band-muted">
-								Businesses operating on Tina Verify
+								{filtersActive ? "Matching businesses" : "Platform businesses"}
 							</p>
 						</div>
 						{summaryBusy ? (
@@ -466,13 +430,11 @@ export default function OwnersPage() {
 								<Skeleton className="admin-brand-band-skeleton h-4 w-40" />
 							</div>
 						) : (
-							<div className="flex flex-col gap-1">
-								<p className="font-mono text-[clamp(2rem,5vw,2.75rem)] leading-none font-semibold tracking-tight tabular-nums">
-									{summarySnapshot?.totalBusinesses != null
-										? summarySnapshot.totalBusinesses.toLocaleString()
-										: "—"}
-								</p>
-							</div>
+							<p className="font-mono text-[clamp(2rem,5vw,2.75rem)] leading-none font-semibold tracking-tight tabular-nums">
+								{summarySnapshot?.totalBusinesses != null
+									? summarySnapshot.totalBusinesses.toLocaleString()
+									: "—"}
+							</p>
 						)}
 					</div>
 
@@ -480,16 +442,14 @@ export default function OwnersPage() {
 
 					<div className="grid flex-1 grid-cols-2 gap-x-6 gap-y-5 sm:grid-cols-2">
 						<OwnersLedgerStat
-							label="Active"
+							label="Active (page)"
 							loading={summaryBusy}
 							value={
-								summarySnapshot
-									? summarySnapshot.active.toLocaleString()
-									: null
+								summarySnapshot ? summarySnapshot.active.toLocaleString() : null
 							}
 						/>
 						<OwnersLedgerStat
-							label="Pending"
+							label="Pending (page)"
 							loading={summaryBusy}
 							value={
 								summarySnapshot
@@ -498,7 +458,7 @@ export default function OwnersPage() {
 							}
 						/>
 						<OwnersLedgerStat
-							label="Expired"
+							label="Expired (page)"
 							loading={summaryBusy}
 							value={
 								summarySnapshot
@@ -507,7 +467,7 @@ export default function OwnersPage() {
 							}
 						/>
 						<OwnersLedgerStat
-							label="Unsubscribed"
+							label="Unsubscribed (page)"
 							loading={summaryBusy}
 							value={
 								summarySnapshot
@@ -519,65 +479,71 @@ export default function OwnersPage() {
 				</div>
 			</section>
 
-			{summarySnapshot ? (
-				<p className="text-xs leading-relaxed text-muted-foreground">
-					Status counts are for businesses on this page only, based on the
-					business list response.
-					{summarySnapshot.other > 0
-						? ` Includes ${summarySnapshot.other.toLocaleString()} other status.`
-						: ""}
-				</p>
-			) : null}
-
-			<section aria-labelledby="owners-list-heading" className="flex flex-col gap-3">
-				<div className="flex flex-col gap-0.5">
-					<h2
-						id="owners-list-heading"
-						className="text-sm font-semibold tracking-tight text-foreground"
-					>
-						Business list
-					</h2>
-					<p className="text-sm text-muted-foreground">
-						Filter and sort businesses, then open a row to manage it.
-					</p>
-				</div>
-
-				<Card size="sm">
-					<CardHeader className="border-b">
-						<div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
-							<div>
-								<CardTitle>Find businesses</CardTitle>
-								<CardDescription>
-									Search business name, TIN, owner name or phone, plan, and
-									status. Filter by subscription status, plan, or creation date.
-								</CardDescription>
-							</div>
-							{filtersActive ? (
-								<Button
-									type="button"
-									variant="outline"
-									size="sm"
-									onClick={clearFilters}
-								>
-									Clear filters
-								</Button>
-							) : null}
-						</div>
+			<section
+				aria-labelledby="owners-list-heading"
+				className="flex flex-col gap-3"
+			>
+				<Card className="ring-0">
+					<CardHeader className="flex-row justify-end">
+						{filtersActive ? (
+							<Button
+								type="button"
+								variant="outline"
+								size="sm"
+								onClick={clearFilters}
+							>
+								Clear filters
+							</Button>
+						) : null}
 					</CardHeader>
 					<CardContent className="flex flex-col gap-4 pt-4">
 						<div className="flex flex-col gap-3 rounded-xl border border-border bg-muted/30 p-3 sm:p-4">
-							<div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-								<Field className="gap-1 sm:col-span-2">
+							<div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+								<Field className="gap-1">
 									<FieldLabel className="text-[11px] text-muted-foreground">
-										Search
+										Business name
 									</FieldLabel>
 									<Input
 										type="search"
-										placeholder="Business, TIN, owner name or phone…"
-										value={searchTerm}
+										placeholder="Any business name"
+										value={businessName}
 										onChange={(e) => {
-											setSearchTerm(e.target.value);
+											setBusinessName(e.target.value);
 										}}
+										className={cn(
+											"h-9 bg-background",
+											searchPending && "opacity-80",
+										)}
+										aria-busy={searchPending}
+									/>
+								</Field>
+
+								<Field className="gap-1">
+									<FieldLabel className="text-[11px] text-muted-foreground">
+										Owner name
+									</FieldLabel>
+									<Input
+										type="search"
+										placeholder="Any owner name"
+										value={ownerName}
+										onChange={(e) => setOwnerName(e.target.value)}
+										className={cn(
+											"h-9 bg-background",
+											searchPending && "opacity-80",
+										)}
+										aria-busy={searchPending}
+									/>
+								</Field>
+
+								<Field className="gap-1">
+									<FieldLabel className="text-[11px] text-muted-foreground">
+										Owner phone
+									</FieldLabel>
+									<Input
+										type="search"
+										placeholder="Any phone number"
+										value={ownerPhone}
+										onChange={(e) => setOwnerPhone(e.target.value)}
 										className={cn(
 											"h-9 bg-background",
 											searchPending && "opacity-80",
@@ -612,7 +578,9 @@ export default function OwnersPage() {
 												<SelectItem value="insufficient_credits">
 													Insufficient credits
 												</SelectItem>
-												<SelectItem value="unsubscribed">Unsubscribed</SelectItem>
+												<SelectItem value="unsubscribed">
+													Unsubscribed
+												</SelectItem>
 											</SelectGroup>
 										</SelectContent>
 									</Select>
@@ -635,7 +603,9 @@ export default function OwnersPage() {
 										</SelectTrigger>
 										<SelectContent>
 											<SelectGroup>
-												<SelectItem value={PLAN_FILTER_ALL}>All plans</SelectItem>
+												<SelectItem value={PLAN_FILTER_ALL}>
+													All plans
+												</SelectItem>
 												{(plans ?? [])
 													.filter((p) => !p.is_archived)
 													.map((p) => (
@@ -678,158 +648,156 @@ export default function OwnersPage() {
 							</div>
 						</div>
 
-					{listBusy ? (
-						<div className="flex flex-col gap-2">
-							{Array.from({ length: 6 }).map((_, i) => (
-								<Skeleton key={i} className="h-12 w-full" />
-							))}
-						</div>
-					) : pageRows.length === 0 ? (
-						<div className="flex flex-col items-start gap-1 py-10">
-							<p className="text-sm font-medium text-foreground">
-								No businesses match
-							</p>
-							<p className="max-w-md text-sm text-muted-foreground">
-								Adjust the filters or clear them to see more businesses.
-							</p>
-							{filtersActive ? (
-								<Button
-									type="button"
-									variant="outline"
-									size="sm"
-									className="mt-3"
-									onClick={clearFilters}
-								>
-									Clear filters
-								</Button>
-							) : null}
-						</div>
-					) : (
-						<div className="overflow-x-auto rounded-xl border border-border">
-							<Table>
-								<TableHeader>
-									<TableRow className="hover:bg-transparent">
-										<TableHead>Owner</TableHead>
-										<SortableHead
-											label="Business"
-											column="business"
-											sortKey={sortKey}
-											sortDir={sortDir}
-											onSort={toggleSort}
-										/>
-										<SortableHead
-											label="Plan"
-											column="plan"
-											sortKey={sortKey}
-											sortDir={sortDir}
-											onSort={toggleSort}
-										/>
-										<SortableHead
-											label="Status"
-											column="status"
-											sortKey={sortKey}
-											sortDir={sortDir}
-											onSort={toggleSort}
-										/>
-										<SortableHead
-											label="Date"
-											column="date"
-											sortKey={sortKey}
-											sortDir={sortDir}
-											onSort={toggleSort}
-										/>
-										<TableHead className="w-8">
-											<span className="sr-only">Open</span>
-										</TableHead>
-									</TableRow>
-								</TableHeader>
-								<TableBody>
-									{pageRows.map((business) => (
-										<BusinessRow
-											key={business.id}
-											business={business}
-											onSelect={() =>
-												router.push(`/admin/business/${business.id}`)
-											}
-										/>
-									))}
-								</TableBody>
-							</Table>
-						</div>
-					)}
-
-					{!listBusy && businessTotal > 0 ? (
-						<div className="flex flex-col gap-3 border-t border-border pt-4 sm:flex-row sm:items-center sm:justify-between">
-							<div className="flex flex-col gap-1">
-								<p className="font-mono text-xs tabular-nums text-muted-foreground">
-									Businesses {rangeStart}–{rangeEnd} of{" "}
-									{businessTotal.toLocaleString()}
-									{statusFilter !== "all"
-										? ` · ${getSubscriptionStatusFilterLabel(statusFilter)}`
-										: ""}
-									{pageRows.length > 0
-										? ` · ${pageRows.length} business${pageRows.length === 1 ? "" : "es"} shown`
-										: ""}
+						{listBusy ? (
+							<div className="flex flex-col gap-2">
+								{Array.from({ length: 6 }).map((_, i) => (
+									<Skeleton key={i} className="h-12 w-full" />
+								))}
+							</div>
+						) : pageRows.length === 0 ? (
+							<div className="flex flex-col items-start gap-1 py-10">
+								<p className="text-sm font-medium text-foreground">
+									No businesses match
 								</p>
-								{businessesFetching ? (
-									<p className="text-[11px] text-muted-foreground">
-										Loading page…
-									</p>
+								<p className="max-w-md text-sm text-muted-foreground">
+									Adjust the filters or clear them to see more businesses.
+								</p>
+								{filtersActive ? (
+									<Button
+										type="button"
+										variant="outline"
+										size="sm"
+										className="mt-3"
+										onClick={clearFilters}
+									>
+										Clear filters
+									</Button>
 								) : null}
 							</div>
-							<div className="flex flex-wrap items-center gap-2">
-								<span className="text-[11px] text-muted-foreground">
-									Per page
-								</span>
-								<Select
-									value={String(pageSize)}
-									onValueChange={(v) => {
-										const next = Number(v) as PageSize;
-										if (PAGE_SIZE_OPTIONS.includes(next)) {
-											setPageSize(next);
-											setPage(1);
-										}
-									}}
-								>
-									<SelectTrigger className="h-8 w-18" size="sm">
-										<span>{pageSize}</span>
-									</SelectTrigger>
-									<SelectContent>
-										{PAGE_SIZE_OPTIONS.map((n) => (
-											<SelectItem key={n} value={String(n)}>
-												{n}
-											</SelectItem>
+						) : (
+							<div className="overflow-x-auto rounded-xl border border-border">
+								<Table>
+									<TableHeader>
+										<TableRow className="hover:bg-transparent">
+											<TableHead>Owner</TableHead>
+											<SortableHead
+												label="Business"
+												column="business"
+												sortKey={sortKey}
+												sortDir={sortDir}
+												onSort={toggleSort}
+											/>
+											<SortableHead
+												label="Plan"
+												column="plan"
+												sortKey={sortKey}
+												sortDir={sortDir}
+												onSort={toggleSort}
+											/>
+											<SortableHead
+												label="Status"
+												column="status"
+												sortKey={sortKey}
+												sortDir={sortDir}
+												onSort={toggleSort}
+											/>
+											<SortableHead
+												label="Date"
+												column="date"
+												sortKey={sortKey}
+												sortDir={sortDir}
+												onSort={toggleSort}
+											/>
+											<TableHead className="w-8">
+												<span className="sr-only">Open</span>
+											</TableHead>
+										</TableRow>
+									</TableHeader>
+									<TableBody>
+										{pageRows.map((business) => (
+											<BusinessRow
+												key={business.id}
+												business={business}
+												onSelect={() =>
+													router.push(`/admin/business/${business.id}`)
+												}
+											/>
 										))}
-									</SelectContent>
-								</Select>
-								<Button
-									type="button"
-									variant="outline"
-									size="sm"
-									disabled={currentPage <= 1 || businessesFetching}
-									onClick={() => setPage(Math.max(1, currentPage - 1))}
-								>
-									Previous
-								</Button>
-								<span className="font-mono text-xs tabular-nums text-muted-foreground">
-									{currentPage}/{totalPages}
-								</span>
-								<Button
-									type="button"
-									variant="outline"
-									size="sm"
-									disabled={
-										currentPage >= totalPages || businessesFetching
-									}
-									onClick={() =>
-										setPage(Math.min(totalPages, currentPage + 1))
-									}
-								>
-									Next
-								</Button>
+									</TableBody>
+								</Table>
 							</div>
-						</div>
-					) : null}
+						)}
+
+						{!listBusy && businessTotal > 0 ? (
+							<div className="flex flex-col gap-3 border-t border-border pt-4 sm:flex-row sm:items-center sm:justify-between">
+								<div className="flex flex-col gap-1">
+									<p className="font-mono text-xs tabular-nums text-muted-foreground">
+										Businesses {rangeStart}–{rangeEnd} of{" "}
+										{businessTotal.toLocaleString()}
+										{statusFilter !== "all"
+											? ` · ${getSubscriptionStatusFilterLabel(statusFilter)}`
+											: ""}
+										{pageRows.length > 0
+											? ` · ${pageRows.length} business${pageRows.length === 1 ? "" : "es"} shown`
+											: ""}
+									</p>
+									{businessesFetching ? (
+										<p className="text-[11px] text-muted-foreground">
+											Loading page…
+										</p>
+									) : null}
+								</div>
+								<div className="flex flex-wrap items-center gap-2">
+									<span className="text-[11px] text-muted-foreground">
+										Per page
+									</span>
+									<Select
+										value={String(pageSize)}
+										onValueChange={(v) => {
+											const next = Number(v) as PageSize;
+											if (PAGE_SIZE_OPTIONS.includes(next)) {
+												setPageSize(next);
+												setPage(1);
+											}
+										}}
+									>
+										<SelectTrigger className="h-8 w-18" size="sm">
+											<span>{pageSize}</span>
+										</SelectTrigger>
+										<SelectContent>
+											{PAGE_SIZE_OPTIONS.map((n) => (
+												<SelectItem key={n} value={String(n)}>
+													{n}
+												</SelectItem>
+											))}
+										</SelectContent>
+									</Select>
+									<Button
+										type="button"
+										variant="outline"
+										size="sm"
+										disabled={currentPage <= 1 || businessesFetching}
+										onClick={() => setPage(Math.max(1, currentPage - 1))}
+									>
+										Previous
+									</Button>
+									<span className="font-mono text-xs tabular-nums text-muted-foreground">
+										{currentPage}/{totalPages}
+									</span>
+									<Button
+										type="button"
+										variant="outline"
+										size="sm"
+										disabled={currentPage >= totalPages || businessesFetching}
+										onClick={() =>
+											setPage(Math.min(totalPages, currentPage + 1))
+										}
+									>
+										Next
+									</Button>
+								</div>
+							</div>
+						) : null}
 					</CardContent>
 				</Card>
 			</section>
@@ -845,9 +813,9 @@ function BusinessRow({
 	onSelect: () => void;
 }) {
 	const status = businessStatus(business);
-const ownerName = business.owner_name?.trim();
-const ownerPhone = business.owner_phone?.trim();
-return (
+	const ownerName = business.owner_name?.trim();
+	const ownerPhone = business.owner_phone?.trim();
+	return (
 		<TableRow
 			className="cursor-pointer motion-safe:transition-colors hover:bg-muted/40 focus-visible:bg-muted/50 focus-visible:outline-none"
 			onClick={onSelect}
