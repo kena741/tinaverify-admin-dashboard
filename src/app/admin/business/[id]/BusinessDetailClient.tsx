@@ -64,6 +64,7 @@ import { useListBankAccountsQuery } from "../../../../services/bank-accounts/ban
 import {
 	useGetActiveSubscriptionQuery,
 	useGrantSubscriptionCreditsMutation,
+	useGetSubscriptionUsageQuery,
 	useListAdminSubscriptionTransactionsQuery,
 } from "../../../../services/subscription/subscriptionApi";
 import { useAdminAssignSubscriptionMutation } from "../../../../services/admin/adminApi";
@@ -229,10 +230,8 @@ export default function BusinessDetailClient({
 		{ skip: businessLoading || businessFetching || missingBusinessId },
 	);
 
-	const {
-		data: allBusinesses = [],
-		isLoading: allBusinessesLoading,
-	} = useListAllBusinessesQuery({}, { skip: missingBusinessId });
+	const { data: allBusinesses = [], isLoading: allBusinessesLoading } =
+		useListAllBusinessesQuery({}, { skip: missingBusinessId });
 
 	const ownerBusinesses = useMemo(() => {
 		const ownerId = business?.owner_id;
@@ -283,6 +282,11 @@ export default function BusinessDetailClient({
 		error: activeSubscriptionError,
 		refetch: refetchActiveSubscription,
 	} = useGetActiveSubscriptionQuery(
+		{ businessId },
+		{ skip: missingBusinessId },
+	);
+
+	const { data: subscriptionUsage } = useGetSubscriptionUsageQuery(
 		{ businessId },
 		{ skip: missingBusinessId },
 	);
@@ -549,14 +553,8 @@ export default function BusinessDetailClient({
 	const planName = latestSubscriptionFromHistory
 		? getSubscriptionPlanLabel(latestSubscriptionFromHistory.plan)
 		: null;
-	const planPrice =
-		latestSubscriptionFromHistory?.amount == null
-			? (latestSubscriptionFromHistory?.plan?.price ?? null)
-			: latestSubscriptionFromHistory.amount.toLocaleString(undefined, {
-					maximumFractionDigits: 2,
-				});
-	const historyCredits = latestSubscriptionFromHistory
-		? latestSubscriptionFromHistory.credits_limit.toLocaleString()
+	const usageCredits = subscriptionUsage
+		? subscriptionUsage.remaining_credits.toLocaleString()
 		: null;
 
 	return (
@@ -876,10 +874,10 @@ export default function BusinessDetailClient({
 
 			<section
 				aria-label="Live account context"
-				className="sticky top-0 z-10 flex flex-col gap-3 rounded-xl border border-border bg-card/95 p-4 shadow-xs backdrop-blur-sm supports-backdrop-filter:bg-card/90"
+				className="sticky top-0 z-10 flex flex-col gap-3 bg-card/95 py-3 backdrop-blur-sm supports-backdrop-filter:bg-card/90"
 			>
-				<div className="grid grid-cols-2 divide-x divide-y divide-border overflow-hidden rounded-lg border border-border sm:grid-cols-5 sm:divide-y-0">
-					<div className="flex flex-col gap-1.5 px-3 py-3">
+				<div className="grid grid-cols-1 items-stretch gap-2 sm:grid-cols-3">
+					<div className="flex min-h-14 min-w-0 flex-col justify-center gap-1.5 py-2">
 						<p className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
 							Status
 						</p>
@@ -898,7 +896,7 @@ export default function BusinessDetailClient({
 							)}
 						</div>
 					</div>
-					<div className="flex flex-col gap-1.5 px-3 py-3">
+					<div className="flex min-h-14 min-w-0 flex-col justify-center gap-1.5 py-2">
 						<p className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
 							Plan
 						</p>
@@ -906,28 +904,12 @@ export default function BusinessDetailClient({
 							{planName ?? "—"}
 						</p>
 					</div>
-					<div className="flex flex-col gap-1.5 px-3 py-3">
+					<div className="flex min-h-14 min-w-0 flex-col justify-center gap-1.5 py-2">
 						<p className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
-							Price
+							Remaining Credits
 						</p>
 						<p className="font-mono text-sm font-medium tabular-nums">
-							{planPrice ?? "—"}
-						</p>
-					</div>
-					<div className="flex flex-col gap-1.5 px-3 py-3">
-						<p className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
-							Credits
-						</p>
-						<p className="font-mono text-sm font-medium tabular-nums">
-							{historyCredits ?? "—"}
-						</p>
-					</div>
-					<div className="col-span-2 flex flex-col gap-1.5 px-3 py-3 sm:col-span-1">
-						<p className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
-							TIN
-						</p>
-						<p className="font-mono text-sm font-medium tabular-nums">
-							{business.tin_number}
+							{usageCredits ?? "—"}
 						</p>
 					</div>
 				</div>
@@ -1044,17 +1026,12 @@ export default function BusinessDetailClient({
 
 					{grantCreditsEnabled ? (
 						<form
-							className="flex flex-wrap items-end gap-2 rounded-lg border border-border bg-muted/30 p-2.5"
+							className="flex flex-wrap items-end gap-2 sm:border-l sm:border-border sm:pl-3"
 							onSubmit={(e) => {
 								e.preventDefault();
 								openGrantConfirm();
 							}}
 						>
-							<div className="flex w-full flex-wrap items-center gap-2">
-								<p className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
-									Grant credits
-								</p>
-							</div>
 							<Field className="min-w-40 flex-1">
 								<FieldLabel
 									htmlFor="quick-grant-credits"
@@ -1089,7 +1066,7 @@ export default function BusinessDetailClient({
 							</Button>
 						</form>
 					) : (
-						<div className="flex flex-col gap-1.5 rounded-lg border border-dashed border-border bg-muted/20 px-3 py-2.5">
+						<div className="flex flex-col gap-1.5 px-3 py-2.5 sm:border-l sm:border-border">
 							<div className="flex flex-wrap items-center gap-2">
 								<p className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
 									Under development
@@ -1169,34 +1146,6 @@ export default function BusinessDetailClient({
 				</TabsList>
 
 				<TabsContent value="business" className="mt-0 flex flex-col gap-4">
-					<div className="grid grid-cols-1 overflow-hidden rounded-xl border border-border sm:grid-cols-3">
-						<div className="flex flex-col gap-1 px-4 py-3.5">
-							<p className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
-								Name
-							</p>
-							<p className="text-sm font-medium tracking-tight">
-								{business.name || "—"}
-							</p>
-						</div>
-						<div className="flex flex-col gap-1 border-border px-4 py-3.5 sm:border-l">
-							<p className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
-								TIN
-							</p>
-							<p className="font-mono text-sm font-medium tabular-nums">
-								{business.tin_number}
-							</p>
-						</div>
-						<div className="flex flex-col gap-1 border-border px-4 py-3.5 sm:border-l">
-							<p className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
-								Status
-							</p>
-							<p className="text-sm font-medium tracking-tight">
-								{business.is_active ? "Active" : "Inactive"}
-								{business.is_archived ? " · Archived" : ""}
-							</p>
-						</div>
-					</div>
-
 					<section className="overflow-hidden rounded-xl border border-border">
 						<div className="border-b border-border px-4 py-3">
 							<h2 className="text-sm font-semibold tracking-tight">Branches</h2>
