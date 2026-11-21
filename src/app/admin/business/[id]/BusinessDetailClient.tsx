@@ -21,9 +21,11 @@ import { Calendar } from "@/components/ui/calendar";
 import {
 	Card,
 	CardAction,
+	CardContent,
 	CardHeader,
 	CardTitle,
 } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Field, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -88,11 +90,11 @@ import type {
 	BusinessOutput,
 	EmployeeOutput,
 	RoleOutput,
+	VerifiedTransactionOutput,
 } from "../../../../services/types";
 import { useListRolesQuery } from "../../../../services/role/roleApi";
 import { useGetUserByIdQuery } from "../../../../services/auth/authApi";
 import { useListTransactionsByBusinessQuery } from "../../../../services/transactions/transactionsApi";
-import { BusinessPaymentsTab } from "@/components/admin/business-payments-tab";
 import { ConfirmCreditActionDialog } from "@/components/admin/confirm-credit-action-dialog";
 import { ResetUserPasswordDialog } from "@/components/admin/reset-user-password-dialog";
 import { SendBusinessSmsDialog } from "@/components/admin/send-business-sms-dialog";
@@ -170,8 +172,52 @@ function transactionBadgeVariant(
 	return "outline";
 }
 
+function ScanTransactionRow({ row }: { row: VerifiedTransactionOutput }) {
+	return (
+		<TableRow>
+			<TableCell className="whitespace-nowrap text-left text-sm text-muted-foreground">
+				{formatDateTime(row.recorded_date)}
+			</TableCell>
+			<TableCell className="max-w-48 truncate text-left">
+				{row.sender_name ?? "—"}
+			</TableCell>
+			<TableCell className="text-left font-mono text-sm tabular-nums">
+				{row.currency}{" "}
+				{Number.isFinite(Number(row.amount))
+					? Number(row.amount).toLocaleString(undefined, {
+							maximumFractionDigits: 2,
+						})
+					: row.amount}
+			</TableCell>
+			<TableCell className="text-left">
+				<Badge
+					variant={transactionBadgeVariant(row.status)}
+					className="font-normal capitalize"
+				>
+					{row.status.replaceAll("_", " ")}
+				</Badge>
+			</TableCell>
+			<TableCell className="text-left">
+				{row.receipt_url ? (
+					<a
+						href={row.receipt_url}
+						target="_blank"
+						rel="noreferrer"
+						className="font-medium text-primary underline-offset-4 hover:underline"
+					>
+						View receipt
+					</a>
+				) : (
+					<span className="text-muted-foreground">—</span>
+				)}
+			</TableCell>
+		</TableRow>
+	);
+}
+
 const DETAIL_TABS = ["business", "people", "money", "scans"] as const;
 const SCANS_PAGE_SIZE = 25;
+const EMPTY_SCAN_ROWS: VerifiedTransactionOutput[] = [];
 
 type DetailTab = (typeof DETAIL_TABS)[number];
 
@@ -218,6 +264,7 @@ export default function BusinessDetailClient({
 	const missingBusinessId = !businessId;
 	const [sendSmsOpen, setSendSmsOpen] = useState(false);
 	const [scansOffset, setScansOffset] = useState(0);
+	const [groupScansByBank, setGroupScansByBank] = useState(false);
 	const [scansCalendarOpen, setScansCalendarOpen] = useState(false);
 	const [scansDateRange, setScansDateRange] = useState<DateRange | undefined>(
 		() => {
@@ -341,6 +388,7 @@ export default function BusinessDetailClient({
 			businessId,
 			startDate: scansStartDate ?? "",
 			endDate: scansEndDate ?? "",
+			bankFilter: groupScansByBank,
 			limit: SCANS_PAGE_SIZE,
 			offset: scansOffset,
 		},
@@ -384,9 +432,7 @@ export default function BusinessDetailClient({
 
 	const [activeDialogOpen, setActiveDialogOpen] = useState(false);
 	const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-	const [billingPane, setBillingPane] = useState<
-		"history" | "payments" | "banks"
-	>("history");
+	const [billingPane, setBillingPane] = useState<"history" | "banks">("history");
 	const [statusBanner, setStatusBanner] = useState<{
 		variant: "default" | "destructive";
 		title: string;
@@ -436,9 +482,37 @@ export default function BusinessDetailClient({
 	}, [subscriptionHistoryRows]);
 
 	const employeeRows = employees ?? [];
-	const scanRows = scans ?? [];
+	const scanRows = scans ?? EMPTY_SCAN_ROWS;
 	const canPreviousScansPage = scansOffset > 0;
 	const canNextScansPage = scanRows.length === SCANS_PAGE_SIZE;
+	const scansGroupedByBank = useMemo(() => {
+		if (!groupScansByBank) return [];
+
+		const bankNameByAccountId = new Map(
+			(bankAccounts ?? []).map((account) => [account.id, account.bank_name]),
+		);
+		const rowsByBank = new Map<string, VerifiedTransactionOutput[]>();
+		for (const row of scanRows) {
+			const bankName = row.bank_account_id
+				? (bankNameByAccountId.get(row.bank_account_id) ?? "Other / unknown bank")
+				: "Other / unknown bank";
+			const rows = rowsByBank.get(bankName) ?? [];
+			rows.push(row);
+			rowsByBank.set(bankName, rows);
+		}
+
+		return Array.from(rowsByBank, ([bankName, rows]) => ({ bankName, rows }));
+	}, [bankAccounts, groupScansByBank, scanRows]);
+	const scanTableRows = groupScansByBank
+		? scansGroupedByBank.flatMap(({ bankName, rows }) => [
+				<TableRow key={`bank-${bankName}`} className="bg-muted/40">
+					<TableCell colSpan={5} className="font-medium">
+						{bankName}
+					</TableCell>
+				</TableRow>,
+				...rows.map((row) => <ScanTransactionRow key={row.id} row={row} />),
+			])
+		: scanRows.map((row) => <ScanTransactionRow key={row.id} row={row} />);
 	const scansDateRangeLabel = scansDateRange?.from
 		? scansDateRange.to
 			? `${format(scansDateRange.from, "MMM d, yyyy")} – ${format(scansDateRange.to, "MMM d, yyyy")}`
@@ -1453,7 +1527,7 @@ export default function BusinessDetailClient({
 					<Card size="sm">
 						<CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
 							<div className="flex flex-col gap-1">
-								<CardTitle>Scan date range</CardTitle>
+								<CardTitle>Scan filters</CardTitle>
 							</div>
 							<CardAction className="w-full self-stretch sm:w-auto sm:self-center">
 								<Popover
@@ -1491,6 +1565,29 @@ export default function BusinessDetailClient({
 								</Popover>
 							</CardAction>
 						</CardHeader>
+						<CardContent className="pt-0">
+							<Field orientation="horizontal" className="items-start">
+								<Checkbox
+									id="scans-group-by-bank"
+									checked={groupScansByBank}
+									onCheckedChange={(checked) => {
+										setGroupScansByBank(checked === true);
+										setScansOffset(0);
+									}}
+								/>
+								<div className="flex flex-col gap-0.5">
+									<FieldLabel
+										htmlFor="scans-group-by-bank"
+										className="cursor-pointer"
+									>
+										Group transactions by bank
+									</FieldLabel>
+									<p className="text-xs text-muted-foreground">
+										Organize the results into bank groups.
+									</p>
+								</div>
+							</Field>
+						</CardContent>
 					</Card>
 
 					{!hasCompleteScansDateRange ? (
@@ -1543,50 +1640,11 @@ export default function BusinessDetailClient({
 													colSpan={5}
 													className="py-10 text-center text-sm text-muted-foreground"
 												>
-													No scans found for this business.
+													No scans found for the selected filters.
 												</TableCell>
 											</TableRow>
 										) : (
-											scanRows.map((row) => (
-												<TableRow key={row.id}>
-													<TableCell className="whitespace-nowrap text-left text-sm text-muted-foreground">
-														{formatDateTime(row.recorded_date)}
-													</TableCell>
-													<TableCell className="max-w-48 truncate text-left">
-														{row.sender_name ?? "—"}
-													</TableCell>
-													<TableCell className="text-left font-mono text-sm tabular-nums">
-														{row.currency}{" "}
-														{Number.isFinite(Number(row.amount))
-															? Number(row.amount).toLocaleString(undefined, {
-																	maximumFractionDigits: 2,
-																})
-															: row.amount}
-													</TableCell>
-													<TableCell className="text-left">
-														<Badge
-															variant={transactionBadgeVariant(row.status)}
-															className="font-normal capitalize"
-														>
-															{row.status.replaceAll("_", " ")}
-														</Badge>
-													</TableCell>
-													<TableCell className="text-left">
-														{row.receipt_url ? (
-															<a
-																href={row.receipt_url}
-																target="_blank"
-																rel="noreferrer"
-																className="font-medium text-primary underline-offset-4 hover:underline"
-															>
-																View receipt
-															</a>
-														) : (
-															<span className="text-muted-foreground">—</span>
-														)}
-													</TableCell>
-												</TableRow>
-											))
+											scanTableRows
 										)}
 									</TableBody>
 								</Table>
@@ -1642,7 +1700,6 @@ export default function BusinessDetailClient({
 						{(
 							[
 								["history", "History"],
-								["payments", "Payments"],
 								["banks", "Banks"],
 							] as const
 						).map(([id, label]) => (
@@ -1778,10 +1835,6 @@ export default function BusinessDetailClient({
 								</div>
 							)}
 						</div>
-					) : null}
-
-					{billingPane === "payments" ? (
-						<BusinessPaymentsTab businessId={businessId} />
 					) : null}
 
 					{billingPane === "banks" ? (
