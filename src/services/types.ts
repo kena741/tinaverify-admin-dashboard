@@ -745,6 +745,7 @@ export type VerifiedTransactionOutput = {
 	id: UUID;
 	reference_number: string;
 	business_id: UUID;
+	recorded_date?: string | null;
 	amount: string;
 	currency: string;
 	bank_account_id?: UUID | null;

@@ -5,18 +5,28 @@ import { useMemo, useState } from "react";
 import {
 	ArrowLeft,
 	Building2,
+	CalendarDays,
 	Loader2Icon,
 	MessageSquare,
 	MoreHorizontal,
 	Phone,
 } from "lucide-react";
-import { format } from "date-fns";
+import { endOfDay, format, startOfDay, subDays } from "date-fns";
+import type { DateRange } from "react-day-picker";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
+import {
+	Card,
+	CardAction,
+	CardHeader,
+	CardTitle,
+} from "@/components/ui/card";
 import { Field, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -81,6 +91,7 @@ import type {
 } from "../../../../services/types";
 import { useListRolesQuery } from "../../../../services/role/roleApi";
 import { useGetUserByIdQuery } from "../../../../services/auth/authApi";
+import { useListTransactionsByBusinessQuery } from "../../../../services/transactions/transactionsApi";
 import { BusinessPaymentsTab } from "@/components/admin/business-payments-tab";
 import { ConfirmCreditActionDialog } from "@/components/admin/confirm-credit-action-dialog";
 import { ResetUserPasswordDialog } from "@/components/admin/reset-user-password-dialog";
@@ -147,7 +158,20 @@ function subscriptionBadgeVariant(
 	return "outline";
 }
 
-const DETAIL_TABS = ["business", "people", "money"] as const;
+function transactionBadgeVariant(
+	status: string,
+): "default" | "secondary" | "destructive" | "outline" {
+	const normalizedStatus = status.toLowerCase();
+	if (normalizedStatus === "verified" || normalizedStatus === "success")
+		return "default";
+	if (normalizedStatus === "pending") return "secondary";
+	if (normalizedStatus === "failed" || normalizedStatus === "canceled")
+		return "destructive";
+	return "outline";
+}
+
+const DETAIL_TABS = ["business", "people", "money", "scans"] as const;
+const SCANS_PAGE_SIZE = 25;
 
 type DetailTab = (typeof DETAIL_TABS)[number];
 
@@ -159,6 +183,7 @@ const LEGACY_TAB_MAP: Record<string, DetailTab> = {
 	payments: "money",
 	subscription: "money",
 	referrals: "money",
+	transactions: "scans",
 };
 
 function isDetailTab(value: string | null | undefined): value is DetailTab {
@@ -192,6 +217,14 @@ export default function BusinessDetailClient({
 	const businessSmsEnabled = ADMIN_FEATURE.businessSms;
 	const missingBusinessId = !businessId;
 	const [sendSmsOpen, setSendSmsOpen] = useState(false);
+	const [scansOffset, setScansOffset] = useState(0);
+	const [scansCalendarOpen, setScansCalendarOpen] = useState(false);
+	const [scansDateRange, setScansDateRange] = useState<DateRange | undefined>(
+		() => {
+			const to = new Date();
+			return { from: subDays(to, 29), to };
+		},
+	);
 	const [resetPasswordTarget, setResetPasswordTarget] = useState<{
 		userName: string;
 		phoneNumber?: string | null;
@@ -203,6 +236,7 @@ export default function BusinessDetailClient({
 	const activeTab: DetailTab = resolveDetailTab(tabParam);
 
 	function goToBusiness(nextBusinessId: string) {
+		setScansOffset(0);
 		router.push(businessDetailPath(nextBusinessId, activeTab), {
 			scroll: false,
 		});
@@ -213,6 +247,14 @@ export default function BusinessDetailClient({
 		if (!isDetailTab(tab) || tab === activeTab) return;
 		router.replace(businessDetailPath(businessId, tab), { scroll: false });
 	}
+
+	const scansStartDate = scansDateRange?.from
+		? startOfDay(scansDateRange.from).toISOString()
+		: null;
+	const scansEndDate = scansDateRange?.to
+		? endOfDay(scansDateRange.to).toISOString()
+		: null;
+	const hasCompleteScansDateRange = Boolean(scansStartDate && scansEndDate);
 
 	const {
 		data: business,
@@ -286,6 +328,28 @@ export default function BusinessDetailClient({
 	} = useGetActiveSubscriptionQuery(
 		{ businessId },
 		{ skip: missingBusinessId },
+	);
+
+	const {
+		data: scans,
+		isLoading: scansLoading,
+		isFetching: scansFetching,
+		error: scansError,
+		refetch: refetchScans,
+	} = useListTransactionsByBusinessQuery(
+		{
+			businessId,
+			startDate: scansStartDate ?? "",
+			endDate: scansEndDate ?? "",
+			limit: SCANS_PAGE_SIZE,
+			offset: scansOffset,
+		},
+		{
+			skip:
+				missingBusinessId ||
+				activeTab !== "scans" ||
+				!hasCompleteScansDateRange,
+		},
 	);
 
 	const { data: subscriptionUsage } = useGetSubscriptionUsageQuery(
@@ -372,6 +436,14 @@ export default function BusinessDetailClient({
 	}, [subscriptionHistoryRows]);
 
 	const employeeRows = employees ?? [];
+	const scanRows = scans ?? [];
+	const canPreviousScansPage = scansOffset > 0;
+	const canNextScansPage = scanRows.length === SCANS_PAGE_SIZE;
+	const scansDateRangeLabel = scansDateRange?.from
+		? scansDateRange.to
+			? `${format(scansDateRange.from, "MMM d, yyyy")} – ${format(scansDateRange.to, "MMM d, yyyy")}`
+			: `${format(scansDateRange.from, "MMM d, yyyy")} – Select end date`
+		: "Select date range";
 
 	const grantCreditsParsed = Number.parseInt(grantCreditsInput.trim(), 10);
 	const canGrantCredits =
@@ -1130,6 +1202,9 @@ export default function BusinessDetailClient({
 					<TabsTrigger value="people" className="rounded-md">
 						Staff
 					</TabsTrigger>
+					<TabsTrigger value="scans" className="rounded-md">
+						Scans
+					</TabsTrigger>
 					<TabsTrigger value="money" className="rounded-md">
 						Billing
 					</TabsTrigger>
@@ -1372,6 +1447,190 @@ export default function BusinessDetailClient({
 							)}
 						</div>
 					</section>
+				</TabsContent>
+
+				<TabsContent value="scans" className="mt-0 flex flex-col gap-3">
+					<Card size="sm">
+						<CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+							<div className="flex flex-col gap-1">
+								<CardTitle>Scan date range</CardTitle>
+							</div>
+							<CardAction className="w-full self-stretch sm:w-auto sm:self-center">
+								<Popover
+									open={scansCalendarOpen}
+									onOpenChange={setScansCalendarOpen}
+								>
+									<PopoverTrigger
+										render={
+											<Button
+												type="button"
+												variant="outline"
+												className="w-full justify-start font-normal sm:w-auto"
+												aria-label="Choose scan date range"
+											/>
+										}
+									>
+										<CalendarDays data-icon="inline-start" aria-hidden="true" />
+										{scansDateRangeLabel}
+									</PopoverTrigger>
+									<PopoverContent className="w-auto p-0" align="end">
+										<Calendar
+											mode="range"
+											selected={scansDateRange}
+											onSelect={(range) => {
+												setScansDateRange(range);
+												setScansOffset(0);
+												if (range?.from && range.to) {
+													setScansCalendarOpen(false);
+												}
+											}}
+											numberOfMonths={2}
+											disabled={{ after: new Date() }}
+										/>
+									</PopoverContent>
+								</Popover>
+							</CardAction>
+						</CardHeader>
+					</Card>
+
+					{!hasCompleteScansDateRange ? (
+						<p className="py-8 text-center text-sm text-muted-foreground">
+							Select both dates to view scans.
+						</p>
+					) : scansError ? (
+						<Alert variant="destructive">
+							<AlertTitle>Couldn’t load scans</AlertTitle>
+							<AlertDescription className="flex flex-wrap items-center gap-2">
+								<span className="wrap-break-word">
+									{getErrorMessage(scansError, "Request failed.")}
+								</span>
+								<Button
+									type="button"
+									variant="outline"
+									size="sm"
+									onClick={() => refetchScans()}
+								>
+									Retry
+								</Button>
+							</AlertDescription>
+						</Alert>
+					) : scansLoading || scansFetching ? (
+						<div className="flex flex-col gap-2">
+							{Array.from({ length: 6 }).map((_, index) => (
+								<Skeleton key={index} className="h-10 w-full" />
+							))}
+						</div>
+					) : (
+						<>
+							<div className="overflow-x-auto rounded-xl border border-border">
+								<Table
+									aria-label="Business scans"
+									className="w-full table-fixed"
+								>
+									<TableHeader>
+										<TableRow>
+											<TableHead className="text-left">Date</TableHead>
+											<TableHead className="text-left">Sender name</TableHead>
+											<TableHead className="text-left">Amount</TableHead>
+											<TableHead className="text-left">Status</TableHead>
+											<TableHead className="text-left">Receipt</TableHead>
+										</TableRow>
+									</TableHeader>
+									<TableBody>
+										{scanRows.length === 0 ? (
+											<TableRow>
+												<TableCell
+													colSpan={5}
+													className="py-10 text-center text-sm text-muted-foreground"
+												>
+													No scans found for this business.
+												</TableCell>
+											</TableRow>
+										) : (
+											scanRows.map((row) => (
+												<TableRow key={row.id}>
+													<TableCell className="whitespace-nowrap text-left text-sm text-muted-foreground">
+														{formatDateTime(row.recorded_date)}
+													</TableCell>
+													<TableCell className="max-w-48 truncate text-left">
+														{row.sender_name ?? "—"}
+													</TableCell>
+													<TableCell className="text-left font-mono text-sm tabular-nums">
+														{row.currency}{" "}
+														{Number.isFinite(Number(row.amount))
+															? Number(row.amount).toLocaleString(undefined, {
+																	maximumFractionDigits: 2,
+																})
+															: row.amount}
+													</TableCell>
+													<TableCell className="text-left">
+														<Badge
+															variant={transactionBadgeVariant(row.status)}
+															className="font-normal capitalize"
+														>
+															{row.status.replaceAll("_", " ")}
+														</Badge>
+													</TableCell>
+													<TableCell className="text-left">
+														{row.receipt_url ? (
+															<a
+																href={row.receipt_url}
+																target="_blank"
+																rel="noreferrer"
+																className="font-medium text-primary underline-offset-4 hover:underline"
+															>
+																View receipt
+															</a>
+														) : (
+															<span className="text-muted-foreground">—</span>
+														)}
+													</TableCell>
+												</TableRow>
+											))
+										)}
+									</TableBody>
+								</Table>
+							</div>
+
+							<div className="flex flex-wrap items-center justify-between gap-3">
+								<p className="text-xs text-muted-foreground">
+									{scanRows.length === 0
+										? "Showing 0 scans"
+										: `Showing ${scansOffset + 1}–${scansOffset + scanRows.length} scans`}
+									{scansFetching ? " · refreshing…" : ""}
+								</p>
+								<div className="flex items-center gap-2">
+									<Button
+										type="button"
+										variant="outline"
+										size="sm"
+										disabled={!canPreviousScansPage || scansFetching}
+										onClick={() =>
+											setScansOffset((offset) =>
+												Math.max(0, offset - SCANS_PAGE_SIZE),
+											)
+										}
+									>
+										Previous
+									</Button>
+									<span className="font-mono text-xs tabular-nums text-muted-foreground">
+										{Math.floor(scansOffset / SCANS_PAGE_SIZE) + 1}
+									</span>
+									<Button
+										type="button"
+										variant="outline"
+										size="sm"
+										disabled={!canNextScansPage || scansFetching}
+										onClick={() =>
+											setScansOffset((offset) => offset + SCANS_PAGE_SIZE)
+										}
+									>
+										Next
+									</Button>
+								</div>
+							</div>
+						</>
+					)}
 				</TabsContent>
 
 				<TabsContent value="money" className="mt-0 flex flex-col gap-4">
