@@ -698,9 +698,11 @@ export type AdminSubscriptionOutput = {
 /** OpenAPI `UsageOutputSchema` */
 export type UsageOutput = {
 	subscription_id: UUID;
-	credits_limit: number;
+	is_unlimited: boolean;
+	credits_limit: number | null;
 	credits_used: number;
-	remaining_credits: number;
+	remaining_credits: number | null;
+	days_remaining: number | null;
 };
 
 /** OpenAPI `ExchangeRateOutputSchema` */

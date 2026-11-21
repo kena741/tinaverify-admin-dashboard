@@ -700,9 +700,10 @@ export default function BusinessDetailClient({
 	const planName = latestSubscriptionFromHistory
 		? getSubscriptionPlanLabel(latestSubscriptionFromHistory.plan)
 		: null;
-	const usageCredits = subscriptionUsage
-		? subscriptionUsage.remaining_credits.toLocaleString()
-		: null;
+	const usageCredits = subscriptionUsage?.remaining_credits
+		?.toLocaleString() ?? null;
+	const usageDaysRemaining = subscriptionUsage?.days_remaining
+		?.toLocaleString() ?? null;
 
 	return (
 		<div className="mx-auto flex w-full max-w-6xl flex-col gap-5 pb-10">
@@ -1011,7 +1012,7 @@ export default function BusinessDetailClient({
 				aria-label="Live account context"
 				className="sticky top-0 z-10 flex flex-col gap-3 bg-card/95 py-3 backdrop-blur-sm supports-backdrop-filter:bg-card/90"
 			>
-				<div className="grid grid-cols-1 items-stretch gap-2 sm:grid-cols-3">
+				<div className="grid grid-cols-1 items-stretch gap-2 sm:grid-cols-4">
 					<div className="flex min-h-14 min-w-0 flex-col justify-center gap-1.5 py-2">
 						<p className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
 							Status
@@ -1045,6 +1046,14 @@ export default function BusinessDetailClient({
 						</p>
 						<p className="font-mono text-sm font-medium tabular-nums">
 							{usageCredits ?? "—"}
+						</p>
+					</div>
+					<div className="flex min-h-14 min-w-0 flex-col justify-center gap-1.5 py-2">
+						<p className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
+							Remaining Days
+						</p>
+						<p className="font-mono text-sm font-medium tabular-nums">
+							{usageDaysRemaining ?? "—"}
 						</p>
 					</div>
 				</div>
