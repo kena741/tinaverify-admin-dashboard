@@ -7,7 +7,6 @@ import {
 	ArrowDownIcon,
 	ArrowUpIcon,
 	ArrowUpDownIcon,
-	ChevronRightIcon,
 } from "lucide-react";
 
 import { AdminCreateBusinessDialog } from "@/components/admin/admin-create-business-dialog";
@@ -25,15 +24,18 @@ import {
 	type SubscriptionStatusFilter,
 } from "@/lib/subscription-filters";
 import { cn } from "@/lib/utils";
+import { useAppDispatch, useAppSelector } from "@/store/hooks";
+import {
+	clearOwnersFilters,
+	updateOwnersFilters,
+} from "@/store/owners/ownersFiltersSlice";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
 	Card,
 	CardContent,
-	CardDescription,
 	CardHeader,
-	CardTitle,
 } from "@/components/ui/card";
 import { Field, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -173,19 +175,17 @@ const SEARCH_DEBOUNCE_MS = 350;
 
 export default function OwnersPage() {
 	const router = useRouter();
-	const [planId, setPlanId] = useState(PLAN_FILTER_ALL);
-	const [statusFilter, setStatusFilter] =
-		useState<SubscriptionStatusFilter>("all");
-	const [businessName, setBusinessName] = useState("");
-	const [ownerName, setOwnerName] = useState("");
-	const [ownerPhone, setOwnerPhone] = useState("");
-	const [debouncedSearch, setDebouncedSearch] = useState({
-		businessName: "",
-		ownerName: "",
-		ownerPhone: "",
-	});
-	const [dateFrom, setDateFrom] = useState("");
-	const [dateTo, setDateTo] = useState("");
+	const dispatch = useAppDispatch();
+	const {
+		businessName,
+		ownerName,
+		ownerPhone,
+		planId,
+		statusFilter,
+		dateFrom,
+		dateTo,
+		debouncedSearch,
+	} = useAppSelector((state) => state.ownersFilters);
 	const [sortKey, setSortKey] = useState<SortKey>("date");
 	const [sortDir, setSortDir] = useState<SortDir>("desc");
 	// ponytail: server page of businesses; Next/Prev only — no auto-walk
@@ -196,11 +196,15 @@ export default function OwnersPage() {
 
 	useEffect(() => {
 		const timeoutId = window.setTimeout(() => {
-			setDebouncedSearch({ businessName, ownerName, ownerPhone });
+			dispatch(
+				updateOwnersFilters({
+					debouncedSearch: { businessName, ownerName, ownerPhone },
+				}),
+			);
 		}, SEARCH_DEBOUNCE_MS);
 
 		return () => window.clearTimeout(timeoutId);
-	}, [businessName, ownerName, ownerPhone]);
+	}, [businessName, dispatch, ownerName, ownerPhone]);
 
 	const filterResetKey = useMemo(
 		() =>
@@ -225,6 +229,10 @@ export default function OwnersPage() {
 			dateTo,
 		],
 	);
+	const searchPending =
+		businessName !== debouncedSearch.businessName ||
+		ownerName !== debouncedSearch.ownerName ||
+		ownerPhone !== debouncedSearch.ownerPhone;
 	const [prevFilterResetKey, setPrevFilterResetKey] = useState(filterResetKey);
 	if (prevFilterResetKey !== filterResetKey) {
 		setPrevFilterResetKey(filterResetKey);
@@ -248,7 +256,7 @@ export default function OwnersPage() {
 		status: statusFilter === "all" ? undefined : statusFilter,
 		from_date: dateFrom || undefined,
 		to_date: dateTo || undefined,
-	});
+	}, { skip: searchPending });
 	const businesses = businessPage?.items;
 	const businessTotal = businessPage?.total_count ?? 0;
 
@@ -275,10 +283,6 @@ export default function OwnersPage() {
 	const rangeStart = businessTotal === 0 ? 0 : businessOffset + 1;
 	const rangeEnd = Math.min(businessOffset + pageSize, businessTotal);
 
-	const searchPending =
-		businessName !== debouncedSearch.businessName ||
-		ownerName !== debouncedSearch.ownerName ||
-		ownerPhone !== debouncedSearch.ownerPhone;
 	const filtersActive =
 		planId !== PLAN_FILTER_ALL ||
 		statusFilter !== "all" ||
@@ -289,13 +293,7 @@ export default function OwnersPage() {
 		dateTo !== "";
 
 	function clearFilters() {
-		setPlanId(PLAN_FILTER_ALL);
-		setStatusFilter("all");
-		setBusinessName("");
-		setOwnerName("");
-		setOwnerPhone("");
-		setDateFrom("");
-		setDateTo("");
+		dispatch(clearOwnersFilters());
 		setPage(1);
 	}
 
@@ -338,7 +336,7 @@ export default function OwnersPage() {
 		};
 	}, [businessPage, businesses, businessTotal]);
 
-	const businessesBusy = businessesLoading && !businessPage;
+	const businessesBusy = searchPending || (businessesLoading && !businessPage);
 	const summaryBusy = businessesBusy;
 
 	const planLabel =
@@ -346,7 +344,8 @@ export default function OwnersPage() {
 			? "All plans"
 			: (plans?.find((plan) => plan.id === planId)?.name ?? "All plans");
 	const listBusy =
-		!businessPage && (businessesLoading || businessesFetching);
+		searchPending ||
+		(!businessPage && (businessesLoading || businessesFetching));
 
 	return (
 		<div className="mx-auto flex w-full max-w-6xl flex-col gap-6 pb-8">
@@ -507,9 +506,11 @@ export default function OwnersPage() {
 										type="search"
 										placeholder="Any business name"
 										value={businessName}
-										onChange={(e) => {
-											setBusinessName(e.target.value);
-										}}
+										onChange={(e) =>
+											dispatch(
+												updateOwnersFilters({ businessName: e.target.value }),
+											)
+										}
 										className={cn(
 											"h-9 bg-background",
 											searchPending && "opacity-80",
@@ -526,7 +527,11 @@ export default function OwnersPage() {
 										type="search"
 										placeholder="Any owner name"
 										value={ownerName}
-										onChange={(e) => setOwnerName(e.target.value)}
+										onChange={(e) =>
+											dispatch(
+												updateOwnersFilters({ ownerName: e.target.value }),
+											)
+										}
 										className={cn(
 											"h-9 bg-background",
 											searchPending && "opacity-80",
@@ -543,7 +548,11 @@ export default function OwnersPage() {
 										type="search"
 										placeholder="Any phone number"
 										value={ownerPhone}
-										onChange={(e) => setOwnerPhone(e.target.value)}
+										onChange={(e) =>
+											dispatch(
+												updateOwnersFilters({ ownerPhone: e.target.value }),
+											)
+										}
 										className={cn(
 											"h-9 bg-background",
 											searchPending && "opacity-80",
@@ -559,7 +568,10 @@ export default function OwnersPage() {
 									<Select
 										value={statusFilter}
 										onValueChange={(v) => {
-											if (v != null && isStatusFilter(v)) setStatusFilter(v);
+											if (v != null && isStatusFilter(v))
+												dispatch(
+													updateOwnersFilters({ statusFilter: v }),
+												);
 										}}
 									>
 										<SelectTrigger className="h-9 w-full bg-background">
@@ -593,7 +605,8 @@ export default function OwnersPage() {
 									<Select
 										value={planId}
 										onValueChange={(v) => {
-											if (v != null && v !== "") setPlanId(v);
+											if (v != null && v !== "")
+												dispatch(updateOwnersFilters({ planId: v }));
 										}}
 									>
 										<SelectTrigger className="h-9 w-full bg-background">
@@ -628,7 +641,11 @@ export default function OwnersPage() {
 										type="date"
 										value={dateFrom}
 										max={dateTo || undefined}
-										onChange={(e) => setDateFrom(e.target.value)}
+										onChange={(e) =>
+											dispatch(
+												updateOwnersFilters({ dateFrom: e.target.value }),
+											)
+										}
 										className="h-9 bg-background"
 									/>
 								</Field>
@@ -641,11 +658,18 @@ export default function OwnersPage() {
 										type="date"
 										value={dateTo}
 										min={dateFrom || undefined}
-										onChange={(e) => setDateTo(e.target.value)}
+										onChange={(e) =>
+											dispatch(
+												updateOwnersFilters({ dateTo: e.target.value }),
+											)
+										}
 										className="h-9 bg-background"
 									/>
 								</Field>
 							</div>
+							<p className="text-xs text-muted-foreground">
+								Filters are kept while navigating within the admin app.
+							</p>
 						</div>
 
 						{listBusy ? (
