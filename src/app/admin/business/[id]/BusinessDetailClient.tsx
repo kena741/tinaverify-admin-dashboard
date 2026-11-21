@@ -432,7 +432,6 @@ export default function BusinessDetailClient({
 
 	const [activeDialogOpen, setActiveDialogOpen] = useState(false);
 	const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-	const [billingPane, setBillingPane] = useState<"history" | "banks">("history");
 	const [statusBanner, setStatusBanner] = useState<{
 		variant: "default" | "destructive";
 		title: string;
@@ -1337,6 +1336,94 @@ export default function BusinessDetailClient({
 							</Table>
 						</div>
 					</section>
+
+					<section className="overflow-hidden rounded-xl border border-border">
+						<div className="border-b border-border px-4 py-3">
+							<h2 className="text-sm font-semibold tracking-tight">
+								Bank accounts
+							</h2>
+							<p className="text-xs text-muted-foreground">
+								Bank accounts linked to this business
+							</p>
+						</div>
+						{bankAccountsError ? (
+							<div className="p-4">
+								<Alert variant="destructive">
+									<AlertTitle>Failed to load bank accounts</AlertTitle>
+									<AlertDescription className="flex flex-wrap items-center gap-2">
+										<span className="wrap-break-word">Request failed.</span>
+										<Button
+											type="button"
+											variant="outline"
+											size="sm"
+											onClick={() => refetchBankAccounts()}
+										>
+											Try again
+										</Button>
+									</AlertDescription>
+								</Alert>
+							</div>
+						) : null}
+						{bankAccountsLoading ? (
+							<div className="flex flex-col gap-2 p-4">
+								{Array.from({ length: 4 }).map((_, i) => (
+									<Skeleton key={i} className="h-10 w-full" />
+								))}
+							</div>
+						) : (
+							<div className="overflow-x-auto">
+								<Table>
+									<TableHeader>
+										<TableRow>
+											<TableHead>Bank</TableHead>
+											<TableHead>Account name</TableHead>
+											<TableHead>Account number</TableHead>
+											<TableHead>Status</TableHead>
+										</TableRow>
+									</TableHeader>
+									<TableBody>
+										{(bankAccounts ?? []).length === 0 ? (
+											<TableRow>
+												<TableCell
+													colSpan={4}
+													className="py-10 text-center text-sm text-muted-foreground"
+												>
+													No bank accounts linked to this business.
+												</TableCell>
+											</TableRow>
+										) : (
+											(bankAccounts ?? []).map(
+												(account: BankAccountResponse) => (
+													<TableRow
+														key={`${account.bank_name}-${account.account_number}-${account.account_name}`}
+													>
+														<TableCell className="font-medium">
+															{account.bank_name}
+														</TableCell>
+														<TableCell>{account.account_name}</TableCell>
+														<TableCell className="font-mono text-sm">
+															{account.account_number}
+														</TableCell>
+														<TableCell>
+															<Badge
+																variant={
+																	account.is_archived
+																		? "secondary"
+																		: "default"
+																}
+															>
+																{account.is_archived ? "Archived" : "Active"}
+															</Badge>
+														</TableCell>
+													</TableRow>
+												),
+											)
+										)}
+									</TableBody>
+								</Table>
+							</div>
+						)}
+					</section>
 				</TabsContent>
 
 				<TabsContent value="people" className="mt-0">
@@ -1692,230 +1779,119 @@ export default function BusinessDetailClient({
 				</TabsContent>
 
 				<TabsContent value="money" className="mt-0 flex flex-col gap-4">
-					<div
-						role="tablist"
-						aria-label="Billing records"
-						className="flex w-fit flex-wrap gap-1 rounded-lg border border-border bg-muted/40 p-1"
-					>
-						{(
-							[
-								["history", "History"],
-								["banks", "Banks"],
-							] as const
-						).map(([id, label]) => (
-							<button
-								key={id}
-								type="button"
-								role="tab"
-								aria-selected={billingPane === id}
-								onClick={() => setBillingPane(id)}
-								className={cn(
-									"h-7 rounded-md px-3 text-sm motion-safe:transition-colors",
-									billingPane === id
-										? "bg-background font-medium text-foreground shadow-xs"
-										: "text-muted-foreground hover:text-foreground",
-								)}
-							>
-								{label}
-							</button>
-						))}
+					<div className="flex flex-col gap-3">
+						{subscriptionHistoryError ? (
+							<Alert variant="destructive">
+								<AlertTitle>Couldn’t load history</AlertTitle>
+								<AlertDescription className="flex flex-wrap items-center gap-2">
+									<span className="wrap-break-word">
+										{getErrorMessage(
+											subscriptionHistoryError,
+											"Request failed.",
+										)}
+									</span>
+									<Button
+										type="button"
+										variant="outline"
+										size="sm"
+										onClick={() => refetchSubscriptionHistory()}
+									>
+										Retry
+									</Button>
+								</AlertDescription>
+							</Alert>
+						) : subscriptionHistoryLoading || subscriptionHistoryFetching ? (
+							<div className="flex flex-col gap-2">
+								{Array.from({ length: 5 }).map((_, i) => (
+									<Skeleton key={i} className="h-10 w-full" />
+								))}
+							</div>
+						) : (
+							<div className="overflow-x-auto rounded-xl border border-border">
+								<Table aria-label="Subscription history">
+									<TableHeader>
+										<TableRow>
+											<TableHead>Plan</TableHead>
+											<TableHead>Status</TableHead>
+											<TableHead>Amount</TableHead>
+											<TableHead>Paid</TableHead>
+											<TableHead>Method</TableHead>
+											<TableHead>Credits</TableHead>
+											<TableHead>Started</TableHead>
+											<TableHead>Ended</TableHead>
+											<TableHead className="hidden lg:table-cell">
+												Reference
+											</TableHead>
+										</TableRow>
+									</TableHeader>
+									<TableBody>
+										{subscriptionHistoryRows.length === 0 ? (
+											<TableRow>
+												<TableCell
+													colSpan={9}
+													className="py-10 text-center text-sm text-muted-foreground"
+												>
+													No subscription history for this business.
+												</TableCell>
+											</TableRow>
+										) : (
+											subscriptionHistoryRows.map(
+												(row: AdminSubscriptionOutput) => (
+													<TableRow key={row.id}>
+														<TableCell className="font-medium">
+															{getSubscriptionPlanLabel(row.plan)}
+														</TableCell>
+														<TableCell>
+															<Badge
+																variant={subscriptionBadgeVariant(row.status)}
+																className="font-normal capitalize"
+															>
+																{getSubscriptionStatusLabel(row.status)}
+															</Badge>
+														</TableCell>
+														<TableCell className="font-mono text-sm tabular-nums">
+															{row.amount == null
+																? "—"
+																: row.amount.toLocaleString(undefined, {
+																		maximumFractionDigits: 2,
+																	})}
+														</TableCell>
+														<TableCell className="font-mono text-sm tabular-nums">
+															{row.transaction_amount == null
+																? "—"
+																: row.transaction_amount.toLocaleString(
+																		undefined,
+																		{ maximumFractionDigits: 2 },
+																	)}
+														</TableCell>
+														<TableCell className="text-sm text-muted-foreground">
+															{row.transaction_payment_method
+																? formatPlatformLabel(
+																		row.transaction_payment_method,
+																	)
+																: "—"}
+														</TableCell>
+														<TableCell className="font-mono text-sm tabular-nums">
+															{row.credits_limit.toLocaleString()}
+														</TableCell>
+														<TableCell className="font-mono text-sm whitespace-nowrap tabular-nums">
+															{formatDateTime(row.started_at)}
+														</TableCell>
+														<TableCell className="font-mono text-sm whitespace-nowrap tabular-nums">
+															{formatDateTime(row.ended_at)}
+														</TableCell>
+														<TableCell className="hidden max-w-48 truncate font-mono text-xs lg:table-cell">
+															{row.chapa_transaction_reference ?? "—"}
+														</TableCell>
+													</TableRow>
+												),
+											)
+										)}
+									</TableBody>
+								</Table>
+							</div>
+						)}
 					</div>
-
-					{billingPane === "history" ? (
-						<div className="flex flex-col gap-3">
-							{subscriptionHistoryError ? (
-								<Alert variant="destructive">
-									<AlertTitle>Couldn’t load history</AlertTitle>
-									<AlertDescription className="flex flex-wrap items-center gap-2">
-										<span className="wrap-break-word">
-											{getErrorMessage(
-												subscriptionHistoryError,
-												"Request failed.",
-											)}
-										</span>
-										<Button
-											type="button"
-											variant="outline"
-											size="sm"
-											onClick={() => refetchSubscriptionHistory()}
-										>
-											Retry
-										</Button>
-									</AlertDescription>
-								</Alert>
-							) : subscriptionHistoryLoading || subscriptionHistoryFetching ? (
-								<div className="flex flex-col gap-2">
-									{Array.from({ length: 5 }).map((_, i) => (
-										<Skeleton key={i} className="h-10 w-full" />
-									))}
-								</div>
-							) : (
-								<div className="overflow-x-auto rounded-xl border border-border">
-									<Table aria-label="Subscription history">
-										<TableHeader>
-											<TableRow>
-												<TableHead>Plan</TableHead>
-												<TableHead>Status</TableHead>
-												<TableHead>Amount</TableHead>
-												<TableHead>Paid</TableHead>
-												<TableHead>Method</TableHead>
-												<TableHead>Credits</TableHead>
-												<TableHead>Started</TableHead>
-												<TableHead>Ended</TableHead>
-												<TableHead className="hidden lg:table-cell">
-													Reference
-												</TableHead>
-											</TableRow>
-										</TableHeader>
-										<TableBody>
-											{subscriptionHistoryRows.length === 0 ? (
-												<TableRow>
-													<TableCell
-														colSpan={9}
-														className="py-10 text-center text-sm text-muted-foreground"
-													>
-														No subscription history for this business.
-													</TableCell>
-												</TableRow>
-											) : (
-												subscriptionHistoryRows.map(
-													(row: AdminSubscriptionOutput) => (
-														<TableRow key={row.id}>
-															<TableCell className="font-medium">
-																{getSubscriptionPlanLabel(row.plan)}
-															</TableCell>
-															<TableCell>
-																<Badge
-																	variant={subscriptionBadgeVariant(row.status)}
-																	className="font-normal capitalize"
-																>
-																	{getSubscriptionStatusLabel(row.status)}
-																</Badge>
-															</TableCell>
-															<TableCell className="font-mono text-sm tabular-nums">
-																{row.amount == null
-																	? "—"
-																	: row.amount.toLocaleString(undefined, {
-																			maximumFractionDigits: 2,
-																		})}
-															</TableCell>
-															<TableCell className="font-mono text-sm tabular-nums">
-																{row.transaction_amount == null
-																	? "—"
-																	: row.transaction_amount.toLocaleString(
-																			undefined,
-																			{ maximumFractionDigits: 2 },
-																		)}
-															</TableCell>
-															<TableCell className="text-sm text-muted-foreground">
-																{row.transaction_payment_method
-																	? formatPlatformLabel(
-																			row.transaction_payment_method,
-																		)
-																	: "—"}
-															</TableCell>
-															<TableCell className="font-mono text-sm tabular-nums">
-																{row.credits_limit.toLocaleString()}
-															</TableCell>
-															<TableCell className="font-mono text-sm whitespace-nowrap tabular-nums">
-																{formatDateTime(row.started_at)}
-															</TableCell>
-															<TableCell className="font-mono text-sm whitespace-nowrap tabular-nums">
-																{formatDateTime(row.ended_at)}
-															</TableCell>
-															<TableCell className="hidden max-w-48 truncate font-mono text-xs lg:table-cell">
-																{row.chapa_transaction_reference ?? "—"}
-															</TableCell>
-														</TableRow>
-													),
-												)
-											)}
-										</TableBody>
-									</Table>
-								</div>
-							)}
-						</div>
-					) : null}
-
-					{billingPane === "banks" ? (
-						<div className="flex flex-col gap-3">
-							{bankAccountsError ? (
-								<Alert variant="destructive">
-									<AlertTitle>Failed to load bank accounts</AlertTitle>
-									<AlertDescription className="flex flex-wrap items-center gap-2">
-										<span className="wrap-break-word">Request failed.</span>
-										<Button
-											type="button"
-											variant="outline"
-											size="sm"
-											onClick={() => refetchBankAccounts()}
-										>
-											Try again
-										</Button>
-									</AlertDescription>
-								</Alert>
-							) : null}
-							{bankAccountsLoading ? (
-								<div className="flex flex-col gap-2">
-									{Array.from({ length: 4 }).map((_, i) => (
-										<Skeleton key={i} className="h-10 w-full" />
-									))}
-								</div>
-							) : (
-								<div className="overflow-x-auto rounded-xl border border-border">
-									<Table>
-										<TableHeader>
-											<TableRow>
-												<TableHead>Bank</TableHead>
-												<TableHead>Account name</TableHead>
-												<TableHead>Account number</TableHead>
-												<TableHead>Status</TableHead>
-											</TableRow>
-										</TableHeader>
-										<TableBody>
-											{(bankAccounts ?? []).length === 0 ? (
-												<TableRow>
-													<TableCell
-														colSpan={4}
-														className="py-10 text-center text-sm text-muted-foreground"
-													>
-														No bank accounts linked to this business.
-													</TableCell>
-												</TableRow>
-											) : (
-												(bankAccounts ?? []).map(
-													(account: BankAccountResponse) => (
-														<TableRow
-															key={`${account.bank_name}-${account.account_number}-${account.account_name}`}
-														>
-															<TableCell className="font-medium">
-																{account.bank_name}
-															</TableCell>
-															<TableCell>{account.account_name}</TableCell>
-															<TableCell className="font-mono text-sm">
-																{account.account_number}
-															</TableCell>
-															<TableCell>
-																<Badge
-																	variant={
-																		account.is_archived
-																			? "secondary"
-																			: "default"
-																	}
-																>
-																	{account.is_archived ? "Archived" : "Active"}
-																</Badge>
-															</TableCell>
-														</TableRow>
-													),
-												)
-											)}
-										</TableBody>
-									</Table>
-								</div>
-							)}
-						</div>
-					) : null}
 				</TabsContent>
 			</Tabs>
 		</div>
