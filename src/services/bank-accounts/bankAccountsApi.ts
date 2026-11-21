@@ -5,6 +5,7 @@ import { backendBaseQuery } from "../baseQuery";
 import type {
 	BankAccountCreateRequest,
 	BankAccountResponse,
+	BankAccountUpdateRequest,
 	BankNameEnum,
 } from "../types";
 
@@ -95,6 +96,46 @@ export const bankAccountsApi = createApi({
 				{ type: "BankAccount" as const, id: arg.account_number },
 			],
 		}),
+
+		updateBankAccount: builder.mutation<
+			BankAccountResponse,
+			{
+				accountId: string;
+				businessId: string;
+				body: BankAccountUpdateRequest;
+			}
+		>({
+			query: ({ accountId, businessId, body }) => ({
+				url: `/api/v1/bank-accounts/${accountId}`,
+				method: "PUT",
+				params: { business_id: businessId },
+				body,
+				headers: {
+					"Content-Type": "application/json",
+					...bearerHeaders(),
+				},
+			}),
+			invalidatesTags: (_result, _err, { businessId, accountId }) => [
+				{ type: "BankAccount" as const, id: `BUSINESS_${businessId}` },
+				{ type: "BankAccount" as const, id: accountId },
+			],
+		}),
+
+		deleteBankAccount: builder.mutation<
+			void,
+			{ accountId: string; businessId: string }
+		>({
+			query: ({ accountId, businessId }) => ({
+				url: `/api/v1/bank-accounts/${accountId}`,
+				method: "DELETE",
+				params: { business_id: businessId },
+				headers: bearerHeaders(),
+			}),
+			invalidatesTags: (_result, _err, { businessId, accountId }) => [
+				{ type: "BankAccount" as const, id: `BUSINESS_${businessId}` },
+				{ type: "BankAccount" as const, id: accountId },
+			],
+		}),
 	}),
 });
 
@@ -103,4 +144,6 @@ export const {
 	useFilterBankAccountsQuery,
 	useLazyGetBankAccountQuery,
 	useCreateBankAccountMutation,
+	useUpdateBankAccountMutation,
+	useDeleteBankAccountMutation,
 } = bankAccountsApi;

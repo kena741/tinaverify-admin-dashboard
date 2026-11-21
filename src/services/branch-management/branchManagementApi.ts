@@ -14,6 +14,8 @@ import type {
 	BusinessListFilters,
 	BusinessListQuery,
 	BusinessOutput,
+	CreateEmployeeUserRequest,
+	CreateEmployeeUserResponse,
 	DeactivateBusinessRequest,
 	EmployeeOutput,
 	PaginatedBusinessResponse,
@@ -251,6 +253,38 @@ export const branchManagementApi = createApi({
 			],
 		}),
 
+		createEmployee: builder.mutation<
+			CreateEmployeeUserResponse,
+			{ body: CreateEmployeeUserRequest }
+		>({
+			query: ({ body }) => ({
+				url: "/api/v1/business/employees/create-user",
+				method: "POST",
+				body,
+				headers: {
+					"Content-Type": "application/json",
+					...bearerHeaders(),
+				},
+			}),
+			invalidatesTags: (_result, _err, { body }) => [
+				{ type: "Employee", id: body.business_id },
+			],
+		}),
+
+		deleteEmployee: builder.mutation<
+			void,
+			{ businessId: string; employeeId: string }
+		>({
+			query: ({ businessId, employeeId }) => ({
+				url: `/api/v1/business/${businessId}/employees/${employeeId}`,
+				method: "DELETE",
+				headers: bearerHeaders(),
+			}),
+			invalidatesTags: (_result, _err, { businessId }) => [
+				{ type: "Employee", id: businessId },
+			],
+		}),
+
 		listBusinessBranches: builder.query<
 			BranchOutput[],
 			{ businessId: string; accessToken?: string | null }
@@ -354,6 +388,8 @@ export const {
 	useListAllUserBranchesQuery,
 	useListBusinessEmployeesQuery,
 	useUpdateEmployeeRoleMutation,
+	useCreateEmployeeMutation,
+	useDeleteEmployeeMutation,
 	useCreateBranchMutation,
 	useListBusinessBranchesQuery,
 	useGetBranchQuery,

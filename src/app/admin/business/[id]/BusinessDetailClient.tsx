@@ -10,6 +10,9 @@ import {
 	MessageSquare,
 	MoreHorizontal,
 	Phone,
+	Pencil,
+	Plus,
+	Trash2,
 } from "lucide-react";
 import { endOfDay, format, startOfDay, subDays } from "date-fns";
 import type { DateRange } from "react-day-picker";
@@ -26,8 +29,16 @@ import {
 	CardTitle,
 } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Field, FieldLabel } from "@/components/ui/field";
+import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import {
+	Dialog,
+	DialogContent,
+	DialogDescription,
+	DialogFooter,
+	DialogHeader,
+	DialogTitle,
+} from "@/components/ui/dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -52,6 +63,7 @@ import {
 import {
 	Select,
 	SelectContent,
+	SelectGroup,
 	SelectItem,
 	SelectTrigger,
 	SelectValue,
@@ -73,8 +85,18 @@ import {
 	useListBusinessBranchesQuery,
 	useSetBusinessActiveMutation,
 	useUpdateEmployeeRoleMutation,
+	useCreateBranchMutation,
+	useUpdateBranchMutation,
+	useDeleteBranchMutation,
+	useCreateEmployeeMutation,
+	useDeleteEmployeeMutation,
 } from "../../../../services/branch-management/branchManagementApi";
-import { useListBankAccountsQuery } from "../../../../services/bank-accounts/bankAccountsApi";
+import {
+	useCreateBankAccountMutation,
+	useDeleteBankAccountMutation,
+	useListBankAccountsQuery,
+	useUpdateBankAccountMutation,
+} from "../../../../services/bank-accounts/bankAccountsApi";
 import {
 	useGetActiveSubscriptionQuery,
 	useGrantSubscriptionCreditsMutation,
@@ -86,6 +108,7 @@ import { useListSubscriptionPlansQuery } from "../../../../services/subscription
 import type {
 	AdminSubscriptionOutput,
 	BankAccountResponse,
+	BankNameEnum,
 	BranchOutput,
 	BusinessOutput,
 	EmployeeOutput,
@@ -425,6 +448,17 @@ export default function BusinessDetailClient({
 	const [deleteBusiness, deleteBusinessState] = useDeleteBusinessMutation();
 	const [updateEmployeeRole, updateEmployeeRoleState] =
 		useUpdateEmployeeRoleMutation();
+	const [createBranch, createBranchState] = useCreateBranchMutation();
+	const [updateBranch, updateBranchState] = useUpdateBranchMutation();
+	const [deleteBranch, deleteBranchState] = useDeleteBranchMutation();
+	const [createEmployee, createEmployeeState] = useCreateEmployeeMutation();
+	const [deleteEmployee, deleteEmployeeState] = useDeleteEmployeeMutation();
+	const [createBankAccount, createBankAccountState] =
+		useCreateBankAccountMutation();
+	const [updateBankAccount, updateBankAccountState] =
+		useUpdateBankAccountMutation();
+	const [deleteBankAccount, deleteBankAccountState] =
+		useDeleteBankAccountMutation();
 	const [grantSubscriptionCredits, { isLoading: grantingCredits }] =
 		useGrantSubscriptionCreditsMutation();
 	const [assignSubscription, { isLoading: assigningSubscription }] =
@@ -455,6 +489,44 @@ export default function BusinessDetailClient({
 	const [employeeRoleDraft, setEmployeeRoleDraft] = useState<
 		Record<string, string>
 	>({});
+	const [employeeBranchDraft, setEmployeeBranchDraft] = useState<
+		Record<string, string>
+	>({});
+	const [branchDialogOpen, setBranchDialogOpen] = useState(false);
+	const [editingBranch, setEditingBranch] = useState<BranchOutput | null>(null);
+	const [branchForm, setBranchForm] = useState({
+		name: "",
+		address: "",
+		is_head_quarter: false,
+	});
+	const [branchError, setBranchError] = useState<string | null>(null);
+	const [branchPendingDelete, setBranchPendingDelete] =
+		useState<BranchOutput | null>(null);
+	const [bankDialogOpen, setBankDialogOpen] = useState(false);
+	const [editingBankAccount, setEditingBankAccount] =
+		useState<BankAccountResponse | null>(null);
+	const [bankForm, setBankForm] = useState<{
+		bank_name: BankNameEnum | "";
+		account_name: string;
+		account_number: string;
+	}>({ bank_name: "", account_name: "", account_number: "" });
+	const [bankError, setBankError] = useState<string | null>(null);
+	const [bankPendingDelete, setBankPendingDelete] =
+		useState<BankAccountResponse | null>(null);
+	const [employeeDialogOpen, setEmployeeDialogOpen] = useState(false);
+	const [employeeForm, setEmployeeForm] = useState({
+		phone_number: "",
+		username: "",
+		email: "",
+		role_id: "",
+		branch_id: "",
+	});
+	const [employeeError, setEmployeeError] = useState<string | null>(null);
+	const [createdEmployeePassword, setCreatedEmployeePassword] = useState<
+		string | null
+	>(null);
+	const [employeePendingDelete, setEmployeePendingDelete] =
+		useState<EmployeeOutput | null>(null);
 
 	const roleById = useMemo(() => {
 		const items = roles ?? [];
@@ -618,6 +690,184 @@ export default function BusinessDetailClient({
 				title: "Assign failed",
 				message: getErrorMessage(err, "Could not assign subscription."),
 			});
+		}
+	}
+
+	function openCreateBranch() {
+		setEditingBranch(null);
+		setBranchForm({ name: "", address: "", is_head_quarter: false });
+		setBranchError(null);
+		setBranchDialogOpen(true);
+	}
+
+	function openEditBranch(branch: BranchOutput) {
+		setEditingBranch(branch);
+		setBranchForm({
+			name: branch.name,
+			address: branch.address ?? "",
+			is_head_quarter: branch.is_head_quarter,
+		});
+		setBranchError(null);
+		setBranchDialogOpen(true);
+	}
+
+	async function handleBranchSubmit(event: React.FormEvent) {
+		event.preventDefault();
+		setBranchError(null);
+		if (!branchForm.name.trim()) {
+			setBranchError("Enter a branch name.");
+			return;
+		}
+		try {
+			if (editingBranch) {
+				await updateBranch({
+					branchId: editingBranch.id,
+					body: {
+						name: branchForm.name.trim(),
+						address: branchForm.address.trim() || null,
+						is_head_quarter: branchForm.is_head_quarter,
+					},
+				}).unwrap();
+			} else {
+				await createBranch({
+					accessToken: "",
+					body: {
+						business_id: businessId,
+						name: branchForm.name.trim(),
+						address: branchForm.address.trim() || null,
+						is_head_quarter: branchForm.is_head_quarter,
+					},
+				}).unwrap();
+			}
+			setBranchDialogOpen(false);
+		} catch (error) {
+			setBranchError(getErrorMessage(error, "Could not save the branch."));
+		}
+	}
+
+	async function handleBranchDelete() {
+		if (!branchPendingDelete) return;
+		setBranchError(null);
+		try {
+			await deleteBranch({ branchId: branchPendingDelete.id }).unwrap();
+			setBranchPendingDelete(null);
+		} catch (error) {
+			setBranchError(getErrorMessage(error, "Could not delete the branch."));
+		}
+	}
+
+	function openCreateBankAccount() {
+		setEditingBankAccount(null);
+		setBankForm({ bank_name: "", account_name: "", account_number: "" });
+		setBankError(null);
+		setBankDialogOpen(true);
+	}
+
+	function openEditBankAccount(account: BankAccountResponse) {
+		setEditingBankAccount(account);
+		setBankForm({
+			bank_name: account.bank_name,
+			account_name: account.account_name,
+			account_number: account.account_number,
+		});
+		setBankError(null);
+		setBankDialogOpen(true);
+	}
+
+	async function handleBankSubmit(event: React.FormEvent) {
+		event.preventDefault();
+		setBankError(null);
+		if (!bankForm.bank_name || !bankForm.account_name.trim() || !bankForm.account_number.trim()) {
+			setBankError("Complete all bank account fields.");
+			return;
+		}
+		try {
+			if (editingBankAccount) {
+				await updateBankAccount({
+					accountId: editingBankAccount.id,
+					businessId,
+					body: {
+						bank_name: bankForm.bank_name,
+						account_name: bankForm.account_name.trim(),
+						account_number: bankForm.account_number.trim(),
+					},
+				}).unwrap();
+			} else {
+				await createBankAccount({
+					business_id: businessId,
+					bank_name: bankForm.bank_name,
+					account_name: bankForm.account_name.trim(),
+					account_number: bankForm.account_number.trim(),
+				}).unwrap();
+			}
+			setBankDialogOpen(false);
+		} catch (error) {
+			setBankError(getErrorMessage(error, "Could not save the bank account."));
+		}
+	}
+
+	async function handleBankDelete() {
+		if (!bankPendingDelete) return;
+		setBankError(null);
+		try {
+			await deleteBankAccount({
+				accountId: bankPendingDelete.id,
+				businessId,
+			}).unwrap();
+			setBankPendingDelete(null);
+		} catch (error) {
+			setBankError(getErrorMessage(error, "Could not delete the bank account."));
+		}
+	}
+
+	function openCreateEmployee() {
+		setEmployeeForm({
+			phone_number: "",
+			username: "",
+			email: "",
+			role_id: "",
+			branch_id: "",
+		});
+		setCreatedEmployeePassword(null);
+		setEmployeeError(null);
+		setEmployeeDialogOpen(true);
+	}
+
+	async function handleEmployeeCreate(event: React.FormEvent) {
+		event.preventDefault();
+		setEmployeeError(null);
+		if (!employeeForm.phone_number.trim() || !employeeForm.role_id || !employeeForm.branch_id) {
+			setEmployeeError("Phone number, role, and branch are required.");
+			return;
+		}
+		try {
+			const created = await createEmployee({
+				body: {
+					business_id: businessId,
+					phone_number: employeeForm.phone_number.trim(),
+					role_id: employeeForm.role_id,
+					branch_id: employeeForm.branch_id,
+					username: employeeForm.username.trim() || null,
+					email: employeeForm.email.trim() || null,
+				},
+			}).unwrap();
+			setCreatedEmployeePassword(created.temporary_password);
+		} catch (error) {
+			setEmployeeError(getErrorMessage(error, "Could not create the staff member."));
+		}
+	}
+
+	async function handleEmployeeDelete() {
+		if (!employeePendingDelete) return;
+		setEmployeeError(null);
+		try {
+			await deleteEmployee({
+				businessId,
+				employeeId: employeePendingDelete.id,
+			}).unwrap();
+			setEmployeePendingDelete(null);
+		} catch (error) {
+			setEmployeeError(getErrorMessage(error, "Could not delete the staff member."));
 		}
 	}
 
@@ -1276,7 +1526,11 @@ export default function BusinessDetailClient({
 				/>
 			) : null}
 
-			<Tabs value={activeTab} onValueChange={onTabChange} className="gap-3">
+			<Tabs
+				value={activeTab}
+				onValueChange={onTabChange}
+				className="mt-2 gap-3"
+			>
 				<TabsList className="h-auto w-full flex-wrap justify-start gap-1 rounded-lg border border-border bg-muted/40 p-1">
 					<TabsTrigger value="business" className="rounded-md">
 						Business
@@ -1292,13 +1546,21 @@ export default function BusinessDetailClient({
 					</TabsTrigger>
 				</TabsList>
 
-				<TabsContent value="business" className="mt-0 flex flex-col gap-4">
+				<TabsContent value="business" className="mt-0 flex flex-col gap-10">
 					<section className="overflow-hidden rounded-xl border border-border">
-						<div className="border-b border-border px-4 py-3">
-							<h2 className="text-sm font-semibold tracking-tight">Branches</h2>
-							<p className="text-xs text-muted-foreground">
-								Locations under this business
-							</p>
+						<div className="flex items-start justify-between gap-3 border-b border-border px-4 py-3">
+							<div>
+								<h2 className="text-sm font-semibold tracking-tight">Branches</h2>
+								<p className="text-xs text-muted-foreground">
+									Locations under this business
+								</p>
+							</div>
+							{canMutateOwners ? (
+								<Button type="button" size="sm" onClick={openCreateBranch}>
+									<Plus data-icon="inline-start" aria-hidden="true" />
+									Add Branch
+								</Button>
+							) : null}
 						</div>
 						<div className="overflow-x-auto">
 							<Table>
@@ -1307,12 +1569,15 @@ export default function BusinessDetailClient({
 										<TableHead>Branch</TableHead>
 										<TableHead>Headquarters</TableHead>
 										<TableHead>Address</TableHead>
+										{canMutateOwners ? (
+											<TableHead className="text-right">Actions</TableHead>
+										) : null}
 									</TableRow>
 								</TableHeader>
 								<TableBody>
 									{branchesLoading ? (
 										<TableRow>
-											<TableCell colSpan={3} className="py-10 text-center">
+											<TableCell colSpan={canMutateOwners ? 4 : 3} className="py-10 text-center">
 												<span className="text-sm text-muted-foreground">
 													Loading branches…
 												</span>
@@ -1320,7 +1585,7 @@ export default function BusinessDetailClient({
 										</TableRow>
 									) : branches?.length === 0 ? (
 										<TableRow>
-											<TableCell colSpan={3} className="py-10 text-center">
+											<TableCell colSpan={canMutateOwners ? 4 : 3} className="py-10 text-center">
 												<span className="text-sm text-muted-foreground">
 													No branches found.
 												</span>
@@ -1338,6 +1603,42 @@ export default function BusinessDetailClient({
 												<TableCell className="text-muted-foreground">
 													{branch.address ?? "—"}
 												</TableCell>
+												{canMutateOwners ? (
+													<TableCell className="text-right">
+														<DropdownMenu>
+															<DropdownMenuTrigger
+																render={
+																	<Button
+																		type="button"
+																		variant="ghost"
+																		size="icon-sm"
+																		aria-label={`Actions for ${branch.name}`}
+																	/>
+																}
+															>
+																<MoreHorizontal aria-hidden="true" />
+															</DropdownMenuTrigger>
+															<DropdownMenuContent align="end">
+																<DropdownMenuGroup>
+																	<DropdownMenuItem
+																		onClick={() => openEditBranch(branch)}
+																	>
+																		<Pencil aria-hidden="true" />
+																		Edit
+																	</DropdownMenuItem>
+																	<DropdownMenuSeparator />
+																	<DropdownMenuItem
+																		variant="destructive"
+																		onClick={() => setBranchPendingDelete(branch)}
+																	>
+																		<Trash2 aria-hidden="true" />
+																		Delete
+																	</DropdownMenuItem>
+																</DropdownMenuGroup>
+															</DropdownMenuContent>
+														</DropdownMenu>
+													</TableCell>
+												) : null}
 											</TableRow>
 										))
 									)}
@@ -1347,13 +1648,21 @@ export default function BusinessDetailClient({
 					</section>
 
 					<section className="overflow-hidden rounded-xl border border-border">
-						<div className="border-b border-border px-4 py-3">
-							<h2 className="text-sm font-semibold tracking-tight">
-								Bank accounts
-							</h2>
-							<p className="text-xs text-muted-foreground">
-								Bank accounts linked to this business
-							</p>
+						<div className="flex items-start justify-between gap-3 border-b border-border px-4 py-3">
+							<div>
+								<h2 className="text-sm font-semibold tracking-tight">
+									Bank accounts
+								</h2>
+								<p className="text-xs text-muted-foreground">
+									Bank accounts linked to this business
+								</p>
+							</div>
+							{canMutateOwners ? (
+								<Button type="button" size="sm" onClick={openCreateBankAccount}>
+									<Plus data-icon="inline-start" aria-hidden="true" />
+									Add Account
+								</Button>
+							) : null}
 						</div>
 						{bankAccountsError ? (
 							<div className="p-4">
@@ -1388,13 +1697,16 @@ export default function BusinessDetailClient({
 											<TableHead>Account name</TableHead>
 											<TableHead>Account number</TableHead>
 											<TableHead>Status</TableHead>
+											{canMutateOwners ? (
+												<TableHead className="text-right">Actions</TableHead>
+											) : null}
 										</TableRow>
 									</TableHeader>
 									<TableBody>
 										{(bankAccounts ?? []).length === 0 ? (
 											<TableRow>
 												<TableCell
-													colSpan={4}
+													colSpan={canMutateOwners ? 5 : 4}
 													className="py-10 text-center text-sm text-muted-foreground"
 												>
 													No bank accounts linked to this business.
@@ -1424,6 +1736,43 @@ export default function BusinessDetailClient({
 																{account.is_archived ? "Archived" : "Active"}
 															</Badge>
 														</TableCell>
+														{canMutateOwners ? (
+															<TableCell className="text-right">
+																<DropdownMenu>
+																	<DropdownMenuTrigger
+																		render={
+																			<Button
+																				type="button"
+																				variant="ghost"
+																				size="icon-sm"
+																				aria-label={`Actions for ${account.account_name}`}
+																			/>
+																		}
+																	>
+																		<MoreHorizontal aria-hidden="true" />
+																	</DropdownMenuTrigger>
+																	<DropdownMenuContent align="end">
+																		<DropdownMenuGroup>
+																			<DropdownMenuItem
+																				onClick={() => openEditBankAccount(account)}
+																			>
+																				<Pencil aria-hidden="true" />
+																				Edit
+																			</DropdownMenuItem>
+																			<DropdownMenuSeparator />
+																			<DropdownMenuItem
+																				variant="destructive"
+																				disabled={account.is_archived}
+																				onClick={() => setBankPendingDelete(account)}
+																			>
+																				<Trash2 aria-hidden="true" />
+																				Delete
+																			</DropdownMenuItem>
+																		</DropdownMenuGroup>
+																	</DropdownMenuContent>
+																</DropdownMenu>
+															</TableCell>
+														) : null}
 													</TableRow>
 												),
 											)
@@ -1437,11 +1786,19 @@ export default function BusinessDetailClient({
 
 				<TabsContent value="people" className="mt-0">
 					<section className="overflow-hidden rounded-xl border border-border">
-						<div className="border-b border-border px-4 py-3">
-							<h2 className="text-sm font-semibold tracking-tight">Staff</h2>
-							<p className="text-xs text-muted-foreground">
-								Roles and branch assignment for this business
-							</p>
+						<div className="flex items-start justify-between gap-3 border-b border-border px-4 py-3">
+							<div>
+								<h2 className="text-sm font-semibold tracking-tight">Staff</h2>
+								<p className="text-xs text-muted-foreground">
+									Roles and branch assignment for this business
+								</p>
+							</div>
+							{canMutateOwners ? (
+								<Button type="button" size="sm" onClick={openCreateEmployee}>
+									<Plus data-icon="inline-start" aria-hidden="true" />
+									Add Staff
+								</Button>
+							) : null}
 						</div>
 						<div className="flex flex-col gap-4 p-4">
 							{employeesError ? (
@@ -1498,6 +1855,8 @@ export default function BusinessDetailClient({
 													const selectedRoleId =
 														employeeRoleDraft[emp.id] ?? emp.role_id;
 													const selectedRole = roleById.get(selectedRoleId);
+														const selectedBranchId =
+															employeeBranchDraft[emp.id] ?? emp.branch_id ?? "";
 
 													return (
 														<TableRow key={emp.id}>
@@ -1550,9 +1909,38 @@ export default function BusinessDetailClient({
 																)}
 															</TableCell>
 															<TableCell>
-																<span className="truncate font-medium">
-																	{emp.branch?.name ?? "—"}
-																</span>
+																{canMutateOwners ? (
+																	<Select
+																		value={selectedBranchId}
+																		onValueChange={(value) => {
+																			if (!value) return;
+																			setEmployeeBranchDraft((prev) => ({
+																				...prev,
+																				[emp.id]: value,
+																			}));
+																		}}
+																	>
+																		<SelectTrigger
+																			aria-label="Select employee branch"
+																			className="w-56"
+																		>
+																			<SelectValue placeholder="Select branch">
+																				{branches?.find((branch) => branch.id === selectedBranchId)?.name ?? "—"}
+																			</SelectValue>
+																		</SelectTrigger>
+																		<SelectContent>
+																			{(branches ?? []).map((branch) => (
+																				<SelectItem key={branch.id} value={branch.id}>
+																					{branch.name}
+																				</SelectItem>
+																			))}
+																		</SelectContent>
+																	</Select>
+																) : (
+																	<span className="truncate font-medium">
+																		{emp.branch?.name ?? "—"}
+																	</span>
+																)}
 															</TableCell>
 															{canMutateOwners ? (
 																<TableCell className="text-right">
@@ -1568,42 +1956,66 @@ export default function BusinessDetailClient({
 																			disabled={
 																				updateEmployeeRoleState.isLoading ||
 																				!selectedRoleId ||
-																				selectedRoleId === emp.role_id
+																				(!selectedBranchId && !emp.branch_id) ||
+																				(selectedRoleId === emp.role_id &&
+																					selectedBranchId === (emp.branch_id ?? ""))
 																			}
 																			onClick={async () => {
-																				if (!selectedRoleId) return;
+																				if (!selectedRoleId || !selectedBranchId) return;
 																				await updateEmployeeRole({
 																					businessId,
 																					employeeId: emp.id,
-																					body: { role_id: selectedRoleId },
+																					body: {
+																						role_id: selectedRoleId,
+																						branch_id: selectedBranchId,
+																					},
 																				}).unwrap();
 																			}}
 																		>
 																			Save
 																		</button>
-																		<button
-																			type="button"
-																			className={cn(
-																				buttonVariants({
-																					variant: "ghost",
-																					size: "sm",
-																				}),
-																			)}
-																			onClick={() =>
-																				setResetPasswordTarget({
-																					userName:
-																						emp.user?.username ??
-																						emp.user?.phone_number ??
-																						emp.user_id,
-																					phoneNumber:
-																						emp.user?.phone_number ?? null,
-																					email: emp.user?.email ?? null,
-																					contextLabel: business.name,
-																				})
-																			}
-																		>
-																			Reset password
-																		</button>
+																		<DropdownMenu>
+																			<DropdownMenuTrigger
+																				render={
+																					<Button
+																						type="button"
+																					variant="ghost"
+																					size="icon-sm"
+																					aria-label={`Actions for ${emp.user?.username ?? emp.user?.phone_number ?? "staff member"}`}
+																					/>
+																				}
+																			>
+																				<MoreHorizontal aria-hidden="true" />
+																			</DropdownMenuTrigger>
+																			<DropdownMenuContent align="end">
+																				<DropdownMenuGroup>
+																					<DropdownMenuItem
+																						onClick={() =>
+																							setResetPasswordTarget({
+																								userName:
+																									emp.user?.username ??
+																									emp.user?.phone_number ??
+																									emp.user_id,
+																								phoneNumber:
+																									emp.user?.phone_number ?? null,
+																								email: emp.user?.email ?? null,
+																								contextLabel: business.name,
+																							})
+																						}
+																					>
+																						Reset password
+																					</DropdownMenuItem>
+																					<DropdownMenuSeparator />
+																					<DropdownMenuItem
+																						variant="destructive"
+																						onClick={() => setEmployeePendingDelete(emp)}
+																					>
+																						<Trash2 aria-hidden="true" />
+																						Delete
+																					</DropdownMenuItem>
+																				</DropdownMenuGroup>
+																			</DropdownMenuContent>
+																		</DropdownMenu>
 																	</div>
 																</TableCell>
 															) : null}
@@ -1903,6 +2315,308 @@ export default function BusinessDetailClient({
 					</div>
 				</TabsContent>
 			</Tabs>
+
+			<Dialog open={branchDialogOpen} onOpenChange={setBranchDialogOpen}>
+				<DialogContent className="sm:max-w-lg">
+					<DialogHeader>
+						<DialogTitle>{editingBranch ? "Edit Branch" : "Add Branch"}</DialogTitle>
+						<DialogDescription>
+							Manage the location details for {business.name}.
+						</DialogDescription>
+					</DialogHeader>
+					<form onSubmit={handleBranchSubmit} className="flex flex-col gap-4">
+						<FieldGroup>
+							<Field>
+								<FieldLabel htmlFor="business-branch-name">Branch name</FieldLabel>
+								<Input
+									id="business-branch-name"
+									name="branch-name"
+									value={branchForm.name}
+									onChange={(event) =>
+										setBranchForm((current) => ({
+											...current,
+											name: event.target.value,
+										}))
+									}
+									placeholder="Main location"
+									autoComplete="off"
+								/>
+							</Field>
+							<Field>
+								<FieldLabel htmlFor="business-branch-address">Address</FieldLabel>
+								<Input
+									id="business-branch-address"
+									name="branch-address"
+									value={branchForm.address}
+									onChange={(event) =>
+										setBranchForm((current) => ({
+											...current,
+											address: event.target.value,
+										}))
+									}
+									placeholder="City, street, building…"
+									autoComplete="street-address"
+								/>
+							</Field>
+							<label className="flex items-center gap-2 text-sm">
+								<Checkbox
+									checked={branchForm.is_head_quarter}
+									onCheckedChange={(checked) =>
+										setBranchForm((current) => ({
+											...current,
+											is_head_quarter: checked === true,
+										}))
+									}
+								/>
+								Headquarters
+							</label>
+						</FieldGroup>
+						{branchError ? <FieldError>{branchError}</FieldError> : null}
+						<DialogFooter>
+							<Button type="button" variant="outline" onClick={() => setBranchDialogOpen(false)}>
+								Cancel
+							</Button>
+							<Button type="submit" disabled={createBranchState.isLoading || updateBranchState.isLoading}>
+								{createBranchState.isLoading || updateBranchState.isLoading ? (
+									<Loader2Icon className="animate-spin" aria-hidden="true" />
+								) : null}
+								{editingBranch ? "Save Branch" : "Create Branch"}
+							</Button>
+						</DialogFooter>
+					</form>
+				</DialogContent>
+			</Dialog>
+
+			<Dialog open={bankDialogOpen} onOpenChange={setBankDialogOpen}>
+				<DialogContent className="sm:max-w-lg">
+					<DialogHeader>
+						<DialogTitle>{editingBankAccount ? "Edit Bank Account" : "Add Bank Account"}</DialogTitle>
+						<DialogDescription>
+							Manage the payment account linked to {business.name}.
+						</DialogDescription>
+					</DialogHeader>
+					<form onSubmit={handleBankSubmit} className="flex flex-col gap-4">
+						<FieldGroup>
+							<Field>
+								<FieldLabel htmlFor="business-bank-name">Bank</FieldLabel>
+								<Select
+									value={bankForm.bank_name}
+									onValueChange={(value) =>
+										setBankForm((current) => ({
+											...current,
+											bank_name: (value as BankNameEnum) || "",
+										}))
+									}
+								>
+									<SelectTrigger id="business-bank-name" className="w-full">
+										<SelectValue placeholder="Select a bank" />
+									</SelectTrigger>
+									<SelectContent>
+										<SelectGroup>
+											<SelectItem value="CBE">Commercial Bank of Ethiopia</SelectItem>
+											<SelectItem value="DASHEN">Dashen Bank</SelectItem>
+											<SelectItem value="AWASH">Awash Bank</SelectItem>
+											<SelectItem value="ABYSINIA">Bank of Abyssinia</SelectItem>
+											<SelectItem value="TELEBIRR">Telebirr</SelectItem>
+											<SelectItem value="CBEBIRR">CBE Birr</SelectItem>
+										</SelectGroup>
+									</SelectContent>
+								</Select>
+							</Field>
+							<Field>
+								<FieldLabel htmlFor="business-bank-account-name">Account name</FieldLabel>
+								<Input
+									id="business-bank-account-name"
+									name="account-name"
+									value={bankForm.account_name}
+									onChange={(event) =>
+										setBankForm((current) => ({
+											...current,
+											account_name: event.target.value,
+										}))
+									}
+									placeholder="Business account"
+									autoComplete="off"
+								/>
+							</Field>
+							<Field>
+								<FieldLabel htmlFor="business-bank-account-number">Account number</FieldLabel>
+								<Input
+									id="business-bank-account-number"
+									name="account-number"
+									value={bankForm.account_number}
+									onChange={(event) =>
+										setBankForm((current) => ({
+											...current,
+											account_number: event.target.value,
+										}))
+									}
+									placeholder="Enter account number"
+									autoComplete="off"
+									inputMode="numeric"
+								/>
+							</Field>
+						</FieldGroup>
+						{bankError ? <FieldError>{bankError}</FieldError> : null}
+						<DialogFooter>
+							<Button type="button" variant="outline" onClick={() => setBankDialogOpen(false)}>
+								Cancel
+							</Button>
+							<Button type="submit" disabled={createBankAccountState.isLoading || updateBankAccountState.isLoading}>
+								{createBankAccountState.isLoading || updateBankAccountState.isLoading ? (
+									<Loader2Icon className="animate-spin" aria-hidden="true" />
+								) : null}
+								{editingBankAccount ? "Save Account" : "Create Account"}
+							</Button>
+						</DialogFooter>
+					</form>
+				</DialogContent>
+			</Dialog>
+
+			<Dialog open={employeeDialogOpen} onOpenChange={setEmployeeDialogOpen}>
+				<DialogContent className="sm:max-w-lg">
+					<DialogHeader>
+						<DialogTitle>{createdEmployeePassword ? "Staff Created" : "Add Staff"}</DialogTitle>
+						<DialogDescription>
+							{createdEmployeePassword
+								? "Share the temporary password securely with this staff member."
+								: `Create a staff account for ${business.name}.`}
+						</DialogDescription>
+					</DialogHeader>
+					{createdEmployeePassword ? (
+						<div className="flex flex-col gap-4">
+							<Alert>
+								<AlertTitle>Temporary password</AlertTitle>
+								<AlertDescription className="font-mono text-sm">
+									{createdEmployeePassword}
+								</AlertDescription>
+							</Alert>
+							<DialogFooter>
+								<Button type="button" onClick={() => setEmployeeDialogOpen(false)}>Done</Button>
+							</DialogFooter>
+						</div>
+					) : (
+						<form onSubmit={handleEmployeeCreate} className="flex flex-col gap-4">
+							<FieldGroup>
+								<Field>
+									<FieldLabel htmlFor="staff-phone">Phone number</FieldLabel>
+									<Input
+										id="staff-phone"
+										name="phone"
+										type="tel"
+										inputMode="tel"
+										value={employeeForm.phone_number}
+										onChange={(event) => setEmployeeForm((current) => ({ ...current, phone_number: event.target.value }))}
+										placeholder="+251…"
+										autoComplete="tel"
+									/>
+								</Field>
+								<Field>
+									<FieldLabel htmlFor="staff-username">Username</FieldLabel>
+									<Input
+										id="staff-username"
+										name="username"
+										value={employeeForm.username}
+										onChange={(event) => setEmployeeForm((current) => ({ ...current, username: event.target.value }))}
+										placeholder="Optional"
+										autoComplete="off"
+										spellCheck={false}
+									/>
+								</Field>
+								<Field>
+									<FieldLabel htmlFor="staff-email">Email</FieldLabel>
+									<Input
+										id="staff-email"
+										name="email"
+										type="email"
+										value={employeeForm.email}
+										onChange={(event) => setEmployeeForm((current) => ({ ...current, email: event.target.value }))}
+										placeholder="name@example.com"
+										autoComplete="email"
+										spellCheck={false}
+									/>
+								</Field>
+								<Field>
+									<FieldLabel htmlFor="staff-role">Role</FieldLabel>
+									<Select value={employeeForm.role_id} onValueChange={(value) => setEmployeeForm((current) => ({ ...current, role_id: value ?? "" }))}>
+										<SelectTrigger id="staff-role" className="w-full"><SelectValue placeholder="Select role" /></SelectTrigger>
+										<SelectContent>
+											<SelectGroup>
+												{(roles ?? []).map((role) => (
+													<SelectItem key={role.id} value={role.id}>{role.name}</SelectItem>
+												))}
+											</SelectGroup>
+										</SelectContent>
+									</Select>
+								</Field>
+								<Field>
+									<FieldLabel htmlFor="staff-branch">Branch</FieldLabel>
+									<Select value={employeeForm.branch_id} onValueChange={(value) => setEmployeeForm((current) => ({ ...current, branch_id: value ?? "" }))}>
+										<SelectTrigger id="staff-branch" className="w-full"><SelectValue placeholder="Select branch" /></SelectTrigger>
+										<SelectContent>
+											<SelectGroup>
+												{(branches ?? []).map((branch) => (
+													<SelectItem key={branch.id} value={branch.id}>{branch.name}</SelectItem>
+												))}
+											</SelectGroup>
+										</SelectContent>
+									</Select>
+								</Field>
+							</FieldGroup>
+							{employeeError ? <FieldError>{employeeError}</FieldError> : null}
+							<DialogFooter>
+								<Button type="button" variant="outline" onClick={() => setEmployeeDialogOpen(false)}>Cancel</Button>
+								<Button type="submit" disabled={createEmployeeState.isLoading}>
+									{createEmployeeState.isLoading ? <Loader2Icon className="animate-spin" aria-hidden="true" /> : null}
+									Create Staff
+								</Button>
+							</DialogFooter>
+						</form>
+					)}
+				</DialogContent>
+			</Dialog>
+
+			<AlertDialog open={Boolean(branchPendingDelete)} onOpenChange={(open) => !open && setBranchPendingDelete(null)}>
+				<AlertDialogContent>
+					<AlertDialogHeader>
+						<AlertDialogTitle>Delete {branchPendingDelete?.name}?</AlertDialogTitle>
+						<AlertDialogDescription>This action cannot be undone.</AlertDialogDescription>
+					</AlertDialogHeader>
+					{branchError ? <Alert variant="destructive"><AlertDescription>{branchError}</AlertDescription></Alert> : null}
+					<AlertDialogFooter>
+						<AlertDialogCancel>Cancel</AlertDialogCancel>
+						<AlertDialogAction onClick={handleBranchDelete} disabled={deleteBranchState.isLoading}>Delete Branch</AlertDialogAction>
+					</AlertDialogFooter>
+				</AlertDialogContent>
+			</AlertDialog>
+
+			<AlertDialog open={Boolean(bankPendingDelete)} onOpenChange={(open) => !open && setBankPendingDelete(null)}>
+				<AlertDialogContent>
+					<AlertDialogHeader>
+						<AlertDialogTitle>Delete {bankPendingDelete?.account_name}?</AlertDialogTitle>
+						<AlertDialogDescription>This bank account will be removed from this business.</AlertDialogDescription>
+					</AlertDialogHeader>
+					{bankError ? <Alert variant="destructive"><AlertDescription>{bankError}</AlertDescription></Alert> : null}
+					<AlertDialogFooter>
+						<AlertDialogCancel>Cancel</AlertDialogCancel>
+						<AlertDialogAction onClick={handleBankDelete} disabled={deleteBankAccountState.isLoading}>Delete Account</AlertDialogAction>
+					</AlertDialogFooter>
+				</AlertDialogContent>
+			</AlertDialog>
+
+			<AlertDialog open={Boolean(employeePendingDelete)} onOpenChange={(open) => !open && setEmployeePendingDelete(null)}>
+				<AlertDialogContent>
+					<AlertDialogHeader>
+						<AlertDialogTitle>Delete this staff member?</AlertDialogTitle>
+						<AlertDialogDescription>This removes the employee assignment from this business.</AlertDialogDescription>
+					</AlertDialogHeader>
+					{employeeError ? <Alert variant="destructive"><AlertDescription>{employeeError}</AlertDescription></Alert> : null}
+					<AlertDialogFooter>
+						<AlertDialogCancel>Cancel</AlertDialogCancel>
+						<AlertDialogAction onClick={handleEmployeeDelete} disabled={deleteEmployeeState.isLoading}>Delete Staff</AlertDialogAction>
+					</AlertDialogFooter>
+				</AlertDialogContent>
+			</AlertDialog>
 		</div>
 	);
 }
