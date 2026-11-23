@@ -2,7 +2,6 @@ import type {
 	AdminSubscriptionOutput,
 	BusinessOutput,
 	PaginatedAdminSubscriptionResponse,
-	SubscriptionStatus,
 } from "@/services/types";
 
 export function asAdminSubscriptionRows(
@@ -27,28 +26,50 @@ export type SubscriptionStatusFilter =
 	| "active"
 	| "expired"
 	| "cancelled"
-	| "upgraded"
-	| "insufficient_credits"
-	| "unsubscribed";
+	| "insufficient_credits";
+
+export type SubscriptionTypeFilter =
+	| "all"
+	| "standard"
+	| "free"
+	| "custom"
+	| "none";
+
+export type BusinessActiveFilter = "all" | "true" | "false";
 
 export const SUBSCRIPTION_STATUS_FILTER_LABELS: Record<
 	SubscriptionStatusFilter,
 	string
 > = {
-	all: "All",
+	all: "All statuses",
 	pending: "Pending",
 	active: "Active",
 	expired: "Expired",
 	cancelled: "Cancelled",
-	upgraded: "Upgraded",
 	insufficient_credits: "Insufficient credits",
-	unsubscribed: "Unsubscribed",
+};
+
+export const SUBSCRIPTION_TYPE_FILTER_LABELS: Record<
+	SubscriptionTypeFilter,
+	string
+> = {
+	all: "All types",
+	standard: "Standard",
+	free: "Free",
+	custom: "Custom",
+	none: "No subscription",
 };
 
 export function getSubscriptionStatusFilterLabel(
 	filter: SubscriptionStatusFilter,
 ): string {
 	return SUBSCRIPTION_STATUS_FILTER_LABELS[filter];
+}
+
+export function getSubscriptionTypeFilterLabel(
+	filter: SubscriptionTypeFilter,
+): string {
+	return SUBSCRIPTION_TYPE_FILTER_LABELS[filter];
 }
 
 export const SUBSCRIPTION_STATUS_LABELS: Record<string, string> = {
@@ -65,12 +86,13 @@ export function getSubscriptionStatusLabel(status: string): string {
 	return SUBSCRIPTION_STATUS_LABELS[status.toLowerCase()] ?? status;
 }
 
-/** API accepts only these status query values (not `unsubscribed`). */
-export function apiStatusForStatusFilter(
-	filter: SubscriptionStatusFilter,
-): SubscriptionStatus | undefined {
-	if (filter === "all" || filter === "unsubscribed") return undefined;
-	return filter;
+export function getSubscriptionTypeLabel(type: string | null | undefined): string {
+	if (!type) return "—";
+	const key = type.toLowerCase() as SubscriptionTypeFilter;
+	if (key in SUBSCRIPTION_TYPE_FILTER_LABELS && key !== "all") {
+		return SUBSCRIPTION_TYPE_FILTER_LABELS[key];
+	}
+	return type;
 }
 
 /** Businesses with no subscription transaction (UI label: Unsubscribed). */

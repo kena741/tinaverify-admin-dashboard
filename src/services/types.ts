@@ -112,11 +112,11 @@ export type BusinessCreateRequest = {
 	tin_number: string;
 };
 
-/** OpenAPI `BusinessOutputSchema` */
+/** OpenAPI `BusinessOutputSchema` — list items may include enrich fields */
 export type BusinessOutput = {
 	id: UUID;
 	name: string;
-	tin_number?: string | null;
+	tin_number: string | null;
 	owner_id: UUID;
 	is_active: boolean;
 	is_archived: boolean;
@@ -124,22 +124,11 @@ export type BusinessOutput = {
 	owner_phone?: string | null;
 	plan_name?: string | null;
 	subscription_status?: string | null;
+	subscription_type?: string | null;
+	remaining_credits?: number | null;
+	is_unlimited?: boolean | null;
+	subscription_started_at?: string | null;
 	created_at?: string | null;
-};
-
-export type BusinessListFilters = {
-	owner_name?: string | null;
-	business_name?: string | null;
-	phone?: string | null;
-	plan?: string | null;
-	status?: string | null;
-	from_date?: string | null;
-	to_date?: string | null;
-};
-
-export type BusinessListQuery = BusinessListFilters & {
-	offset?: number;
-	limit?: number;
 };
 
 /** OpenAPI `PaginatedBusinessResponse` — `GET /api/v1/business` */
@@ -664,7 +653,7 @@ export type SubscriptionStatus =
 export type SubscriptionBusinessOutput = {
 	id: UUID;
 	name: string;
-	tin_number?: string | null;
+	tin_number: string | null;
 };
 
 /** Paginated wrapper some deployments return for `GET /api/v1/subscriptions/transactions`. */
@@ -870,7 +859,9 @@ export type CouponCreateRequest = {
 	description?: string | null;
 	discount_type: CouponDiscountType;
 	discount_value: number | string;
-	applicable_plan_ids: UUID[];
+	max_discount_amount?: number | string | null;
+	min_purchase_amount?: number | string;
+	applicable_plan_ids?: UUID[] | null;
 	max_uses?: number | null;
 	max_uses_per_business?: number;
 	valid_from?: string | null;
@@ -883,6 +874,8 @@ export type CouponUpdateRequest = {
 	description?: string | null;
 	discount_type?: CouponDiscountType | null;
 	discount_value?: number | string | null;
+	max_discount_amount?: number | string | null;
+	min_purchase_amount?: number | string | null;
 	applicable_plan_ids?: UUID[] | null;
 	max_uses?: number | null;
 	max_uses_per_business?: number | null;
@@ -898,7 +891,9 @@ export type CouponOutput = {
 	description?: string | null;
 	discount_type: CouponDiscountType;
 	discount_value: string;
-	applicable_plan_ids?: UUID[];
+	max_discount_amount?: string | null;
+	min_purchase_amount: string;
+	applicable_plan_ids?: UUID[] | null;
 	max_uses?: number | null;
 	used_count: number;
 	max_uses_per_business: number;

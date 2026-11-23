@@ -55,7 +55,7 @@ const systemAdminMainNav: NavItem[] = [
 ];
 
 const systemAdminUsersNav: NavItem[] = [
-	{ name: "Owners", href: "/admin/owners", icon: Users },
+	{ name: "Businesses", href: "/admin/owners", icon: Users },
 ];
 
 const branchAdminMainNav: NavItem[] = [
@@ -68,7 +68,7 @@ const branchAdminMainNav: NavItem[] = [
 ];
 
 const branchAdminUsersNav: NavItem[] = [
-	{ name: "Owners", href: "/admin/owners", icon: Users },
+	{ name: "Businesses", href: "/admin/owners", icon: Users },
 	{ name: "Staff", href: "/admin/staff", icon: UserRound },
 	{ name: "Notifications", href: "/admin/notifications", icon: Bell },
 ];

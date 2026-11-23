@@ -11,8 +11,6 @@ import type {
 	BranchCreateRequest,
 	BranchOutput,
 	BranchUpdateRequest,
-	BusinessListFilters,
-	BusinessListQuery,
 	BusinessOutput,
 	CreateEmployeeUserRequest,
 	CreateEmployeeUserResponse,
@@ -21,28 +19,6 @@ import type {
 	PaginatedBusinessResponse,
 	UpdateEmployeeRequest,
 } from "../types";
-
-function businessFilterParams(
-	filters: BusinessListFilters | void,
-): Record<string, string> {
-	const params: Record<string, string> = {};
-	if (!filters) return params;
-
-	for (const key of [
-		"owner_name",
-		"business_name",
-		"phone",
-		"plan",
-		"status",
-		"from_date",
-		"to_date",
-	] as const) {
-		const value = filters[key];
-		if (typeof value === "string") params[key] = value;
-	}
-
-	return params;
-}
 
 function bearerHeaders(accessToken?: string | null) {
 	const token =
@@ -59,43 +35,108 @@ export type ListAllUserBranchesResult = {
 	myBusinesses: { id: string; name: string }[];
 };
 
+/** `GET /api/v1/business` query — pagination + server filters. */
+export type ListBusinessesParams = {
+	offset?: number;
+	limit?: number;
+	owner_id?: string | null;
+	owner_name?: string | null;
+	business_name?: string | null;
+	phone?: string | null;
+	plan_id?: string | null;
+	plan_name?: string | null;
+	subscription_status?: string | null;
+	subscription_type?: string | null;
+	is_active?: boolean | null;
+	min_amount?: number | null;
+	max_amount?: number | null;
+	min_credits?: number | null;
+	max_credits?: number | null;
+	from_date?: string | null;
+	to_date?: string | null;
+};
+
+function listBusinessesQueryParams(
+	arg: ListBusinessesParams,
+): Record<string, string | number | boolean> {
+	const params: Record<string, string | number | boolean> = {
+		offset: arg.offset ?? 0,
+		limit: arg.limit ?? ADMIN_LIST_PAGE_SIZE,
+	};
+	const ownerId = arg.owner_id?.trim();
+	const ownerName = arg.owner_name?.trim();
+	const businessName = arg.business_name?.trim();
+	const phone = arg.phone?.trim();
+	const planId = arg.plan_id?.trim();
+	const planName = arg.plan_name?.trim();
+	const subscriptionStatus = arg.subscription_status?.trim();
+	const subscriptionType = arg.subscription_type?.trim();
+	const fromDate = arg.from_date?.trim();
+	const toDate = arg.to_date?.trim();
+	if (ownerId) params.owner_id = ownerId;
+	if (ownerName) params.owner_name = ownerName;
+	if (businessName) params.business_name = businessName;
+	if (phone) params.phone = phone;
+	if (planId) params.plan_id = planId;
+	if (planName) params.plan_name = planName;
+	if (subscriptionStatus) params.subscription_status = subscriptionStatus;
+	if (subscriptionType) params.subscription_type = subscriptionType;
+	if (arg.is_active === true || arg.is_active === false) {
+		params.is_active = arg.is_active;
+	}
+	if (arg.min_amount != null && Number.isFinite(arg.min_amount)) {
+		params.min_amount = arg.min_amount;
+	}
+	if (arg.max_amount != null && Number.isFinite(arg.max_amount)) {
+		params.max_amount = arg.max_amount;
+	}
+	if (arg.min_credits != null && Number.isFinite(arg.min_credits)) {
+		params.min_credits = arg.min_credits;
+	}
+	if (arg.max_credits != null && Number.isFinite(arg.max_credits)) {
+		params.max_credits = arg.max_credits;
+	}
+	if (fromDate) params.from_date = fromDate;
+	if (toDate) params.to_date = toDate;
+	return params;
+}
+
 export const branchManagementApi = createApi({
 	reducerPath: "branchManagementApi",
 	baseQuery: backendBaseQuery,
 	tagTypes: ["Branch", "MyBusinesses", "Business", "Employee"],
 	endpoints: (builder) => ({
 		/** `GET /api/v1/business` — one paginated slice. */
-		listBusinesses: builder.query<
-			PaginatedBusinessResponse,
-			BusinessListQuery
-		>({
-			query: ({ offset = 0, limit = ADMIN_LIST_PAGE_SIZE, ...filters }) => ({
-				url: "/api/v1/business",
-				method: "GET",
-				params: { offset, limit, ...businessFilterParams(filters) },
-				headers: bearerHeaders(),
-			}),
-			providesTags: (result) =>
-				result
-					? [
-							{ type: "Business" as const, id: "LIST" },
-							...result.items.map((b) => ({
-								type: "Business" as const,
-								id: b.id,
-							})),
-						]
-					: [{ type: "Business" as const, id: "LIST" }],
-		}),
+		listBusinesses: builder.query<PaginatedBusinessResponse, ListBusinessesParams>(
+			{
+				query: (arg) => ({
+					url: "/api/v1/business",
+					method: "GET",
+					params: listBusinessesQueryParams(arg),
+					headers: bearerHeaders(),
+				}),
+				providesTags: (result) =>
+					result
+						? [
+								{ type: "Business" as const, id: "LIST" },
+								...result.items.map((b) => ({
+									type: "Business" as const,
+									id: b.id,
+								})),
+							]
+						: [{ type: "Business" as const, id: "LIST" }],
+			},
+		),
 
 		/**
 		 * `GET /api/v1/business` — loads every page sequentially in small batches.
 		 * Prefer `listBusinesses` + `useAccumulatedPaginatedQuery` for progressive UI.
 		 */
-		listAllBusinesses: builder.query<
-			BusinessOutput[],
-			BusinessListFilters | void
-		>({
+		listAllBusinesses: builder.query<BusinessOutput[], ListBusinessesParams | void>({
 			async queryFn(arg, _api, _extraOptions, baseQuery) {
+				const params = listBusinessesQueryParams(arg ?? {});
+				delete params.offset;
+				delete params.limit;
 				return fetchAllPaginatedItems<BusinessOutput>(
 					baseQuery as (arg: {
 						url: string;
@@ -106,7 +147,7 @@ export const branchManagementApi = createApi({
 					"/api/v1/business",
 					bearerHeaders() as Record<string, string>,
 					ADMIN_LIST_MAX_PAGE_SIZE,
-					businessFilterParams(arg),
+					params as Record<string, string | number>,
 				);
 			},
 			providesTags: (result) =>
