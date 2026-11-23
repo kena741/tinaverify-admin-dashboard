@@ -1,5 +1,6 @@
 import { configureStore, combineReducers, AnyAction } from "@reduxjs/toolkit";
 import authReducer from "./authSlice";
+import ownersFiltersReducer from "./owners/ownersFiltersSlice";
 import { resetStore } from "./resetActions";
 import { authApi } from "../services/auth/authApi";
 import { bankAccountsApi } from "../services/bank-accounts/bankAccountsApi";
@@ -21,6 +22,7 @@ import { couponsApi } from "../services/coupons/couponsApi";
 // Combine all reducers
 const appReducer = combineReducers({
 	auth: authReducer,
+	ownersFilters: ownersFiltersReducer,
 	[authApi.reducerPath]: authApi.reducer,
 	[bankAccountsApi.reducerPath]: bankAccountsApi.reducer,
 	[branchManagementApi.reducerPath]: branchManagementApi.reducer,

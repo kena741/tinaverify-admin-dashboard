@@ -16,8 +16,8 @@ function bearerHeaders(accessToken?: string | null) {
 }
 
 /**
- * OpenAPI returns either a bare array or `Record<string, VerifiedTransactionOutput[]>`
- * (bank / group keys). Also tolerate `{ items|transactions|results|data }`.
+ * Supports bare arrays, grouped transaction maps, and paginated responses whose
+ * `items` map groups transactions by bank.
  */
 export function normalizeTransactionList(
 	data: unknown,
@@ -26,6 +26,12 @@ export function normalizeTransactionList(
 	if (data && typeof data === "object") {
 		const o = data as Record<string, unknown>;
 		if (Array.isArray(o.items)) return o.items as VerifiedTransactionOutput[];
+		if (o.items && typeof o.items === "object") {
+			const itemGroups = Object.values(o.items)
+				.filter(Array.isArray)
+				.map((group) => group as VerifiedTransactionOutput[]);
+			if (itemGroups.length > 0) return itemGroups.flat();
+		}
 		if (Array.isArray(o.transactions))
 			return o.transactions as VerifiedTransactionOutput[];
 		if (Array.isArray(o.results))
@@ -134,9 +140,19 @@ export const transactionsApi = createApi({
 				endDate: string;
 				createdBy?: string | null;
 				bankFilter?: boolean;
+				limit?: number;
+				offset?: number;
 			}
 		>({
-			query: ({ businessId, startDate, endDate, createdBy, bankFilter }) => ({
+			query: ({
+				businessId,
+				startDate,
+				endDate,
+				createdBy,
+				bankFilter,
+				limit,
+				offset,
+			}) => ({
 				url: `/api/v1/transactions/business/${businessId}`,
 				params: {
 					start_date: startDate,
@@ -145,6 +161,8 @@ export const transactionsApi = createApi({
 						? { created_by: createdBy }
 						: {}),
 					...(bankFilter != null ? { bank_filter: bankFilter } : {}),
+					...(limit != null ? { limit } : {}),
+					...(offset != null ? { offset } : {}),
 				},
 				headers: bearerHeaders(),
 			}),

@@ -687,9 +687,11 @@ export type AdminSubscriptionOutput = {
 /** OpenAPI `UsageOutputSchema` */
 export type UsageOutput = {
 	subscription_id: UUID;
-	credits_limit: number;
+	is_unlimited: boolean;
+	credits_limit: number | null;
 	credits_used: number;
-	remaining_credits: number;
+	remaining_credits: number | null;
+	days_remaining: number | null;
 };
 
 /** OpenAPI `ExchangeRateOutputSchema` */
@@ -734,6 +736,7 @@ export type VerifiedTransactionOutput = {
 	id: UUID;
 	reference_number: string;
 	business_id: UUID;
+	recorded_date?: string | null;
 	amount: string;
 	currency: string;
 	bank_account_id?: UUID | null;

@@ -12,6 +12,8 @@ import type {
 	BranchOutput,
 	BranchUpdateRequest,
 	BusinessOutput,
+	CreateEmployeeUserRequest,
+	CreateEmployeeUserResponse,
 	DeactivateBusinessRequest,
 	EmployeeOutput,
 	PaginatedBusinessResponse,
@@ -130,8 +132,11 @@ export const branchManagementApi = createApi({
 		 * `GET /api/v1/business` — loads every page sequentially in small batches.
 		 * Prefer `listBusinesses` + `useAccumulatedPaginatedQuery` for progressive UI.
 		 */
-		listAllBusinesses: builder.query<BusinessOutput[], void>({
-			async queryFn(_arg, _api, _extraOptions, baseQuery) {
+		listAllBusinesses: builder.query<BusinessOutput[], ListBusinessesParams | void>({
+			async queryFn(arg, _api, _extraOptions, baseQuery) {
+				const params = listBusinessesQueryParams(arg ?? {});
+				delete params.offset;
+				delete params.limit;
 				return fetchAllPaginatedItems<BusinessOutput>(
 					baseQuery as (arg: {
 						url: string;
@@ -142,6 +147,7 @@ export const branchManagementApi = createApi({
 					"/api/v1/business",
 					bearerHeaders() as Record<string, string>,
 					ADMIN_LIST_MAX_PAGE_SIZE,
+					params as Record<string, string | number>,
 				);
 			},
 			providesTags: (result) =>
@@ -288,6 +294,38 @@ export const branchManagementApi = createApi({
 			],
 		}),
 
+		createEmployee: builder.mutation<
+			CreateEmployeeUserResponse,
+			{ body: CreateEmployeeUserRequest }
+		>({
+			query: ({ body }) => ({
+				url: "/api/v1/business/employees/create-user",
+				method: "POST",
+				body,
+				headers: {
+					"Content-Type": "application/json",
+					...bearerHeaders(),
+				},
+			}),
+			invalidatesTags: (_result, _err, { body }) => [
+				{ type: "Employee", id: body.business_id },
+			],
+		}),
+
+		deleteEmployee: builder.mutation<
+			void,
+			{ businessId: string; employeeId: string }
+		>({
+			query: ({ businessId, employeeId }) => ({
+				url: `/api/v1/business/${businessId}/employees/${employeeId}`,
+				method: "DELETE",
+				headers: bearerHeaders(),
+			}),
+			invalidatesTags: (_result, _err, { businessId }) => [
+				{ type: "Employee", id: businessId },
+			],
+		}),
+
 		listBusinessBranches: builder.query<
 			BranchOutput[],
 			{ businessId: string; accessToken?: string | null }
@@ -391,6 +429,8 @@ export const {
 	useListAllUserBranchesQuery,
 	useListBusinessEmployeesQuery,
 	useUpdateEmployeeRoleMutation,
+	useCreateEmployeeMutation,
+	useDeleteEmployeeMutation,
 	useCreateBranchMutation,
 	useListBusinessBranchesQuery,
 	useGetBranchQuery,
