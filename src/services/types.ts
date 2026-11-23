@@ -112,14 +112,23 @@ export type BusinessCreateRequest = {
 	tin_number: string;
 };
 
-/** OpenAPI `BusinessOutputSchema` */
+/** OpenAPI `BusinessOutputSchema` — list items may include enrich fields */
 export type BusinessOutput = {
 	id: UUID;
 	name: string;
-	tin_number: string;
+	tin_number: string | null;
 	owner_id: UUID;
 	is_active: boolean;
 	is_archived: boolean;
+	owner_name?: string | null;
+	owner_phone?: string | null;
+	plan_name?: string | null;
+	subscription_status?: string | null;
+	subscription_type?: string | null;
+	remaining_credits?: number | null;
+	is_unlimited?: boolean | null;
+	subscription_started_at?: string | null;
+	created_at?: string | null;
 };
 
 /** OpenAPI `PaginatedBusinessResponse` — `GET /api/v1/business` */
