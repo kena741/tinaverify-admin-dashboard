@@ -1,8 +1,19 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useDeferredValue, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { format, parseISO } from "date-fns";
+import {
+	ArrowDownIcon,
+	ArrowUpDownIcon,
+	ArrowUpIcon,
+	SlidersHorizontalIcon,
+	XIcon,
+} from "lucide-react";
+import type {
+	CreditUsageSortBy,
+	CreditUsageSortDir,
+} from "@/services/analytics/analyticsApi";
 import {
 	Area,
 	AreaChart,
@@ -27,6 +38,7 @@ import {
 	type DashboardAnalyticsPreset,
 } from "@/lib/analytics";
 import { getDateRangeLabel } from "@/lib/filter-labels";
+import { PLAN_FILTER_ALL } from "@/lib/subscription-filters";
 import { cn } from "@/lib/utils";
 import {
 	useGetCreditUsageQuery,
@@ -34,6 +46,7 @@ import {
 	useGetPaymentVolume30dQuery,
 	useGetUserAcquisitionQuery,
 } from "@/services/analytics/analyticsApi";
+import { useListSubscriptionPlansQuery } from "@/services/subscription-plan/subscriptionPlanApi";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
@@ -82,8 +95,35 @@ const PRESET_OPTIONS: DashboardAnalyticsPreset[] = [
 const CREDIT_USAGE_LIMIT_OPTIONS = [5, 10, 20, 50, 100] as const;
 type CreditUsageLimit = (typeof CREDIT_USAGE_LIMIT_OPTIONS)[number];
 
+const CREDIT_USAGE_SORT_LABELS: Record<CreditUsageSortBy, string> = {
+	business_name: "Business",
+	credits_used: "Used",
+	credits_limit: "Limit",
+	available_credits: "Available",
+	usage_percentage: "Usage",
+};
+
 function isCreditUsageLimit(v: string): v is `${CreditUsageLimit}` {
 	return CREDIT_USAGE_LIMIT_OPTIONS.some((n) => String(n) === v);
+}
+
+function usageTone(pct: number): "critical" | "warn" | "ok" {
+	if (pct >= 90) return "critical";
+	if (pct >= 70) return "warn";
+	return "ok";
+}
+
+function parseOptionalNumber(raw: string): number | null {
+	const trimmed = raw.trim();
+	if (!trimmed) return null;
+	const n = Number(trimmed);
+	return Number.isFinite(n) ? n : null;
+}
+
+function isRangeInvalid(minRaw: string, maxRaw: string): boolean {
+	const min = parseOptionalNumber(minRaw);
+	const max = parseOptionalNumber(maxRaw);
+	return min != null && max != null && min > max;
 }
 
 const shareChartConfig = {
@@ -186,6 +226,20 @@ export default function DashboardPage() {
 	const [customStart, setCustomStart] = useState(defaultCustom.start);
 	const [customEnd, setCustomEnd] = useState(defaultCustom.end);
 	const [creditLimit, setCreditLimit] = useState<CreditUsageLimit>(10);
+	const [creditBusinessName, setCreditBusinessName] = useState("");
+	const [creditPlanId, setCreditPlanId] = useState(PLAN_FILTER_ALL);
+	const [creditMinUsage, setCreditMinUsage] = useState("");
+	const [creditMaxUsage, setCreditMaxUsage] = useState("");
+	const [creditMinUsed, setCreditMinUsed] = useState("");
+	const [creditMaxUsed, setCreditMaxUsed] = useState("");
+	const [creditMinLimit, setCreditMinLimit] = useState("");
+	const [creditMaxLimit, setCreditMaxLimit] = useState("");
+	const [creditFiltersOpen, setCreditFiltersOpen] = useState(false);
+	const [creditSortBy, setCreditSortBy] =
+		useState<CreditUsageSortBy>("usage_percentage");
+	const [creditSortDir, setCreditSortDir] =
+		useState<CreditUsageSortDir>("desc");
+	const deferredCreditBusinessName = useDeferredValue(creditBusinessName);
 	const todayMax = formatDateInputValue(new Date());
 
 	const {
@@ -211,6 +265,11 @@ export default function DashboardPage() {
 		customEnd: preset === "custom" ? customEnd : undefined,
 	});
 
+	const { data: subscriptionPlans } = useListSubscriptionPlansQuery(
+		undefined,
+		{ skip: !isSystemAdmin },
+	);
+
 	const rangeReady =
 		isSystemAdmin && customRangeValid && !!startDate && !!endDate;
 
@@ -235,11 +294,153 @@ export default function DashboardPage() {
 		isFetching: shareFetching,
 	} = useGetPayingShareQuery(undefined, { skip: !isSystemAdmin });
 
+	const creditUsageQuery = useMemo(() => {
+		const minUsage = parseOptionalNumber(creditMinUsage);
+		const maxUsage = parseOptionalNumber(creditMaxUsage);
+		const minUsed = parseOptionalNumber(creditMinUsed);
+		const maxUsed = parseOptionalNumber(creditMaxUsed);
+		const minLimit = parseOptionalNumber(creditMinLimit);
+		const maxLimit = parseOptionalNumber(creditMaxLimit);
+		return {
+			limit: creditLimit,
+			business_name: deferredCreditBusinessName.trim() || null,
+			plan_id: creditPlanId === PLAN_FILTER_ALL ? null : creditPlanId,
+			min_usage_percentage: minUsage,
+			max_usage_percentage: maxUsage,
+			min_credits_used: minUsed,
+			max_credits_used: maxUsed,
+			min_credits_limit: minLimit,
+			max_credits_limit: maxLimit,
+			sort_by: creditSortBy,
+			sort_dir: creditSortDir,
+		};
+	}, [
+		creditLimit,
+		deferredCreditBusinessName,
+		creditPlanId,
+		creditMinUsage,
+		creditMaxUsage,
+		creditMinUsed,
+		creditMaxUsed,
+		creditMinLimit,
+		creditMaxLimit,
+		creditSortBy,
+		creditSortDir,
+	]);
+
+	function toggleCreditSort(column: CreditUsageSortBy) {
+		if (creditSortBy === column) {
+			setCreditSortDir((d) => (d === "asc" ? "desc" : "asc"));
+			return;
+		}
+		setCreditSortBy(column);
+		setCreditSortDir(column === "business_name" ? "asc" : "desc");
+	}
+
+	const creditUsageRangeInvalid =
+		isRangeInvalid(creditMinUsage, creditMaxUsage) ||
+		isRangeInvalid(creditMinUsed, creditMaxUsed) ||
+		isRangeInvalid(creditMinLimit, creditMaxLimit);
+
+	const creditAdvancedActive =
+		Boolean(creditMinUsage.trim()) ||
+		Boolean(creditMaxUsage.trim()) ||
+		Boolean(creditMinUsed.trim()) ||
+		Boolean(creditMaxUsed.trim()) ||
+		Boolean(creditMinLimit.trim()) ||
+		Boolean(creditMaxLimit.trim());
+
+	const creditFiltersActive =
+		Boolean(deferredCreditBusinessName.trim()) ||
+		creditPlanId !== PLAN_FILTER_ALL ||
+		creditAdvancedActive;
+
+	const creditPlanLabel =
+		creditPlanId === PLAN_FILTER_ALL
+			? "All plans"
+			: (subscriptionPlans?.find((p) => p.id === creditPlanId)?.name ??
+				"Plan");
+
+	const creditSortLabel = CREDIT_USAGE_SORT_LABELS[creditSortBy];
+
+	const creditChips = useMemo(() => {
+		const chips: { key: string; label: string; clear: () => void }[] = [];
+		const name = deferredCreditBusinessName.trim();
+		if (name) {
+			chips.push({
+				key: "business",
+				label: `Business: ${name}`,
+				clear: () => setCreditBusinessName(""),
+			});
+		}
+		if (creditPlanId !== PLAN_FILTER_ALL) {
+			chips.push({
+				key: "plan",
+				label: `Plan: ${creditPlanLabel}`,
+				clear: () => setCreditPlanId(PLAN_FILTER_ALL),
+			});
+		}
+		if (creditMinUsage.trim() || creditMaxUsage.trim()) {
+			chips.push({
+				key: "usage",
+				label: `Usage %: ${creditMinUsage.trim() || "0"}–${creditMaxUsage.trim() || "∞"}`,
+				clear: () => {
+					setCreditMinUsage("");
+					setCreditMaxUsage("");
+				},
+			});
+		}
+		if (creditMinUsed.trim() || creditMaxUsed.trim()) {
+			chips.push({
+				key: "used",
+				label: `Used: ${creditMinUsed.trim() || "0"}–${creditMaxUsed.trim() || "∞"}`,
+				clear: () => {
+					setCreditMinUsed("");
+					setCreditMaxUsed("");
+				},
+			});
+		}
+		if (creditMinLimit.trim() || creditMaxLimit.trim()) {
+			chips.push({
+				key: "limit",
+				label: `Limit: ${creditMinLimit.trim() || "0"}–${creditMaxLimit.trim() || "∞"}`,
+				clear: () => {
+					setCreditMinLimit("");
+					setCreditMaxLimit("");
+				},
+			});
+		}
+		return chips;
+	}, [
+		deferredCreditBusinessName,
+		creditPlanId,
+		creditPlanLabel,
+		creditMinUsage,
+		creditMaxUsage,
+		creditMinUsed,
+		creditMaxUsed,
+		creditMinLimit,
+		creditMaxLimit,
+	]);
+
 	const {
 		data: creditUsage,
 		isLoading: creditLoading,
 		isFetching: creditFetching,
-	} = useGetCreditUsageQuery({ limit: creditLimit }, { skip: !isSystemAdmin });
+	} = useGetCreditUsageQuery(creditUsageQuery, {
+		skip: !isSystemAdmin || creditUsageRangeInvalid,
+	});
+
+	function clearCreditFilters() {
+		setCreditBusinessName("");
+		setCreditPlanId(PLAN_FILTER_ALL);
+		setCreditMinUsage("");
+		setCreditMaxUsage("");
+		setCreditMinUsed("");
+		setCreditMaxUsed("");
+		setCreditMinLimit("");
+		setCreditMaxLimit("");
+	}
 
 	const periodLabelText = periodLabel(preset, customStart, customEnd);
 	const hasSummary = Boolean(summary) && !error;
@@ -866,12 +1067,12 @@ export default function DashboardPage() {
 							<div className="flex flex-col gap-1">
 								<CardTitle>Top credit usage</CardTitle>
 								<CardDescription>
-									Active subscriptions ordered by highest credit usage
-									percentage.
+									Active subscriptions ranked by credit pressure — spot who is
+									closest to running out.
 								</CardDescription>
 							</div>
 							{isSystemAdmin ? (
-								<Field className="w-28 gap-1">
+								<Field className="w-28 shrink-0 gap-1">
 									<FieldLabel
 										htmlFor="credit-usage-limit"
 										className="text-[11px] text-muted-foreground"
@@ -907,69 +1108,354 @@ export default function DashboardPage() {
 								</Field>
 							) : null}
 						</div>
+
+						{isSystemAdmin ? (
+							<div className="mt-3 flex flex-col gap-3 border-t border-border pt-3">
+								<div className="flex flex-col gap-2 lg:flex-row lg:items-end">
+									<div className="grid min-w-0 flex-1 grid-cols-1 gap-2 sm:grid-cols-2">
+										<div className="flex flex-col gap-1.5">
+											<p className="text-[11px] font-medium text-muted-foreground">
+												Business
+											</p>
+											<Input
+												id="credit-filter-business"
+												type="search"
+												autoComplete="off"
+												spellCheck={false}
+												placeholder="Search business…"
+												aria-label="Filter by business name"
+												value={creditBusinessName}
+												onChange={(e) =>
+													setCreditBusinessName(e.target.value)
+												}
+												className={cn(
+													"h-9",
+													creditBusy && "opacity-80",
+												)}
+											/>
+										</div>
+										<div className="flex flex-col gap-1.5">
+											<p className="text-[11px] font-medium text-muted-foreground">
+												Plan
+											</p>
+											<Select
+												value={creditPlanId}
+												onValueChange={(v) => {
+													if (v != null && v !== "") setCreditPlanId(v);
+												}}
+											>
+												<SelectTrigger
+													aria-label="Filter by plan"
+													className="h-9 bg-background"
+												>
+													<span className="flex flex-1 truncate text-left text-sm">
+														{creditPlanLabel}
+													</span>
+												</SelectTrigger>
+												<SelectContent>
+													<SelectGroup>
+														<SelectItem value={PLAN_FILTER_ALL}>
+															All plans
+														</SelectItem>
+														{(subscriptionPlans ?? [])
+															.filter((p) => !p.is_archived)
+															.map((p) => (
+																<SelectItem key={p.id} value={p.id}>
+																	{p.name}
+																</SelectItem>
+															))}
+													</SelectGroup>
+												</SelectContent>
+											</Select>
+										</div>
+									</div>
+									<Button
+										type="button"
+										variant={
+											creditFiltersOpen || creditAdvancedActive
+												? "secondary"
+												: "outline"
+										}
+										size="sm"
+										className="h-9 shrink-0 gap-1.5"
+										aria-expanded={creditFiltersOpen}
+										aria-controls="credit-usage-filters"
+										onClick={() => setCreditFiltersOpen((o) => !o)}
+									>
+										<SlidersHorizontalIcon className="size-4" aria-hidden />
+										Advanced
+										{creditAdvancedActive ? (
+											<span className="rounded-full bg-foreground/10 px-1.5 text-[10px] font-semibold tabular-nums">
+												On
+											</span>
+										) : null}
+									</Button>
+								</div>
+
+								{creditFiltersOpen ? (
+									<div
+										id="credit-usage-filters"
+										className="grid grid-cols-1 gap-2 sm:grid-cols-3"
+									>
+										<CreditFilterRange
+											label="Usage %"
+											minId="credit-min-usage"
+											maxId="credit-max-usage"
+											minValue={creditMinUsage}
+											maxValue={creditMaxUsage}
+											onMinChange={setCreditMinUsage}
+											onMaxChange={setCreditMaxUsage}
+											invalid={isRangeInvalid(
+												creditMinUsage,
+												creditMaxUsage,
+											)}
+										/>
+										<CreditFilterRange
+											label="Credits used"
+											minId="credit-min-used"
+											maxId="credit-max-used"
+											minValue={creditMinUsed}
+											maxValue={creditMaxUsed}
+											onMinChange={setCreditMinUsed}
+											onMaxChange={setCreditMaxUsed}
+											invalid={isRangeInvalid(creditMinUsed, creditMaxUsed)}
+										/>
+										<CreditFilterRange
+											label="Credits limit"
+											minId="credit-min-limit"
+											maxId="credit-max-limit"
+											minValue={creditMinLimit}
+											maxValue={creditMaxLimit}
+											onMinChange={setCreditMinLimit}
+											onMaxChange={setCreditMaxLimit}
+											invalid={isRangeInvalid(
+												creditMinLimit,
+												creditMaxLimit,
+											)}
+										/>
+									</div>
+								) : null}
+
+								{creditUsageRangeInvalid ? (
+									<p className="text-[11px] text-destructive" role="alert">
+										Fix min/max ranges before applying
+									</p>
+								) : null}
+
+								{creditChips.length > 0 ? (
+									<ul
+										className="flex flex-wrap items-center gap-1.5"
+										aria-label="Active credit usage filters"
+									>
+										{creditChips.map((chip) => (
+											<li key={chip.key}>
+												<button
+													type="button"
+													onClick={chip.clear}
+													className="inline-flex h-7 max-w-full items-center gap-1 rounded-md border border-border px-2 text-[11px] font-medium text-foreground transition-colors duration-150 hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+													aria-label={`Remove filter ${chip.label}`}
+												>
+													<span className="min-w-0 truncate">
+														{chip.label}
+													</span>
+													<XIcon
+														className="size-3 shrink-0 opacity-50"
+														aria-hidden
+													/>
+												</button>
+											</li>
+										))}
+										<li>
+											<Button
+												type="button"
+												variant="ghost"
+												size="sm"
+												className="h-7 px-2 text-[11px]"
+												onClick={clearCreditFilters}
+											>
+												Clear all
+											</Button>
+										</li>
+									</ul>
+								) : null}
+							</div>
+						) : null}
 					</CardHeader>
 					<CardContent className="pt-4">
 						{creditBusy && creditRows.length === 0 ? (
-							<div className="flex flex-col gap-2">
-								<Skeleton className="h-10 w-full" />
-								<Skeleton className="h-10 w-full" />
-								<Skeleton className="h-10 w-full" />
+							<div className="flex flex-col gap-2" aria-busy="true">
+								<Skeleton className="h-11 w-full" />
+								<Skeleton className="h-11 w-full" />
+								<Skeleton className="h-11 w-full" />
+								<Skeleton className="h-11 w-full" />
 							</div>
 						) : creditRows.length === 0 ? (
-							<ChartEmpty
-								title="No credit usage yet"
-								body="Businesses with active subscriptions and credit usage will list here."
-							/>
+							<div className="flex flex-col items-start gap-3 py-10">
+								<div className="flex flex-col gap-1">
+									<p className="text-sm font-medium text-foreground">
+										{creditFiltersActive
+											? "No businesses match"
+											: "No credit usage yet"}
+									</p>
+									<p className="max-w-md text-pretty text-sm text-muted-foreground">
+										{creditFiltersActive
+											? "Widen filters or clear them to see who is burning credits fastest."
+											: "Businesses with active subscriptions and credit usage will list here."}
+									</p>
+								</div>
+								{creditFiltersActive ? (
+									<Button
+										type="button"
+										variant="outline"
+										size="sm"
+										onClick={clearCreditFilters}
+									>
+										Clear filters
+									</Button>
+								) : null}
+							</div>
 						) : (
-							<div className="overflow-x-auto rounded-md border border-border">
-								<Table>
-									<TableHeader>
-										<TableRow>
-											<TableHead>Business</TableHead>
-											<TableHead className="text-right">Used</TableHead>
-											<TableHead className="text-right">Limit</TableHead>
-											<TableHead className="text-right">Available</TableHead>
-											<TableHead className="text-right">Usage</TableHead>
-										</TableRow>
-									</TableHeader>
-									<TableBody>
-										{creditRows.map((row) => (
-											<TableRow
-												key={row.business_id}
-												className="cursor-pointer"
-												onClick={() =>
-													router.push(`/admin/business/${row.business_id}`)
-												}
-											>
-												<TableCell className="font-medium">
-													{row.business_name || row.business_id}
-												</TableCell>
-												<TableCell className="text-right tabular-nums">
-													{row.credits_used.toLocaleString()}
-												</TableCell>
-												<TableCell className="text-right tabular-nums">
-													{row.credits_limit.toLocaleString()}
-												</TableCell>
-												<TableCell className="text-right tabular-nums">
-													{row.available_credits.toLocaleString()}
-												</TableCell>
-												<TableCell className="text-right">
-													<Badge
-														variant={
-															row.usage_percentage >= 90
-																? "destructive"
-																: row.usage_percentage >= 70
-																	? "secondary"
-																	: "outline"
-														}
-													>
-														{Math.round(row.usage_percentage)}%
-													</Badge>
-												</TableCell>
+							<div className="flex flex-col gap-3">
+								<div
+									className={cn(
+										"overflow-x-auto rounded-md border border-border motion-safe:transition-opacity duration-150",
+										creditFetching && "opacity-70",
+									)}
+									aria-busy={creditFetching || undefined}
+								>
+									<Table>
+										<TableHeader>
+											<TableRow className="hover:bg-transparent">
+												<TableHead className="w-10 text-muted-foreground">
+													<span className="sr-only">Rank</span>#
+												</TableHead>
+												<CreditSortableHead
+													label="Business"
+													column="business_name"
+													sortBy={creditSortBy}
+													sortDir={creditSortDir}
+													onSort={toggleCreditSort}
+												/>
+												<CreditSortableHead
+													label="Used"
+													column="credits_used"
+													sortBy={creditSortBy}
+													sortDir={creditSortDir}
+													onSort={toggleCreditSort}
+													align="right"
+												/>
+												<CreditSortableHead
+													label="Limit"
+													column="credits_limit"
+													sortBy={creditSortBy}
+													sortDir={creditSortDir}
+													onSort={toggleCreditSort}
+													align="right"
+												/>
+												<CreditSortableHead
+													label="Available"
+													column="available_credits"
+													sortBy={creditSortBy}
+													sortDir={creditSortDir}
+													onSort={toggleCreditSort}
+													align="right"
+												/>
+												<CreditSortableHead
+													label="Usage"
+													column="usage_percentage"
+													sortBy={creditSortBy}
+													sortDir={creditSortDir}
+													onSort={toggleCreditSort}
+													align="right"
+												/>
 											</TableRow>
-										))}
-									</TableBody>
-								</Table>
+										</TableHeader>
+										<TableBody>
+											{creditRows.map((row, index) => {
+												const tone = usageTone(row.usage_percentage);
+												const pct = Math.min(
+													100,
+													Math.max(0, row.usage_percentage),
+												);
+												return (
+													<TableRow
+														key={row.business_id}
+														className="cursor-pointer motion-safe:transition-colors duration-150 hover:bg-muted/40 focus-visible:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+														tabIndex={0}
+														role="link"
+														aria-label={`Open ${row.business_name || "business"}, ${Math.round(row.usage_percentage)}% used`}
+														onClick={() =>
+															router.push(
+																`/admin/business/${row.business_id}`,
+															)
+														}
+														onKeyDown={(e) => {
+															if (e.key === "Enter" || e.key === " ") {
+																e.preventDefault();
+																router.push(
+																	`/admin/business/${row.business_id}`,
+																);
+															}
+														}}
+													>
+														<TableCell className="font-mono text-xs tabular-nums text-muted-foreground">
+															{index + 1}
+														</TableCell>
+														<TableCell className="font-medium text-foreground">
+															{row.business_name || row.business_id}
+														</TableCell>
+														<TableCell className="text-right font-mono text-sm tabular-nums text-muted-foreground">
+															{row.credits_used.toLocaleString()}
+														</TableCell>
+														<TableCell className="text-right font-mono text-sm tabular-nums text-muted-foreground">
+															{row.credits_limit.toLocaleString()}
+														</TableCell>
+														<TableCell className="text-right font-mono text-sm tabular-nums text-muted-foreground">
+															{row.available_credits.toLocaleString()}
+														</TableCell>
+														<TableCell className="text-right">
+															<div className="flex items-center justify-end gap-2.5">
+																<div
+																	className="hidden h-1.5 w-16 overflow-hidden rounded-full bg-muted sm:block"
+																	aria-hidden
+																>
+																	<div
+																		className={cn(
+																			"h-full rounded-full motion-safe:transition-[width] duration-200",
+																			tone === "critical" &&
+																				"bg-destructive",
+																			tone === "warn" &&
+																				"bg-chart-3",
+																			tone === "ok" &&
+																				"bg-chart-1",
+																		)}
+																		style={{ width: `${pct}%` }}
+																	/>
+																</div>
+																<Badge
+																	variant={
+																		tone === "critical"
+																			? "destructive"
+																			: tone === "warn"
+																				? "secondary"
+																				: "outline"
+																	}
+																>
+																	{Math.round(row.usage_percentage)}%
+																</Badge>
+															</div>
+														</TableCell>
+													</TableRow>
+												);
+											})}
+										</TableBody>
+									</Table>
+								</div>
+								<p className="font-mono text-[11px] tabular-nums text-muted-foreground">
+									{creditRows.length.toLocaleString()} of top{" "}
+									{creditLimit.toLocaleString()} · sorted by {creditSortLabel}{" "}
+									{creditSortDir === "asc" ? "↑" : "↓"}
+								</p>
 							</div>
 						)}
 					</CardContent>
@@ -1040,6 +1526,111 @@ function FootprintCell({
 			) : (
 				<span className="h-4" aria-hidden />
 			)}
+		</div>
+	);
+}
+
+function CreditSortableHead({
+	label,
+	column,
+	sortBy,
+	sortDir,
+	onSort,
+	align = "left",
+}: {
+	label: string;
+	column: CreditUsageSortBy;
+	sortBy: CreditUsageSortBy;
+	sortDir: CreditUsageSortDir;
+	onSort: (key: CreditUsageSortBy) => void;
+	align?: "left" | "right";
+}) {
+	const active = sortBy === column;
+	const Icon = !active
+		? ArrowUpDownIcon
+		: sortDir === "asc"
+			? ArrowUpIcon
+			: ArrowDownIcon;
+
+	return (
+		<TableHead className={align === "right" ? "text-right" : undefined}>
+			<button
+				type="button"
+				className={cn(
+					"inline-flex items-center gap-1 rounded-sm font-medium transition-colors duration-150 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+					align === "right" && "w-full justify-end",
+					active ? "text-foreground" : "text-muted-foreground",
+				)}
+				onClick={(e) => {
+					e.stopPropagation();
+					onSort(column);
+				}}
+				aria-label={`Sort by ${label}${active ? `, ${sortDir}ending` : ""}`}
+			>
+				{label}
+				<Icon className="size-3.5 shrink-0 opacity-70" aria-hidden />
+			</button>
+		</TableHead>
+	);
+}
+
+function CreditFilterRange({
+	label,
+	minId,
+	maxId,
+	minValue,
+	maxValue,
+	onMinChange,
+	onMaxChange,
+	invalid = false,
+}: {
+	label: string;
+	minId: string;
+	maxId: string;
+	minValue: string;
+	maxValue: string;
+	onMinChange: (value: string) => void;
+	onMaxChange: (value: string) => void;
+	invalid?: boolean;
+}) {
+	return (
+		<div className="flex flex-col gap-1.5">
+			<p className="text-[11px] font-medium text-muted-foreground">{label}</p>
+			<div className="flex items-center gap-2">
+				<Input
+					id={minId}
+					type="number"
+					inputMode="decimal"
+					min={0}
+					placeholder="Min…"
+					aria-label={`${label} min`}
+					aria-invalid={invalid || undefined}
+					value={minValue}
+					onChange={(e) => onMinChange(e.target.value)}
+					className={cn(
+						"h-9 min-w-0 flex-1",
+						invalid && "border-destructive focus-visible:ring-destructive",
+					)}
+				/>
+				<span className="shrink-0 text-xs text-muted-foreground" aria-hidden>
+					–
+				</span>
+				<Input
+					id={maxId}
+					type="number"
+					inputMode="decimal"
+					min={0}
+					placeholder="Max…"
+					aria-label={`${label} max`}
+					aria-invalid={invalid || undefined}
+					value={maxValue}
+					onChange={(e) => onMaxChange(e.target.value)}
+					className={cn(
+						"h-9 min-w-0 flex-1",
+						invalid && "border-destructive focus-visible:ring-destructive",
+					)}
+				/>
+			</div>
 		</div>
 	);
 }
